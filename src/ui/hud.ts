@@ -31,6 +31,11 @@ export class Hud {
   /** M2 side buttons (hidden until there is a squad / a match pitch). */
   readonly squadBtn: HTMLButtonElement;
   readonly leagueBtn: HTMLButtonElement;
+  private readonly sideL: HTMLDivElement;
+  private readonly sideR: HTMLDivElement;
+  private readonly buttons = new Map<string, { btn: HTMLButtonElement; badge: HTMLElement; sub: HTMLElement; state: string }>();
+  private readonly ticketBox: HTMLDivElement;
+  private readonly ticketText: HTMLSpanElement;
   private shownCash = 0;
   private targetCash = 0;
   private hintMethod: InputMethod | null = null;
@@ -54,9 +59,13 @@ export class Hud {
     this.starText = el('span', 'starbar-text', track);
 
     const tr = el('div', 'hud-tr', this.root);
-    this.cashBox = el('div', 'cash', tr);
+    const row = el('div', 'tr-row', tr);
+    this.ticketBox = el('div', 'tickets hidden', row);
+    this.cashBox = el('div', 'cash', row);
     el('span', 'cash-icon', this.cashBox, icon('cash'));
     this.cashText = el('span', 'cash-text', this.cashBox, '$0');
+    el('span', 'ticket-icon', this.ticketBox, icon('ticket'));
+    this.ticketText = el('span', 'ticket-text', this.ticketBox, '0');
 
     this.objPill = el('div', 'objective hidden', this.root);
     this.objIcon = el('span', 'obj-icon', this.objPill);
@@ -66,6 +75,8 @@ export class Hud {
     this.toasts = el('div', 'toasts', this.root);
     this.edge = el('div', 'edge-arrow hidden', this.root, icon('arrow'));
     const side = el('div', 'hud-side', this.root);
+    this.sideL = side;
+    this.sideR = el('div', 'hud-side right', this.root);
     this.squadBtn = el('button', 'btn-side hidden', side, `${icon('shirt')}<span>${t('hud.squad')}</span>`);
     this.leagueBtn = el('button', 'btn-side hidden', side, `${icon('trophy')}<span>${t('hud.league')}</span>`);
     this.squadBtn.setAttribute('aria-label', t('hud.squad'));
@@ -95,6 +106,40 @@ export class Hud {
     this.starFill.style.width = `${Math.min(100, (stars / Math.max(1, total)) * 100)}%`;
     const txt = t('hud.stars', { stars, total });
     if (this.starText.textContent !== txt) this.starText.textContent = txt;
+  }
+
+  /** A side button (left or right column) with an optional red badge and a small sub line (e.g. a timer). */
+  button(id: string, side: 'left' | 'right', iconId: string, label: string, onClick: () => void): HTMLButtonElement {
+    const btn = el('button', 'btn-side hidden', side === 'left' ? this.sideL : this.sideR, `${icon(iconId)}<span class="bs-label">${label}</span>`);
+    btn.setAttribute('aria-label', label);
+    const badge = el('i', 'bs-badge hidden', btn);
+    const sub = el('small', 'bs-sub hidden', btn);
+    btn.addEventListener('click', onClick);
+    this.buttons.set(id, { btn, badge, sub, state: '' });
+    return btn;
+  }
+
+  /** Updates a side button only when something changed (called every frame). */
+  setButton(id: string, visible: boolean, badge: string | null = null, sub: string | null = null): void {
+    const b = this.buttons.get(id);
+    if (!b) return;
+    const key = `${visible}|${badge}|${sub}`;
+    if (b.state === key) return;
+    b.state = key;
+    b.btn.classList.toggle('hidden', !visible);
+    b.badge.classList.toggle('hidden', badge === null);
+    if (badge !== null) b.badge.textContent = badge;
+    b.sub.classList.toggle('hidden', sub === null);
+    if (sub !== null) b.sub.textContent = sub;
+  }
+
+  setTickets(n: number, visible: boolean): void {
+    this.ticketBox.classList.toggle('hidden', !visible);
+    const s = String(n);
+    if (this.ticketText.textContent !== s) {
+      this.ticketText.textContent = s;
+      bounce(this.ticketBox);
+    }
   }
 
   setSideButtons(squad: boolean, league: boolean): void {

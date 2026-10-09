@@ -265,7 +265,7 @@ export class MatchDirector {
     this.ball.y = 0.15;
     this.ball.k = 1;
     this.holdPitch();
-    this.ui.flash(t('match.kickoff_vs', { team: this.script?.opponent.name ?? '' }), 'info');
+    this.ui.flash(t(this.script?.cup ? 'cup.kickoff_vs' : 'match.kickoff_vs', { team: this.script?.opponent.name ?? '' }), 'info');
     this.audio.play('whistle');
     this.setPhase('intro');
   }

@@ -81,6 +81,8 @@ export interface Trainee extends Agent {
   reps: number;
   totalReps: number;
   waitT: number;
+  /** Found by a scout (or the day-7 reward): shown with a star. */
+  scouted?: boolean;
 }
 
 /** A promoted graduate in the Academy Squad (M2). */
@@ -130,6 +132,39 @@ export interface Records {
 }
 
 /** ball_boy walks crate → baskets; the others work from a fixed spot (desk, drill side, office safe). */
+export type QuestKind = 'sign' | 'reps' | 'win' | 'sell' | 'upgrade' | 'graduate' | 'collect';
+
+export interface Quest {
+  id: string;
+  kind: QuestKind;
+  target: number;
+  progress: number;
+  cash: number;
+  tickets: number;
+  claimed: boolean;
+}
+
+export type ScoutTier = 'local' | 'regional' | 'global';
+
+/** A scouted player waiting to arrive on the next bus. */
+export interface Prospect {
+  rarity: Rarity;
+  position: Position;
+}
+
+/** Retention / meta state (M4). Wall-clock times are epoch ms; days are local YYYY-MM-DD keys. */
+export interface MetaState {
+  daily: { claims: number; lastDay: string };
+  quests: { day: string; list: Quest[] };
+  scout: { tier: ScoutTier | null; startedAt: number; endsAt: number };
+  cupDay: string;
+  album: Record<string, number>;
+  albumClaimed: number;
+  accountPrompted: boolean;
+  /** Recent income ($/s, EMA) for offline earnings. */
+  incomeRate: number;
+}
+
 export type StaffKind = 'ball_boy' | 'receptionist' | 'assistant' | 'accountant';
 export type StaffState = 'idle' | 'toCrate' | 'loading' | 'toBasket' | 'unloading';
 
@@ -212,6 +247,10 @@ export interface SimState {
   records: Records;
   /** Manager's Office upgrade levels by id (data/upgrades.ts). */
   upgrades: Record<string, number>;
+  /** Scout Tickets (M4 currency). */
+  tickets: number;
+  prospects: Prospect[];
+  meta: MetaState;
 }
 
 export function makeAgent(x: number, z: number): Agent {

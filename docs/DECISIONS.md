@@ -92,3 +92,17 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Upgrade prices (sweep):** base ×5, growth 1.55–1.65.
     - **Result:** 22–27 s average gaps in minutes 6–10, all pads by ~6 min, ~26 upgrades spread to ~19:50, 6 matches in 20 min.
     - **Area 2:** the Gym teaser is now the "Training Ground · Area 2 · ★30 · Coming soon" sign.
+54. **M4 meta loop** (`sim/meta.ts`, save v5). Wall-clock features get `sim.now` / `sim.tz` from the host clock, so tests can skip time. "Day" means the player's **local** calendar day.
+    - **Unlock levels:** Daily Reward Lv 2, Quests Lv 4, Scouting Lv 5, Daily Cup Lv 6, Hall of Fame rewards Lv 7. The first 10 minutes stay about the academy, not menus.
+    - **Daily Reward:** a 7-day calendar (cash scales with level; day 7 = 5 tickets + a guaranteed Epic prospect). A missed day keeps the streak.
+    - **Quests:** 3 per local day, drawn from 7 kinds, with progress hooked into the sim.
+    - **Scout Tickets** are the meta currency. Scouting sends one scout at a time (Local 5 min / $400, Regional 30 min / 1 ticket, Global 8 h / 2 tickets). The prospect rides the next bus and is shown with a gold star card.
+    - **Daily Cup:** one extra tie a day against a stronger, rotating fictional XI. It doesn't touch the table or the league timer. A win pays ×5 cash + 3 tickets and fires `happytime()`.
+    - **Hall of Fame:** 16 slots (position × rarity) filled by graduates, with milestone rewards.
+    - **Level-up chests:** 1 ticket from Lv 2, cash from Lv 4. Cash from Lv 1 sped up the opening too much (sim).
+55. **Offline earnings and welcome back.**
+    - **Earnings:** only with a ball boy hired (an automated academy). They pay 50% of a 60 s income average for up to 2 h, and the Office "Night Shift" upgrade adds +2 h per level. The average skips the tick after load and after rewards, so rewards don't inflate it.
+    - **Welcome panel:** a single non-closable "Welcome back" panel bundles offline cash, today's daily reward and finished scouting. It shows on load for returning players and after ≥ 3 min hidden.
+    - **gameplayStart:** at boot the panel delays `gameplayStart()` until Collect. New players never see it, so §2 "no menu before gameplay" still holds for the first session.
+56. **Academy customisation deferred** (user request). The GDD §4.9 kit/colour cosmetics are not in M4. The day-7 reward that would have been a kit is 5 Scout Tickets.
+57. **Account nudge:** a guest is asked once to log in, after 5 min of play with ≥ 70% of the stars, and only if the SDK supports accounts. The game then calls `showAuthPrompt()`.

@@ -134,6 +134,46 @@ export const BALANCE = {
     powerSpeed: 1.1,
     powerTimeout: 3.5,
   },
+  /** M4 meta / retention systems (GDD §4.8–4.9, §5.3). */
+  meta: {
+    /** Academy level at which each feature unlocks. */
+    unlockLevel: { daily: 2, quests: 4, scout: 5, cup: 6, album: 7 },
+    /** Level-up chest: a Scout Ticket every level; cash = perLevel × level from `cashFromLevel` (keeps the opening pace). */
+    chest: { cashPerLevel: 30, cashFromLevel: 4, ticketsFromLevel: 2 },
+    /** 7-day calendar (cash is scaled by 1 + levelScale × (level − 1)); day 7: a guaranteed Epic prospect. */
+    daily: [
+      { cash: 300 },
+      { tickets: 1 },
+      { cash: 600 },
+      { tickets: 2 },
+      { cash: 1000 },
+      { tickets: 3 },
+      { prospect: 'epic' as Rarity, tickets: 5 },
+    ] as Array<{ cash?: number; tickets?: number; prospect?: Rarity }>,
+    dailyLevelScale: 0.5,
+    quests: { perDay: 3, levelScale: 0.5 },
+    /** Scout missions: duration (s), cost, and the rarity floor of the prospect found. */
+    scout: {
+      local: { sec: 300, cash: 400, tickets: 0, floor: 'common' as Rarity, wonderkid: 0.01 },
+      regional: { sec: 1800, cash: 0, tickets: 1, floor: 'rare' as Rarity, wonderkid: 0.03 },
+      global: { sec: 8 * 3600, cash: 0, tickets: 2, floor: 'epic' as Rarity, wonderkid: 0.15 },
+    },
+    /** Daily Cup: once per calendar day; opponent strength = division top + bonus; reward multipliers. */
+    cup: { strengthBonus: 6, cashMult: 5, tickets: 3 },
+    /** Hall of Fame milestones (distinct position × rarity slots) and rewards. */
+    album: [
+      { slots: 4, cash: 500, tickets: 2 },
+      { slots: 8, cash: 1500, tickets: 4 },
+      { slots: 12, cash: 4000, tickets: 6 },
+      { slots: 16, cash: 10000, tickets: 10 },
+    ],
+    /** Offline earnings: share of the recent income rate, base cap (s); the Office upgrade adds hours. */
+    offline: { share: 0.5, baseCapSec: 2 * 3600, minSec: 180 },
+    /** Income-rate EMA time constant (s) for offline earnings. */
+    incomeTau: 60,
+    /** Account prompt: share of Area 1 stars and play time before it may show (never forced). */
+    accountPrompt: { starShare: 0.7, minPlaySec: 300 },
+  },
   /** Effects of decor objects once built (multipliers, stack multiplicatively). */
   perks: {
     flags: { feeMult: 1.2 },

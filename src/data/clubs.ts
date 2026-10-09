@@ -86,3 +86,12 @@ export const BUYERS = [
   'Estrela Norte',
   'Hollen Rovers',
 ];
+
+/** Daily Cup opponents (one per day, rotating). */
+export const CUP_TEAMS = [
+  { id: 'cup_vale', name: 'Vale Cup XI', shirt: 0xffffff, shorts: 0x1d2433 },
+  { id: 'cup_harbour', name: 'Harbour Select', shirt: 0x0ea5e9, shorts: 0xffffff },
+  { id: 'cup_ridge', name: 'Ridge Academy', shirt: 0x7c3aed, shorts: 0xffd23f },
+  { id: 'cup_summit', name: 'Summit United', shirt: 0xef4444, shorts: 0xffffff },
+  { id: 'cup_meadow', name: 'Meadow Stars', shirt: 0x16a34a, shorts: 0x1d2433 },
+];

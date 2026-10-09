@@ -19,7 +19,8 @@ export type UpgradeId =
   | 'st:passing_wall'
   | 'st:sprint_track'
   | 'academy_matchday'
-  | 'academy_bus';
+  | 'academy_bus'
+  | 'academy_offline';
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -67,6 +68,8 @@ export const UPGRADES: UpgradeDef[] = [
   // Academy
   up('academy_matchday', 'academy', 'trophy', 4, 1300, 1.65, 0.25, { built: 'match_pitch' }),
   up('academy_bus', 'academy', 'shelter', 4, 1000, 1.65, 0.1),
+  // offline earnings cap: 2 h + 2 h per level (→ 8 h)
+  up('academy_offline', 'academy', 'clock', 3, 1500, 1.8, 7200),
 ];
 
 export const UPGRADE_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));

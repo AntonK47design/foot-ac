@@ -4,7 +4,7 @@ import { BALANCE } from './data/balance';
 import { BUILD, SAVE_VERSION } from './data/constants';
 import { analytics } from './core/analytics';
 import { RealClock } from './core/clock';
-import { resolveLocale, setLocale, t } from './core/i18n';
+import { formatCash, resolveLocale, setLocale, t } from './core/i18n';
 import { FixedLoop } from './core/loop';
 import { SaveManager } from './core/save';
 import { createPlatform, type Platform } from './platform/platform';
@@ -25,6 +25,9 @@ import { MatchUi } from './ui/match-ui';
 import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
 import { UPGRADES, type UpgradeDef } from './data/upgrades';
 import type { Position, Rarity, Stat } from './data/types';
+import * as Meta from './sim/meta';
+import type { ScoutTier } from './sim/state';
+import { AccountPanel, AlbumPanel, DailyPanel, QuestsPanel, ScoutPanel, WelcomePanel, hms, type DailyView, type RewardView } from './ui/meta-panels';
 
 declare global {
   interface Window {
@@ -54,6 +57,7 @@ async function boot(): Promise<void> {
   applyLocale();
 
   const sim = new Sim(loaded?.game ?? createInitialState(AREA1, newSeed()), AREA1);
+  sim.now = clock.now();
 
   // ── DOM layers: canvas → input layer → labels/popups → HUD → panels
   const gameEl = document.getElementById('game') as HTMLDivElement;
@@ -234,6 +238,8 @@ async function boot(): Promise<void> {
           return t('upfx.balls', { n: BALANCE.coach.carryCap + l * u.step });
         case 'ballboy_carry':
           return t('upfx.balls', { n: BALANCE.staff.ballBoy.carryCap + l * u.step });
+        case 'academy_offline':
+          return t('upfx.offline', { h: Math.round((BALANCE.meta.offline.baseCapSec + l * u.step) / 3600) });
         case 'coach_sign':
         case 'reception_speed':
         case 'academy_bus':
@@ -247,7 +253,7 @@ async function boot(): Promise<void> {
     if (lv >= u.maxLevel) return at(lv);
     // drills read "Lv 1 → Lv 2: …"; the rest "Standard → +7% speed"
     if (u.tab === 'stations') return `${t('upfx.lv', { lv: lv + 1 })} → ${at(lv + 1)}`;
-    const now = lv === 0 && u.id !== 'coach_carry' && u.id !== 'ballboy_carry' ? t('upfx.base') : at(lv);
+    const now = lv === 0 && u.id !== 'coach_carry' && u.id !== 'ballboy_carry' && u.id !== 'academy_offline' ? t('upfx.base') : at(lv);
     return `${now} → ${at(lv + 1)}`;
   };
   const requirement = (u: UpgradeDef): string | null => {
@@ -320,6 +326,7 @@ async function boot(): Promise<void> {
       done: () => {
         const r = sim.finishCurrentMatch();
         sim.state.flags.firstMatchPlayed = true;
+        if (r && script.cup && r.outcome === 'win') platform.happytime();
         const release = (): void => {
           view.endTrip();
           blockers.delete('match');
@@ -342,6 +349,7 @@ async function boot(): Promise<void> {
             promoted: r.promoted,
             champion: r.champion,
             divisionName: divisionName(sim.state.league.division),
+            cup: script.cup ? { tickets: r.outcome === 'win' ? BALANCE.meta.cup.tickets : 0 } : null,
           },
           release,
           () => {
@@ -358,6 +366,163 @@ async function boot(): Promise<void> {
   const updateHint = (): void => hud.showHint(hintDone ? null : input.lastMethod);
   input.onMethodChange(updateHint);
   updateHint();
+
+  // ── M4: daily reward, quests, scouting, Daily Cup, Hall of Fame, chests, offline earnings
+  const dailyPanel = new DailyPanel(gameEl, panelHooks);
+  const welcomePanel = new WelcomePanel(gameEl, panelHooks);
+  const questsPanel = new QuestsPanel(gameEl, panelHooks);
+  const scoutPanel = new ScoutPanel(gameEl, panelHooks);
+  const albumPanel = new AlbumPanel(gameEl, panelHooks);
+  const accountPanel = new AccountPanel(gameEl, panelHooks);
+  const rewardToast = (r: RewardView | null): void => {
+    if (!r) return;
+    hud.setCash(sim.state.cash);
+    const parts: string[] = [];
+    if (r.cash > 0) parts.push('+' + formatCash(r.cash));
+    if (r.tickets > 0) parts.push(t('toast.tickets', { n: r.tickets }));
+    if (r.prospect) parts.push(t('rarity.' + r.prospect.rarity));
+    if (parts.length) hud.toast(parts.join(' · '), 'gold', 2600);
+    audio.play('unlock');
+  };
+  const dailyView = (): DailyView => ({
+    days: [0, 1, 2, 3, 4, 5, 6].map((i) => Meta.dailyReward(sim.state, i)),
+    index: Meta.dailyIndex(sim.state),
+    available: Meta.dailyAvailable(sim.state, sim.now, sim.tz),
+    nextIn: Meta.msToMidnight(sim.now, sim.tz),
+  });
+  const openDaily = (): void => dailyPanel.open(dailyView(), () => rewardToast(sim.claimDaily()));
+  const questText = (kind: string, n: number): string => t('quest.' + kind, { n: kind === 'collect' ? formatCash(n) : n });
+  const openQuests = (): void => {
+    sim.updateMeta();
+    questsPanel.open(
+      () => sim.state.meta.quests.list.map((q) => ({ id: q.id, text: questText(q.kind, q.target), progress: q.progress, target: q.target, progressText: q.kind === 'collect' ? `${formatCash(Math.floor(q.progress))}/${formatCash(q.target)}` : `${Math.floor(q.progress)}/${q.target}`, reward: { cash: q.cash, tickets: q.tickets }, claimed: q.claimed })),
+      () => Meta.msToMidnight(sim.now, sim.tz),
+      (id) => rewardToast(sim.claimQuest(id)),
+    );
+  };
+  const duration = (sec: number): string => (sec >= 3600 ? t('scout.dur_h', { n: Math.round(sec / 3600) }) : t('scout.dur_m', { n: Math.round(sec / 60) }));
+  const TIERS: ScoutTier[] = ['local', 'regional', 'global'];
+  const openScout = (): void =>
+    scoutPanel.open(
+      () => {
+        const sc = sim.state.meta.scout;
+        return {
+          tiers: TIERS.map((tier) => {
+            const S = BALANCE.meta.scout[tier];
+            return { tier, name: t('scout.' + tier), duration: duration(S.sec), cost: Meta.scoutCost(tier), floor: S.floor, canStart: Meta.canScout(sim.state, tier) };
+          }),
+          active: sc.tier ? { name: t('scout.' + sc.tier), remaining: Math.max(0, sc.endsAt - sim.now), total: Math.max(1, sc.endsAt - sc.startedAt) } : null,
+          waiting: sim.state.prospects.length,
+        };
+      },
+      (tier) => {
+        if (sim.startScout(tier)) {
+          hud.setCash(sim.state.cash);
+          audio.play('unlock');
+        }
+      },
+    );
+  const openAlbum = (): void =>
+    albumPanel.open(
+      () => {
+        const next = BALANCE.meta.album[sim.state.meta.albumClaimed];
+        return {
+          cells: Object.entries(sim.state.meta.album).map(([k, count]) => {
+            const [position, rarity] = k.split(':') as [Position, Rarity];
+            return { position, rarity, count };
+          }),
+          slots: Meta.albumSlots(sim.state),
+          next: next ? { slots: next.slots, reward: { cash: next.cash, tickets: next.tickets } } : null,
+          canClaim: !!Meta.albumClaimable(sim.state),
+          lockedLevel: Meta.unlocked(sim.state, 'album') ? null : BALANCE.meta.unlockLevel.album,
+        };
+      },
+      () => rewardToast(sim.claimAlbum()),
+    );
+  hud.button('quests', 'left', 'scroll', t('hud.quests'), openQuests);
+  hud.button('album', 'left', 'trophy', t('hud.album'), openAlbum);
+  hud.button('daily', 'right', 'gift', t('hud.daily'), openDaily);
+  hud.button('scout', 'right', 'scout', t('hud.scout'), openScout);
+  hud.button('cup', 'right', 'whistle', t('hud.cup'), () => hud.toast(t('cup.hint')));
+
+  // scouting finds that land while a welcome panel is being built go into it instead of a toast
+  let scoutNote: string[] | null = null;
+  sim.events.on('scoutDone', (e) => {
+    const msg = t('scout.done', { rarity: t('rarity.' + e.rarity), pos: t('pos.' + e.position) });
+    if (scoutNote) scoutNote.push(msg);
+    else hud.toast(msg, 'gold', 3200);
+  });
+  sim.events.on('albumSlot', () => {
+    if (Meta.albumSlots(sim.state) > 1) hud.toast(t('album.new'), 'good');
+  });
+  sim.events.on('chest', (e) => {
+    const parts = [e.cash > 0 ? t('toast.chest_cash', { level: e.level, cash: formatCash(e.cash) }) : t('toast.chest', { level: e.level })];
+    if (e.tickets > 0) parts.push(t('toast.tickets', { n: e.tickets }));
+    window.setTimeout(() => {
+      hud.toast(parts.join(' · '), 'good', 2800);
+      for (const [f, lv] of Object.entries(BALANCE.meta.unlockLevel)) if (lv === e.level) hud.toast(t('toast.feature.' + f), 'gold', 3600);
+    }, 700);
+  });
+
+  /** Welcome back: offline earnings + today's daily reward + scout finds. Returns true when shown. */
+  const welcomeBack = (awaySec: number): boolean => {
+    scoutNote = [];
+    sim.now = clock.now();
+    sim.updateMeta();
+    const notes = scoutNote;
+    scoutNote = null;
+    const off = Meta.offlineEarnings(sim.state, awaySec);
+    const daily = Meta.dailyAvailable(sim.state, sim.now, sim.tz);
+    if (off.cash <= 0 && !daily && !notes.length) return false;
+    analytics.track('welcome_back', { awaySec: Math.round(awaySec), cash: off.cash });
+    welcomePanel.open(
+      { awaySec: awaySec >= BALANCE.meta.offline.minSec ? awaySec : 0, offlineCash: off.cash, capSec: awaySec > off.sec && off.cash > 0 ? off.sec : 0, daily: daily ? dailyView() : null, scoutDone: notes.length ? notes.join('<br>') : null },
+      () => {
+        sim.collectOffline(off.cash);
+        const d = daily ? sim.claimDaily() : null;
+        rewardToast({ cash: off.cash + (d?.cash ?? 0), tickets: d?.tickets ?? 0, prospect: d?.prospect ?? null });
+      },
+    );
+    return true;
+  };
+
+  // HUD badges and timers (4 Hz) + the one-time account nudge
+  let metaHudT = 0;
+  let accountT = 0;
+  const updateMetaHud = (dt: number): void => {
+    metaHudT -= dt;
+    if (metaHudT > 0) return;
+    metaHudT = 0.25;
+    const st = sim.state;
+    hud.setTickets(st.tickets, st.tickets > 0 || Meta.unlocked(st, 'daily'));
+    const qn = Meta.questsClaimable(st);
+    hud.setButton('quests', Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
+    hud.setButton('album', Meta.albumSlots(st) > 0, Meta.albumClaimable(st) ? '!' : null);
+    hud.setButton('daily', Meta.unlocked(st, 'daily'), Meta.dailyAvailable(st, sim.now, sim.tz) ? '!' : null);
+    const sc = st.meta.scout;
+    hud.setButton('scout', Meta.unlocked(st, 'scout'), !sc.tier && st.tickets > 0 ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
+    const cupOk = Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
+    hud.setButton('cup', cupOk, sim.cupAvailable() ? '!' : null, sim.cupAvailable() ? t('hud.cup_today') : hms(Meta.msToMidnight(sim.now, sim.tz)));
+    accountT -= 0.25;
+    if (accountT <= 0) {
+      accountT = 5;
+      if (
+        !st.meta.accountPrompted &&
+        blockers.size === 0 &&
+        saves.stats.playSec >= BALANCE.meta.accountPrompt.minPlaySec &&
+        st.stars >= sim.world.totalStars * BALANCE.meta.accountPrompt.starShare &&
+        platform.isAccountAvailable()
+      ) {
+        st.meta.accountPrompted = true;
+        void platform
+          .getUser()
+          .then((u) => {
+            if (!u && blockers.size === 0) accountPanel.open(() => void platform.showAuthPrompt().catch(() => null));
+          })
+          .catch(() => undefined);
+      }
+    }
+  };
 
   // ── sim → platform / analytics / save hooks
   sim.events.on('objectiveChanged', (e) => setObjective(e.objective));
@@ -422,6 +587,7 @@ async function boot(): Promise<void> {
         sim.input.x = 0;
         sim.input.z = 0;
       }
+      sim.now = clock.now();
       sim.tick(dt);
       if (!hintDone && sim.state.coach.moved > 2) {
         hintDone = true;
@@ -440,7 +606,7 @@ async function boot(): Promise<void> {
         started = true;
         // first controllable frame
         platform.loadingStop();
-        platform.gameplayStart();
+        if (!blockers.has('panel')) platform.gameplayStart();
         analytics.track('first_frame', { ms: Math.round(performance.now() - (window.__wkBootT0 ?? 0)) });
         document.getElementById('boot')?.remove();
         void import('./view/music').then((m) => m.startMusic(audio)).catch(() => undefined);
@@ -451,6 +617,7 @@ async function boot(): Promise<void> {
       }
       hud.setCash(sim.state.cash);
       hud.setStars(sim.state.stars, sim.world.totalStars);
+      updateMetaHud(frameDt);
       hud.setSideButtons(sim.state.squad.length > 0 || sim.state.records.promoted > 0, !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;
@@ -465,11 +632,15 @@ async function boot(): Promise<void> {
   } catch {
     /* compile is an optimisation only */
   }
+  // returning player: offline earnings + daily reward before the first controllable frame
+  if (loaded) welcomeBack(Math.max(0, (clock.now() - loaded.lastSeen) / 1000));
   loop.start();
 
   // ── visibility: pause sim + render when hidden, save immediately (iOS may kill the tab)
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      hiddenAt = clock.now();
       loop.stop();
       audio.setHidden(true);
       persist('hidden');
@@ -477,6 +648,9 @@ async function boot(): Promise<void> {
       audio.setHidden(false);
       watchdog.reset();
       if (!blockers.has('ctx')) loop.start();
+      const away = hiddenAt ? (clock.now() - hiddenAt) / 1000 : 0;
+      hiddenAt = 0;
+      if (away >= BALANCE.meta.offline.minSec && blockers.size === 0) welcomeBack(away);
     }
   });
   window.addEventListener('pagehide', () => persist('pagehide'));
@@ -504,7 +678,7 @@ async function boot(): Promise<void> {
   });
 
   if (TEST_HOOKS) {
-    window.__wk = { sim, platform, view, saves, clock, settings: () => settings, persist, loop, input };
+    window.__wk = { sim, platform, view, saves, clock, settings: () => settings, persist, loop, input, welcomeBack };
     const params = new URLSearchParams(location.search);
     if (params.get('debug') === '1') {
       void import('./ui/debug').then((m) => m.mountDebug({ sim, platform, view, clock, core, loop }));

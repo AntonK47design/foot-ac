@@ -33,6 +33,10 @@ export const ICONS: Record<string, string> = {
   whistle: svg('<circle cx="9" cy="14" r="6" fill="#FFD23F" stroke="#1d2433" stroke-width="1.6"/><path d="M12 9h9v4h-6" fill="#FFD23F" stroke="#1d2433" stroke-width="1.6" stroke-linejoin="round"/><circle cx="9" cy="14" r="2" fill="#1d2433"/>'),
   trophy: svg('<path d="M7 3h10v5a5 5 0 01-10 0z" fill="#FFC83D" stroke="#D9930F" stroke-width="1.4"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4" fill="none" stroke="#D9930F" stroke-width="1.6"/><path d="M10 13h4v4h-4z" fill="#D9930F"/><rect x="7" y="17" width="10" height="3.5" rx="1" fill="#2a2f3a"/>'),
   shirt: svg('<path d="M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.6-2 2.5-4 2.5S8.5 4.6 8 3z" fill="#2F6BFF" stroke="#1d2433" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 9h4" stroke="#FFD23F" stroke-width="2"/>'),
+  clock: svg('<circle cx="12" cy="12" r="9" fill="#fff" stroke="#2F6BFF" stroke-width="2.4"/><path d="M12 7v5l3.5 2" fill="none" stroke="#1d2433" stroke-width="2.2" stroke-linecap="round"/>'),
+  gift: svg('<rect x="3" y="9" width="18" height="12" rx="2" fill="#FF5A7A"/><rect x="2" y="7" width="20" height="4" rx="1.5" fill="#FF7E96"/><path d="M12 7v14" stroke="#FFD23F" stroke-width="3"/><path d="M12 7c-2-4-6-4-6-1.5S10 7 12 7zm0 0c2-4 6-4 6-1.5S14 7 12 7z" fill="none" stroke="#FFD23F" stroke-width="1.8"/>'),
+  scroll: svg('<rect x="5" y="3" width="14" height="18" rx="2" fill="#FFF3D6" stroke="#C98B4F" stroke-width="1.4"/><path d="M8 8l1.5 1.5L12 7M8 13l1.5 1.5L12 12M14 8.5h3M14 13.5h3M8 18h9" fill="none" stroke="#2F6BFF" stroke-width="1.6" stroke-linecap="round"/>'),
+  scout: svg('<circle cx="10" cy="10" r="6" fill="#DDEBFF" stroke="#1d2433" stroke-width="2.2"/><path d="M14.5 14.5L20 20" stroke="#1d2433" stroke-width="3" stroke-linecap="round"/><path d="M10 7l.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z" fill="#FFC83D"/>'),
   ticket: svg('<path d="M3 7h18v3a2 2 0 000 4v3H3v-3a2 2 0 000-4z" fill="#A35CFF"/>'),
 };
 

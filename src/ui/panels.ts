@@ -161,6 +161,8 @@ export interface ResultInfo {
   promoted: boolean;
   champion: boolean;
   divisionName: string;
+  /** Daily Cup tie: no points/table; a win pays Scout Tickets. */
+  cup?: { tickets: number } | null;
 }
 
 export class ResultsPanel extends Panel {
@@ -169,8 +171,10 @@ export class ResultsPanel extends Panel {
   }
 
   open(r: ResultInfo, onContinue: () => void, onTable: () => void): void {
-    this.title.textContent = t('results.title');
-    const season = r.seasonOver
+    this.title.textContent = r.cup ? t('cup.title') : t('results.title');
+    const season = r.cup
+      ? `<div class="season ${r.outcome === 'win' ? 'gold' : ''}">${r.outcome === 'win' ? t('cup.won') : t('cup.lost')}</div>`
+      : r.seasonOver
       ? `<div class="season ${r.champion ? 'gold' : ''}">${r.promoted ? t('results.promoted', { division: r.divisionName }) : r.champion ? t('results.champions') : t('results.season_over', { rank: t('rank.' + Math.min(r.rank, 6)) })}</div>`
       : '';
     this.body.innerHTML = `
@@ -179,7 +183,13 @@ export class ResultsPanel extends Panel {
       </div>
       <div class="outcome ${r.outcome}">${t('results.' + r.outcome)}</div>
       ${season}
-      <div class="rewards"><span>${icon('cash')}<b>+${formatCash(r.cash)}</b></span><span>${icon('star')}<b>${t('results.points', { n: r.points })}</b></span><span>${icon('trophy')}<b>${t('rank.' + Math.min(r.rank, 6))}</b></span></div>
+      <div class="rewards"><span>${icon('cash')}<b>+${formatCash(r.cash)}</b></span>${
+        r.cup
+          ? r.cup.tickets > 0
+            ? `<span>${icon('ticket')}<b>×${r.cup.tickets}</b></span>`
+            : ''
+          : `<span>${icon('star')}<b>${t('results.points', { n: r.points })}</b></span><span>${icon('trophy')}<b>${t('rank.' + Math.min(r.rank, 6))}</b></span>`
+      }</div>
       ${r.mvp ? `<div class="mvp"><div class="mvp-tag">${t('results.mvp')}</div>${cardHtml(r.mvp, 'small')}</div>` : ''}`;
     const row = document.createElement('div');
     row.className = 'choice-row';

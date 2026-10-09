@@ -34,6 +34,8 @@ export interface Chance {
 
 export interface MatchScript {
   opponent: TeamDef;
+  /** Daily Cup tie (no league table update). */
+  cup: boolean;
   division: number;
   lineup: MatchPlayer[];
   ourStrength: number;
@@ -110,11 +112,11 @@ function lineupFrom(squad: Player[], rng: Rng): MatchPlayer[] {
 }
 
 /** Builds the scripted highlight reel: 3–5 chances, outcomes pre-rolled except for Power Shots. */
-export function createMatch(rng: Rng, squad: Player[], league: League): MatchScript {
+export function createMatch(rng: Rng, squad: Player[], league: League, cupOpponent?: TeamDef): MatchScript {
   const M = BALANCE.match;
   const opps = opponentsOf(league.division);
   const pair = pairings(league.round % 5)[0] as [number, number];
-  const opponent = opps[pair[1] - 1] ?? (opps[0] as TeamDef);
+  const opponent = cupOpponent ?? opps[pair[1] - 1] ?? (opps[0] as TeamDef);
   const lineup = lineupFrom(squad, rng);
   const ourStrength = lineup.reduce((a, p) => a + p.ovr, 0) / lineup.length;
   const opp = opponent.strength;
@@ -148,7 +150,7 @@ export function createMatch(rng: Rng, squad: Player[], league: League): MatchScr
       chances.push({ side: 'them', shooter: si, passer: pi, power: false, base, roll: rng.next(), goal: null });
     }
   }
-  return { opponent, division: league.division, lineup, ourStrength, chances };
+  return { opponent, cup: !!cupOpponent, division: league.division, lineup, ourStrength, chances };
 }
 
 /** Resolves one chance. `quality` (0..1) is the Power Shot timing; ignored for normal chances. */
@@ -207,14 +209,14 @@ export function finishMatch(rng: Rng, m: MatchScript, league: League, squad: Pla
     } else theirGoals++;
   }
   const outcome: MatchOutcome = ourGoals > theirGoals ? 'win' : ourGoals === theirGoals ? 'draw' : 'loss';
-  // table: our fixture + the other two of the round
-  const opps = opponentsOf(league.division);
+  // table: our fixture + the other two of the round (a cup tie leaves the league alone)
+  const opps = m.cup ? [] : opponentsOf(league.division);
   const rowOf = (team: string): LeagueRow | undefined => league.table.find((r) => r.team === team);
-  const us = rowOf('us');
-  const them = rowOf(m.opponent.id);
+  const us = m.cup ? undefined : rowOf('us');
+  const them = m.cup ? undefined : rowOf(m.opponent.id);
   if (us) applyResult(us, ourGoals, theirGoals);
   if (them) applyResult(them, theirGoals, ourGoals);
-  for (const [a, b] of pairings(league.round % 5).slice(1)) {
+  for (const [a, b] of m.cup ? [] : pairings(league.round % 5).slice(1)) {
     const ta = opps[a - 1];
     const tb = opps[b - 1];
     if (!ta || !tb) continue;
@@ -224,7 +226,7 @@ export function finishMatch(rng: Rng, m: MatchScript, league: League, squad: Pla
     if (ra) applyResult(ra, ga, gb);
     if (rb) applyResult(rb, gb, ga);
   }
-  league.round++;
+  if (!m.cup) league.round++;
   // squad bookkeeping + MVP
   let mvp: MatchPlayer | null = null;
   let best = -1;
@@ -251,7 +253,7 @@ export function finishMatch(rng: Rng, m: MatchScript, league: League, squad: Pla
     }
   }
   const rank = sortedTable(league).findIndex((r) => r.team === 'us') + 1;
-  const seasonOver = league.round >= 5;
+  const seasonOver = !m.cup && league.round >= 5;
   const top = DIVISIONS.length - 1;
   const promoted = seasonOver && rank === 1 && league.division < top;
   const champion = seasonOver && rank === 1;
@@ -260,7 +262,7 @@ export function finishMatch(rng: Rng, m: MatchScript, league: League, squad: Pla
     ourGoals,
     theirGoals,
     outcome,
-    cash: Math.round(M.reward[outcome] * mult),
+    cash: Math.round(M.reward[outcome] * mult * (m.cup ? BALANCE.meta.cup.cashMult : 1)),
     points: M.points[outcome],
     xp: M.xp[outcome],
     mvp,

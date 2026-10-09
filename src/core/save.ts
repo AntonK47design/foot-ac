@@ -2,6 +2,7 @@ import { SAVE_BACKUP_KEY, SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import type { AreaDef } from '../data/types';
 import type { SimState } from '../sim/state';
 import { newLeague } from '../sim/match';
+import { newMeta } from '../sim/meta';
 import { DEFAULT_SETTINGS, type Settings } from '../ui/settings';
 
 export interface SaveStats {
@@ -46,6 +47,8 @@ export const MIGRATIONS: Record<number, Migration> = {
   2: (raw) => ({ ...raw, v: 3 }),
   // 3 → 4: M3 adds office upgrades and fixed-spot staff (defaults filled in normalize)
   3: (raw) => ({ ...raw, v: 4 }),
+  // 4 → 5: M4 adds Scout Tickets, prospects and the meta block (defaults filled in normalize)
+  4: (raw) => ({ ...raw, v: 5 }),
 };
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
@@ -93,6 +96,11 @@ export function normalize(blob: SaveBlob, area: AreaDef): SaveBlob {
   g.league = g.league && Array.isArray(g.league.table) ? g.league : newLeague(0, 1);
   g.matchNextAt = typeof g.matchNextAt === 'number' ? g.matchNextAt : 0;
   g.upgrades = g.upgrades && typeof g.upgrades === 'object' ? g.upgrades : {};
+  g.tickets = typeof g.tickets === 'number' ? g.tickets : 0;
+  g.prospects = Array.isArray(g.prospects) ? g.prospects : [];
+  const m = newMeta();
+  const gm = (g.meta ?? {}) as Partial<SimState['meta']>;
+  g.meta = { ...m, ...gm, daily: { ...m.daily, ...(gm.daily ?? {}) }, quests: { ...m.quests, ...(gm.quests ?? {}) }, scout: { ...m.scout, ...(gm.scout ?? {}) }, album: { ...(gm.album ?? {}) } };
   g.records = { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0, ...((g.records ?? {}) as Partial<SimState['records']>) };
   g.stats = { signed: 0, reps: 0, graduated: 0, unlocks: 0, ballsDelivered: 0, cashCollected: 0, ...((g.stats ?? {}) as Partial<SimState['stats']>) };
   for (const t of g.trainees) {

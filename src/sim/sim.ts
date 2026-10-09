@@ -14,6 +14,9 @@ import { BUYERS } from '../data/clubs';
 import { createMatch, finishMatch, newLeague, resolveChance, type MatchResult, type MatchScript } from './match';
 import type { Player } from './state';
 import type { Rarity } from '../data/types';
+import { CUP_TEAMS, DIVISIONS, type TeamDef } from '../data/clubs';
+import * as Meta from './meta';
+import type { ScoutTier } from './state';
 import { UPGRADES, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades';
 
 export interface SimEvents {
@@ -39,6 +42,13 @@ export interface SimEvents {
   matchFinished: { result: MatchResult };
   divisionUp: { division: number };
   upgraded: { id: string; level: number };
+  /** Level-up chest (granted immediately). */
+  chest: { level: number; cash: number; tickets: number };
+  /** A scout mission finished: the prospect arrives on the next bus. */
+  scoutDone: { rarity: Rarity; position: string };
+  /** A graduate filled an empty Hall of Fame slot. */
+  albumSlot: { key: string };
+  questsRefreshed: Record<string, never>;
   /** The accountant moved cash from a pile into the office safe (for a coin arc). */
   cashToSafe: { pileId: string; amount: number };
   staffHired: { id: string };
@@ -113,6 +123,9 @@ export function createInitialState(area: AreaDef = AREA1, seed = 12345): SimStat
     matchNextAt: 0,
     records: { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0 },
     upgrades: {},
+    tickets: 0,
+    prospects: [],
+    meta: Meta.newMeta(),
   };
 }
 
@@ -136,6 +149,12 @@ export class Sim {
   /** Graduate shown by the last office prompt (a new one re-opens it while the coach stays at the computer). */
   private promptedGrad = 0;
   private dismissedAt = 0;
+  /** Earnings at the previous tick for the income EMA; -1 = skip one tick (load, rewards). */
+  private earnedPrev = -1;
+  private metaT = 0;
+  /** Wall-clock time (epoch ms) and timezone offset, set by the host each frame (tests use fixed values). */
+  now = 0;
+  tz: number | undefined = undefined;
   /** The match being played (between startMatch and finishCurrentMatch). */
   match: MatchScript | null = null;
   private readonly rng: Rng;
@@ -156,6 +175,7 @@ export class Sim {
   /** Swaps in a different state (auth change, reset). */
   loadState(state: SimState): void {
     this.state = state;
+    this.earnedPrev = -1;
     this.rng.state = state.rng;
     this.objective = null;
     this.rebuildWorld();
@@ -363,6 +383,8 @@ export class Sim {
     while (s.level < lvl) {
       s.level++;
       this.events.emit('levelUp', { level: s.level });
+      const r = Meta.grantChest(s, s.level);
+      this.events.emit('chest', { level: s.level, cash: r.cash, tickets: r.tickets });
     }
   }
 
@@ -456,6 +478,13 @@ export class Sim {
     this.updateStations();
     this.updateStaff(dt);
     this.updateAccountant(dt);
+    if (this.earnedPrev >= 0) Meta.trackIncome(s.meta, s.earned - this.earnedPrev, dt);
+    this.earnedPrev = s.earned;
+    this.metaT -= dt;
+    if (this.metaT <= 0) {
+      this.metaT = 1;
+      this.updateMeta();
+    }
     this.updatePodium(dt);
     this.updatePrompts();
     s.rng = this.rng.state;
@@ -523,6 +552,7 @@ export class Sim {
       this.addCash(amount);
       s.stats.cashCollected += amount;
       s.flags.firstCash = true;
+      Meta.questProgress(s, 'collect', amount);
       this.events.emit('cashCollected', { pileId: p.id, amount, x: p.x, z: p.z });
       if (p.id.startsWith('starter')) s.piles.splice(i, 1);
     }
@@ -665,6 +695,7 @@ export class Sim {
     s.cash -= cost;
     s.upgrades[id] = this.upLevel(id) + 1;
     s.stats.unlocks++;
+    Meta.questProgress(s, 'upgrade');
     this.addXp(BALANCE.xp.perUpgrade);
     this.events.emit('upgraded', { id, level: s.upgrades[id] as number });
     this.events.emit('saveNeeded', { reason: 'upgrade' });
@@ -805,6 +836,7 @@ export class Sim {
     if (p) p.amount += fee;
     s.stats.signed++;
     s.flags.firstSign = true;
+    Meta.questProgress(s, 'sign');
     t.waitT = 0;
     this.addXp(BALANCE.xp.perSign);
     this.events.emit('signed', { id: t.id, fee });
@@ -923,7 +955,16 @@ export class Sim {
     if (seat < 0) return undefined;
     const door = this.area.gate.door;
     const first = !s.flags.firstTraineeSpawned;
-    const t = createTrainee(this.rng, s.nextId++, door.x, door.z, first ? { name: BALANCE.tutorial.firstTraineeName, rarity: 'rare', position: 'FW', female: false } : {});
+    // scouted prospects (scout missions, day-7 reward) ride the next bus
+    const pro = first ? undefined : s.prospects.shift();
+    const t = createTrainee(
+      this.rng,
+      s.nextId++,
+      door.x,
+      door.z,
+      first ? { name: BALANCE.tutorial.firstTraineeName, rarity: 'rare', position: 'FW', female: false } : pro ? { rarity: pro.rarity, position: pro.position } : {},
+    );
+    if (pro) t.scouted = true;
     s.flags.firstTraineeSpawned = true;
     t.seat = seat;
     t.arrivalOrder = ++s.arrivalCounter;
@@ -1061,6 +1102,7 @@ export class Sim {
     t.totalReps++;
     s.stats.reps++;
     s.flags.firstRep = true;
+    Meta.questProgress(s, 'reps');
     this.events.emit('rep', { traineeId: t.id, stationId: t.stationId, stat: st.stat, gain, cash });
     if (t.reps < BALANCE.trainee.repsPerVisit) return;
     // visit finished: free the lane
@@ -1093,6 +1135,8 @@ export class Sim {
     s.stats.graduated++;
     this.addXp(BALANCE.xp.perGraduation);
     t.stationId = null;
+    Meta.questProgress(s, 'graduate');
+    if (Meta.albumAdd(s, t.position, t.rarity)) this.events.emit('albumSlot', { key: Meta.albumKey(t.position, t.rarity) });
     this.events.emit('graduated', { id: t.id });
     if (s.podiumQueue.length >= this.area.office.seats.length) {
       // office bench full: the club's scouts take the graduate at the standard fee (never blocks training)
@@ -1196,6 +1240,7 @@ export class Sim {
     const prev = s.records.bestSale;
     this.addCash(price);
     s.records.sold++;
+    Meta.questProgress(s, 'sell');
     s.records.bestSale = Math.max(prev, price);
     if (fromPodium) s.podiumQueue = s.podiumQueue.filter((id) => id !== t.id);
     t.state = 'leaving';
@@ -1270,7 +1315,70 @@ export class Sim {
 
   matchAvailable(): boolean {
     const s = this.state;
-    return !!s.built[this.area.matchPitch.objectId] && s.time >= s.matchNextAt && !this.match;
+    return !!s.built[this.area.matchPitch.objectId] && (s.time >= s.matchNextAt || this.cupAvailable()) && !this.match;
+  }
+
+  // ───────────────────────────── meta (M4): daily, quests, scouting, album ─────────────────────────────
+
+  /** Once a second: new quests at local midnight, finished scout missions. */
+  updateMeta(): void {
+    const s = this.state;
+    if (Meta.refreshQuests(s, this.now, this.rng, this.tz)) this.events.emit('questsRefreshed', EMPTY);
+    const p = Meta.updateScout(s, this.now, this.rng);
+    if (p) {
+      this.events.emit('scoutDone', { rarity: p.rarity, position: p.position });
+      this.events.emit('saveNeeded', { reason: 'scout' });
+    }
+  }
+
+  /** Pays what the staff earned while the player was away (computed by the host from the save's lastSeen). */
+  collectOffline(cash: number): void {
+    if (cash <= 0) return;
+    this.addCash(cash);
+    this.earnedPrev = -1; // not counted as live income
+    this.events.emit('saveNeeded', { reason: 'offline' });
+  }
+
+  claimDaily(): Meta.Reward | null {
+    const r = Meta.claimDaily(this.state, this.now, this.rng, this.tz);
+    this.earnedPrev = -1;
+    if (r) this.events.emit('saveNeeded', { reason: 'daily' });
+    return r;
+  }
+
+  claimQuest(id: string): Meta.Reward | null {
+    const r = Meta.claimQuest(this.state, id);
+    this.earnedPrev = -1;
+    if (r) this.events.emit('saveNeeded', { reason: 'quest' });
+    return r;
+  }
+
+  startScout(tier: ScoutTier): boolean {
+    const ok = Meta.startScout(this.state, tier, this.now);
+    if (ok) this.events.emit('saveNeeded', { reason: 'scout' });
+    return ok;
+  }
+
+  claimAlbum(): Meta.Reward | null {
+    const r = Meta.claimAlbum(this.state);
+    this.earnedPrev = -1;
+    if (r) this.events.emit('saveNeeded', { reason: 'album' });
+    return r;
+  }
+
+  /** Today's Daily Cup tie is waiting (played instead of the next league match, no timer). */
+  cupAvailable(): boolean {
+    return !!this.state.built[this.area.matchPitch.objectId] && Meta.cupAvailable(this.state, this.now, this.tz);
+  }
+
+  /** Today's cup opponent: rotates daily, stronger than the current division's best. */
+  cupOpponent(): TeamDef {
+    const day = Meta.dayKey(this.now, this.tz);
+    let h = 0;
+    for (const ch of day) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const base = CUP_TEAMS[h % CUP_TEAMS.length] ?? CUP_TEAMS[0];
+    const divTop = Math.max(...(DIVISIONS[this.state.league.division]?.teams ?? []).map((t) => t.strength));
+    return { id: base?.id ?? 'cup', name: base?.name ?? 'Cup XI', shirt: base?.shirt ?? 0xffffff, shorts: base?.shorts ?? 0x1d2433, strength: divTop + BALANCE.meta.cup.strengthBonus };
   }
 
   /** Seconds until the next match (0 when available; Infinity without a pitch). */
@@ -1283,7 +1391,7 @@ export class Sim {
   /** Creates the highlight script. The caller pauses the sim while the match plays. */
   startMatch(): MatchScript {
     this.prompt = null;
-    this.match = createMatch(this.rng, this.state.squad, this.state.league);
+    this.match = createMatch(this.rng, this.state.squad, this.state.league, this.cupAvailable() ? this.cupOpponent() : undefined);
     this.state.rng = this.rng.state;
     return this.match;
   }
@@ -1303,9 +1411,16 @@ export class Sim {
     this.addCash(r.cash);
     this.addXp(r.xp);
     s.records.matches++;
-    if (r.outcome === 'win') s.records.wins++;
+    if (r.outcome === 'win') {
+      s.records.wins++;
+      Meta.questProgress(s, 'win');
+    }
     s.records.goals += r.ourGoals;
-    s.matchNextAt = s.time + BALANCE.match.interval;
+    if (m.cup) {
+      // the cup doesn't reset the league timer; a win adds Scout Tickets
+      s.meta.cupDay = Meta.dayKey(this.now, this.tz);
+      if (r.outcome === 'win') s.tickets += BALANCE.meta.cup.tickets;
+    } else s.matchNextAt = s.time + BALANCE.match.interval;
     if (r.seasonOver) {
       if (r.champion) s.records.titles++;
       const div = r.promoted ? s.league.division + 1 : s.league.division;

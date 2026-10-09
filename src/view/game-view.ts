@@ -719,7 +719,7 @@ export class GameView {
       const ko = sim.area.matchPitch.kickoff;
       const cd = Math.ceil(sim.matchCountdown());
       const html = ready
-        ? `<div class="kick-sign ready">${icon('trophy')}<b>${t('match.kickoff')}</b></div>`
+        ? `<div class="kick-sign ready${sim.cupAvailable() ? ' cup' : ''}">${icon('trophy')}<b>${sim.cupAvailable() ? t('cup.kickoff') : t('match.kickoff')}</b></div>`
         : `<div class="kick-sign">${icon('trophy')}<span>${t('match.next_in', { time: `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}` })}</span></div>`;
       this.labels.place('kickoff', ko.x, 1.3, ko.z, '', html);
       this.drawSquad(dt, frameId, ballAt);
@@ -930,7 +930,7 @@ export class GameView {
         `<div class="card grad top"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span><span class="val">${formatCash(sim.transferValue(tr))}</span></div>`,
       );
     } else if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
-      this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
+      this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card${tr.scouted ? ' scouted' : ''}">${tr.scouted ? icon('star') : ''}<span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble need">${icon('ball')}<span class="emo">😟</span></div>`);
     } else if (tr.state === 'changing') {
