@@ -104,7 +104,7 @@ export async function runShowcase(root: HTMLElement): Promise<void> {
   const nextKid = (): CharacterKey => kids[kidI++ % kids.length] as CharacterKey;
   const add = (key: CharacterKey, kit: Kit, x: number, z: number, ry: number, anim: CharAnim, scale: number, extra: Partial<Actor> = {}): Actor => {
     const c = new Character(assets, key, kit, scale);
-    c.root.position.set(x, 0, z);
+    c.root.position.set(x, anim === 'sit' ? 0.47 : 0, z);
     c.root.rotation.y = ry;
     c.play(anim, 0);
     c.seek((x * 7 + z * 3) % 1.5);

@@ -50,6 +50,8 @@ const MAX_BALLS = 260;
 const MAX_BILLS = 420;
 const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
+/** Root lift while sitting so the hips rest on the bench seat (bench top 0.53 m, sit-clip hips ≈ 0.05 m). */
+const SIT_LIFT = 0.47;
 const ADULT_SCALE = 1.85;
 const HEAD_Y = 1.45;
 const RARITY_CLS: Record<Rarity, string> = { common: 'r-common', rare: 'r-rare', epic: 'r-epic', wonderkid: 'r-wonderkid' };
@@ -86,6 +88,8 @@ interface Actor {
   yaw: number;
   lastRep: number;
   seen: number;
+  /** Current lift (m): the sit clip puts the hips at floor level, benches are ~0.5 m high. */
+  y?: number;
 }
 
 const dummy = new Object3D();
@@ -784,7 +788,9 @@ export class GameView {
       anim = tr.state === 'leaving' ? 'run' : 'walk';
     }
     a.yaw = lerpAngle(a.yaw, yaw, 1 - Math.exp(-dt * 14));
-    a.c.root.position.set(x, 0, z);
+    const ly = anim === 'sit' ? SIT_LIFT : 0;
+    a.y = (a.y ?? ly) + (ly - (a.y ?? ly)) * (1 - Math.exp(-dt * 12));
+    a.c.root.position.set(x, a.y, z);
     a.c.root.rotation.y = a.yaw + YAW_OFFSET;
     a.c.play(anim, 0.18, animSpeed);
     // label
