@@ -81,6 +81,12 @@ export const BALANCE = {
   } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number }>,
   staff: {
     ballBoy: { speed: 3.8, carryCap: 6, refillBelow: 0.75 },
+    /** Receptionist signs on their own at this multiple of the coach's sign time. */
+    receptionist: { signTimeMult: 1.6 },
+    /** An Assistant Coach at a drill: rep time multiplier. */
+    assistant: { repTimeMult: 0.8 },
+    /** Accountant moves this much cash per second from every pile into the office safe. */
+    accountant: { ratePerSec: 12, minPile: 2 },
   },
   /** Graduation podium and transfers (M2). Value = base × (OVR / ovrRef)^exp × rarity, rounded to 5. */
   transfer: {
@@ -90,6 +96,8 @@ export const BALANCE = {
     rarityMult: { common: 1, rare: 1.4, epic: 2, wonderkid: 3.5 } as Record<Rarity, number>,
     /** Coach stands here to open the podium choice. */
     zoneRadius: 1.2,
+    /** Standing at the office computer after closing it with a graduate waiting re-opens it after this long (s). */
+    reopenSec: 4,
     /** Sold squad players (released from the squad panel) fetch this share of their value. */
     releaseShare: 1,
   },
@@ -134,12 +142,14 @@ export const BALANCE = {
   } as Record<string, { feeMult?: number; repTimeMult?: number; transferMult?: number }>,
   /** Cumulative XP needed to reach level index+1 (level 1 = 0 XP). */
   levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400],
-  xp: { perGraduation: 15, perSign: 2 },
+  xp: { perGraduation: 15, perSign: 2, perUpgrade: 6 },
   objectives: {
     /** Re-evaluate objective this often (s). */
     interval: 0.25,
     /** Don't send the player to collect piles smaller than this unless nothing else to do. */
     minPileWorth: 8,
+    /** Point at an office upgrade only if it costs at most this share of the next pad. */
+    upgradeShare: 0.5,
     /** The 3D guide arrow always shows until this many unlocks (tutorial)... */
     guideUnlocks: 3,
     /** ...after that only when the coach has stood still this long (s). */

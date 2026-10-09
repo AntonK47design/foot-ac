@@ -22,7 +22,8 @@ import { DIVISIONS } from './data/clubs';
 import { computeOvr } from './sim/players';
 import { opponentsOf, pairings, sortedTable } from './sim/match';
 import { MatchUi } from './ui/match-ui';
-import { LeaguePanel, PodiumPanel, ResultsPanel, SquadPanel, type CardData, type PanelHooks } from './ui/panels';
+import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
+import { UPGRADES, type UpgradeDef } from './data/upgrades';
 import type { Position, Rarity, Stat } from './data/types';
 
 declare global {
@@ -189,7 +190,7 @@ async function boot(): Promise<void> {
       refreshPause();
     },
   };
-  const podiumPanel = new PodiumPanel(gameEl, panelHooks);
+  const officePanel = new OfficePanel(gameEl, panelHooks);
   const resultsPanel = new ResultsPanel(gameEl, panelHooks);
   const squadPanel = new SquadPanel(gameEl, panelHooks);
   const leaguePanel = new LeaguePanel(gameEl, panelHooks);
@@ -224,24 +225,83 @@ async function boot(): Promise<void> {
   };
   hud.squadBtn.addEventListener('click', openSquad);
   hud.leagueBtn.addEventListener('click', openLeague);
-  sim.events.on('podiumOpen', () => {
+  // ── Manager's Office computer: transfers + upgrades
+  const pct = (x: number): string => `${Math.round(x * 100)}%`;
+  const effectText = (u: UpgradeDef, lv: number): string => {
+    const at = (l: number): string => {
+      switch (u.id) {
+        case 'coach_carry':
+          return t('upfx.balls', { n: BALANCE.coach.carryCap + l * u.step });
+        case 'ballboy_carry':
+          return t('upfx.balls', { n: BALANCE.staff.ballBoy.carryCap + l * u.step });
+        case 'coach_sign':
+        case 'reception_speed':
+        case 'academy_bus':
+        case 'assistant_drive':
+          return t('upfx.less.' + u.id, { n: pct(1 - Math.pow(1 - u.step, l)) });
+        default:
+          if (u.tab === 'stations') return t('upfx.station', { lv: l + 1, rep: pct(1 - Math.pow(1 - u.step, l)), fee: pct(u.step * l) });
+          return t('upfx.more.' + u.id, { n: pct(u.step * l) });
+      }
+    };
+    if (lv >= u.maxLevel) return at(lv);
+    // drills read "Lv 1 → Lv 2: …"; the rest "Standard → +7% speed"
+    if (u.tab === 'stations') return `${t('upfx.lv', { lv: lv + 1 })} → ${at(lv + 1)}`;
+    const now = lv === 0 && u.id !== 'coach_carry' && u.id !== 'ballboy_carry' ? t('upfx.base') : at(lv);
+    return `${now} → ${at(lv + 1)}`;
+  };
+  const requirement = (u: UpgradeDef): string | null => {
+    if (sim.upgradeUnlocked(u.id)) return null;
+    if (u.requires?.staff) return t('office.needs_staff', { name: t('staff.' + (u.requires.staff.startsWith('assistant') ? 'assistant_any' : u.requires.staff)) });
+    const pad = sim.world.padList.find((p) => p.unlock.type !== 'staff' && p.unlock.type !== 'lane' && 'id' in p.unlock && p.unlock.id === u.requires?.built);
+    return t('office.needs_built', { name: pad ? t(pad.nameKey) : '' });
+  };
+  const officeData = (): OfficeData => {
     const g = sim.podiumGraduate();
-    if (!g) return;
     const full = sim.state.squad.length >= BALANCE.squad.size;
     const w = full ? sim.weakestSquadPlayer() : undefined;
-    podiumPanel.onDismiss = () => sim.dismissPrompt();
-    podiumPanel.open(
-      {
-        card: card(g),
-        price: sim.transferValue(g),
-        buyer: sim.buyerFor(g.id),
-        squadCount: sim.state.squad.length,
-        squadSize: BALANCE.squad.size,
-        replaces: w ? { name: w.name, ovr: computeOvr(w.position, w.stats), price: sim.transferValue(w) } : null,
+    const rows: UpgradeRow[] = UPGRADES.map((u) => ({
+      id: u.id,
+      tab: u.tab,
+      name: t(u.nameKey),
+      icon: u.icon,
+      level: sim.upLevel(u.id),
+      max: u.maxLevel,
+      cost: sim.upgradeCost(u.id),
+      locked: requirement(u),
+      effect: effectText(u, sim.upLevel(u.id)),
+    }));
+    return {
+      cash: sim.state.cash,
+      waiting: sim.state.podiumQueue.length,
+      rows,
+      transfer: g
+        ? {
+            card: card(g),
+            price: sim.transferValue(g),
+            buyer: sim.buyerFor(g.id),
+            squadCount: sim.state.squad.length,
+            squadSize: BALANCE.squad.size,
+            replaces: w ? { name: w.name, ovr: computeOvr(w.position, w.stats), price: sim.transferValue(w) } : null,
+          }
+        : null,
+    };
+  };
+  sim.events.on('podiumOpen', () => {
+    officePanel.onDismiss = () => sim.dismissPrompt();
+    officePanel.open(officeData, {
+      sell: () => {
+        sim.decideGraduate('sell');
+        officePanel.refresh();
       },
-      () => sim.decideGraduate('sell'),
-      () => sim.decideGraduate('promote'),
-    );
+      promote: () => {
+        sim.decideGraduate('promote');
+        officePanel.refresh();
+      },
+      buy: (id) => {
+        if (sim.buyUpgrade(id)) hud.setCash(sim.state.cash);
+      },
+    });
   });
   sim.events.on('sold', (e) => {
     analytics.once('first_sale');

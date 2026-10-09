@@ -69,7 +69,7 @@ export type Unlock =
   | { type: 'object'; id: string }
   | { type: 'staff'; id: string };
 
-export type IconId = 'ball' | 'goal' | 'cones' | 'wall' | 'track' | 'chair' | 'staff' | 'bench' | 'flag' | 'shelter' | 'cooler' | 'lane' | 'pitch' | 'podium';
+export type IconId = 'ball' | 'goal' | 'cones' | 'wall' | 'track' | 'chair' | 'staff' | 'bench' | 'flag' | 'shelter' | 'cooler' | 'lane' | 'pitch' | 'podium' | 'whistle' | 'sign' | 'cash';
 
 export interface PadDef {
   id: string;
@@ -127,6 +127,10 @@ export interface AreaDef {
     busPark: V2;
     stadium: { plot: Rect; road: Rect; busStop: V2 };
   };
+  /** Where fixed-spot staff work (receptionist, 'assistant:<station>', accountant), facing `yaw`. */
+  staffSpots: Record<string, V2 & { yaw: number }>;
+  /** Office safe: the accountant gathers every cash pile here. */
+  safe: V2;
   /** Static obstacles (walls, fences, fixed furniture) — always present. */
   obstacles: Rect[];
   /** Walkable rects for NPC navigation (plot + street corridor to the bus). */

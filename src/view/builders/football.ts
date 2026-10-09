@@ -74,6 +74,14 @@ export class PropKit {
     this.add(G.cyl(8), C.steel, 0, h, -d, 0, 0.06, w, 0.06, 0, Math.PI / 2);
   }
 
+  /** Office safe: steel strongbox with a dial and gold handle. Local: door faces +z. */
+  safe(): void {
+    this.add(G.rbox(0.08), C.dark, 0, 0.4, 0, 0, 0.8, 0.8, 0.7);
+    this.add(G.rbox(0.05), C.steelDark, 0, 0.42, 0.33, 0, 0.66, 0.66, 0.06);
+    this.add(G.cyl(16), C.steel, 0.1, 0.48, 0.38, 0, 0.18, 0.04, 0.18, Math.PI / 2);
+    this.add(G.rbox(0.03), C.gold, -0.18, 0.42, 0.39, 0, 0.06, 0.22, 0.04);
+  }
+
   /** Small corner flag. */
   cornerFlag(x: number, z: number, color = C.yellow): void {
     this.add(G.cyl(6), C.white, x, 0.45, z, 0, 0.04, 0.9, 0.04);

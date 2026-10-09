@@ -129,7 +129,8 @@ export interface Records {
   titles: number;
 }
 
-export type StaffKind = 'ball_boy';
+/** ball_boy walks crate → baskets; the others work from a fixed spot (desk, drill side, office safe). */
+export type StaffKind = 'ball_boy' | 'receptionist' | 'assistant' | 'accountant';
 export type StaffState = 'idle' | 'toCrate' | 'loading' | 'toBasket' | 'unloading';
 
 export interface Staff extends Agent {
@@ -209,6 +210,8 @@ export interface SimState {
   /** Sim time when the next match becomes available. */
   matchNextAt: number;
   records: Records;
+  /** Manager's Office upgrade levels by id (data/upgrades.ts). */
+  upgrades: Record<string, number>;
 }
 
 export function makeAgent(x: number, z: number): Agent {

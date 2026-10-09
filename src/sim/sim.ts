@@ -14,6 +14,7 @@ import { BUYERS } from '../data/clubs';
 import { createMatch, finishMatch, newLeague, resolveChance, type MatchResult, type MatchScript } from './match';
 import type { Player } from './state';
 import type { Rarity } from '../data/types';
+import { UPGRADES, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades';
 
 export interface SimEvents {
   cashCollected: { pileId: string; amount: number; x: number; z: number };
@@ -28,7 +29,7 @@ export interface SimEvents {
   busArrived: Record<string, never>;
   busLeft: Record<string, never>;
   levelUp: { level: number };
-  /** The coach stepped up to the podium with a graduate waiting: show the sell / promote choice. */
+  /** The coach is at the office computer: show the office panel (transfer choice if `id` ≠ 0, upgrades). */
   podiumOpen: { id: number };
   /** The coach is on the kick-off spot and a match is available. */
   kickoffReady: Record<string, never>;
@@ -37,6 +38,9 @@ export interface SimEvents {
   graduateWaiting: { id: number };
   matchFinished: { result: MatchResult };
   divisionUp: { division: number };
+  upgraded: { id: string; level: number };
+  /** The accountant moved cash from a pile into the office safe (for a coin arc). */
+  cashToSafe: { pileId: string; amount: number };
   staffHired: { id: string };
   objectiveChanged: { objective: Objective | null };
   saveNeeded: { reason: string };
@@ -108,6 +112,7 @@ export function createInitialState(area: AreaDef = AREA1, seed = 12345): SimStat
     league: newLeague(0, 1),
     matchNextAt: 0,
     records: { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0 },
+    upgrades: {},
   };
 }
 
@@ -128,6 +133,9 @@ export class Sim {
   prompt: PromptKind | null = null;
   /** Zones re-arm only after the coach leaves them (no re-open loop after closing a panel). */
   private readonly latched: Record<PromptKind, boolean> = { podium: false, kickoff: false };
+  /** Graduate shown by the last office prompt (a new one re-opens it while the coach stays at the computer). */
+  private promptedGrad = 0;
+  private dismissedAt = 0;
   /** The match being played (between startMatch and finishCurrentMatch). */
   match: MatchScript | null = null;
   private readonly rng: Rng;
@@ -237,7 +245,8 @@ export class Sim {
       t.z = t.pz = p.z;
     }
     for (const f of s.staff) {
-      const h = this.staffHome(s.staff.indexOf(f));
+      const spot = this.area.staffSpots[f.id];
+      const h = f.kind === 'ball_boy' ? this.staffHome(this.ballBoyIndex(f)) : (spot ?? this.staffHome(0));
       f.x = f.px = h.x;
       f.z = f.pz = h.z;
       f.goal = null;
@@ -446,6 +455,7 @@ export class Sim {
     this.updateTrainees(dt);
     this.updateStations();
     this.updateStaff(dt);
+    this.updateAccountant(dt);
     this.updatePodium(dt);
     this.updatePrompts();
     s.rng = this.rng.state;
@@ -476,8 +486,9 @@ export class Sim {
       ix /= m;
       iz /= m;
     }
-    const tvx = ix * B.speed;
-    const tvz = iz * B.speed;
+    const maxSp = this.coachSpeed();
+    const tvx = ix * maxSp;
+    const tvz = iz * maxSp;
     let ax = tvx - c.vx;
     let az = tvz - c.vz;
     const dv = Math.hypot(ax, az);
@@ -588,8 +599,12 @@ export class Sim {
       if (u.id === this.area.matchPitch.objectId) s.matchNextAt = s.time;
     } else if (u.type === 'staff') {
       s.built[u.id] = true;
-      const f: Staff = { ...makeAgent(p.pos.x, p.pos.z), id: u.id, kind: 'ball_boy', state: 'idle', carry: 0, target: null, timer: 0 };
+      const kind: Staff['kind'] = u.id.startsWith('assistant:') ? 'assistant' : u.id === 'receptionist' || u.id === 'accountant' ? u.id : 'ball_boy';
+      const spot = this.area.staffSpots[u.id];
+      const f: Staff = { ...makeAgent(spot?.x ?? p.pos.x, spot?.z ?? p.pos.z), id: u.id, kind, state: 'idle', carry: 0, target: null, timer: 0 };
+      if (spot) f.yaw = spot.yaw;
       s.staff.push(f);
+      if (kind === 'accountant' && !this.pile('safe')) s.piles.push({ id: 'safe', x: this.area.safe.x, z: this.area.safe.z, amount: 0 });
       this.events.emit('staffHired', { id: u.id });
     }
     this.rebuildWorld();
@@ -597,6 +612,117 @@ export class Sim {
     this.events.emit('unlocked', { padId: p.id, x: p.pos.x, z: p.pos.z, stars: p.stars, major: !!p.major });
     this.events.emit('saveNeeded', { reason: 'unlock' });
     this.refreshObjective();
+  }
+
+  // ───────────────────────────── upgrades (M3) ─────────────────────────────
+
+  upLevel(id: string): number {
+    return this.state.upgrades[id] ?? 0;
+  }
+
+  /** 1 + step × level (sign +1), or (1 − step)^level for "less is better" effects (sign −1). */
+  upMult(id: string, sign: 1 | -1): number {
+    const def = UPGRADE_BY_ID.get(id as UpgradeId);
+    const lv = this.upLevel(id);
+    if (!def || lv === 0) return 1;
+    return sign > 0 ? 1 + def.step * lv : Math.pow(1 - def.step, lv);
+  }
+
+  /** Cost of the next level, or null at max level. */
+  upgradeCost(id: string): number | null {
+    const def = UPGRADE_BY_ID.get(id as UpgradeId);
+    if (!def) return null;
+    const lv = this.upLevel(id);
+    if (lv >= def.maxLevel) return null;
+    return Math.round((def.base * Math.pow(def.growth, lv)) / 5) * 5;
+  }
+
+  /** Requirements met (station / object built, staff hired). */
+  upgradeUnlocked(id: string): boolean {
+    const def = UPGRADE_BY_ID.get(id as UpgradeId);
+    if (!def) return false;
+    const r = def.requires;
+    if (r?.built && !this.state.built[r.built] && !this.state.stations[r.built]) return false;
+    if (r?.staff && !this.state.staff.some((f) => f.id === r.staff)) return false;
+    return true;
+  }
+
+  /** Cheapest upgrade the player could buy right now (ignores cash), or null. */
+  cheapestUpgrade(): { id: string; cost: number } | null {
+    let best: { id: string; cost: number } | null = null;
+    for (const u of UPGRADES) {
+      if (!this.upgradeUnlocked(u.id)) continue;
+      const c = this.upgradeCost(u.id);
+      if (c !== null && (!best || c < best.cost)) best = { id: u.id, cost: c };
+    }
+    return best;
+  }
+
+  buyUpgrade(id: string): boolean {
+    const s = this.state;
+    const cost = this.upgradeCost(id);
+    if (cost === null || !this.upgradeUnlocked(id) || s.cash + 1e-6 < cost) return false;
+    s.cash -= cost;
+    s.upgrades[id] = this.upLevel(id) + 1;
+    s.stats.unlocks++;
+    this.addXp(BALANCE.xp.perUpgrade);
+    this.events.emit('upgraded', { id, level: s.upgrades[id] as number });
+    this.events.emit('saveNeeded', { reason: 'upgrade' });
+    this.refreshObjective();
+    return true;
+  }
+
+  coachSpeed(): number {
+    return BALANCE.coach.speed * this.upMult('coach_speed', 1);
+  }
+
+  carryCap(): number {
+    return BALANCE.coach.carryCap + this.upLevel('coach_carry') * (UPGRADE_BY_ID.get('coach_carry')?.step ?? 1);
+  }
+
+  signTime(): number {
+    return BALANCE.desk.signTime * this.upMult('coach_sign', -1);
+  }
+
+  ballBoySpeed(): number {
+    return BALANCE.staff.ballBoy.speed * this.upMult('ballboy_speed', 1);
+  }
+
+  ballBoyCarry(): number {
+    return BALANCE.staff.ballBoy.carryCap + this.upLevel('ballboy_carry') * (UPGRADE_BY_ID.get('ballboy_carry')?.step ?? 1);
+  }
+
+  /** Rep time multiplier for a drill: its level, and an Assistant Coach if hired (driven harder by the staff upgrade). */
+  stationRepMult(stationId: string | null): number {
+    if (!stationId) return 1;
+    let m = this.upMult('st:' + stationId, -1);
+    if (this.state.staff.some((f) => f.id === 'assistant:' + stationId)) m *= BALANCE.staff.assistant.repTimeMult * this.upMult('assistant_drive', -1);
+    return m;
+  }
+
+  private ballBoyIndex(f: Staff): number {
+    let i = 0;
+    for (const o of this.state.staff) {
+      if (o === f) return i;
+      if (o.kind === 'ball_boy') i++;
+    }
+    return i;
+  }
+
+  /** Accountant: drains every cash pile into the office safe. */
+  private updateAccountant(dt: number): void {
+    if (!this.hasStaff('accountant')) return;
+    const safe = this.pile('safe');
+    if (!safe) return;
+    const A = BALANCE.staff.accountant;
+    for (const p of this.state.piles) {
+      if (p === safe || p.amount < A.minPile) continue;
+      const take = Math.min(p.amount, A.ratePerSec * dt * Math.max(1, p.amount / 40));
+      p.amount -= take;
+      safe.amount += take;
+      // a coin arc for the view every ~0.4 s per pile (deterministic: from sim time)
+      if (this.state.time % 0.4 < dt) this.events.emit('cashToSafe', { pileId: p.id, amount: take });
+    }
   }
 
   private staffHome(i = 0): { x: number; z: number } {
@@ -611,9 +737,10 @@ export class Sim {
     // crate → carry stack
     const crate = this.area.crate.spot;
     const zr = BALANCE.crate.zoneRadius;
-    if (s.built.ball_crate && dist2(c.x, c.z, crate.x, crate.z) <= zr * zr && c.carry < B.carryCap) {
+    const cap = this.carryCap();
+    if (s.built.ball_crate && dist2(c.x, c.z, crate.x, crate.z) <= zr * zr && c.carry < cap) {
       c.pickT += dt;
-      while (c.pickT >= B.pickupInterval && c.carry < B.carryCap) {
+      while (c.pickT >= B.pickupInterval && c.carry < cap) {
         c.pickT -= B.pickupInterval;
         c.carry++;
         s.flags.firstPickup = true;
@@ -655,8 +782,13 @@ export class Sim {
     const spot = this.area.desk.coachSpot;
     const zr = BALANCE.desk.zoneRadius;
     const inZone = dist2(c.x, c.z, spot.x, spot.z) <= zr * zr;
-    if (t && inZone && this.canSign()) {
-      c.deskT += dt / BALANCE.desk.signTime;
+    const rec = this.hasStaff('receptionist');
+    if (t && (inZone || rec) && this.canSign()) {
+      // the receptionist signs on their own; the coach at the desk speeds it up
+      let rate = 0;
+      if (inZone) rate += 1 / this.signTime();
+      if (rec) rate += 1 / (this.signTime() * BALANCE.staff.receptionist.signTimeMult * this.upMult('reception_speed', -1));
+      c.deskT += dt * rate;
       if (c.deskT >= 1) {
         c.deskT = 0;
         this.sign(t);
@@ -777,7 +909,7 @@ export class Sim {
         if (k >= 1) {
           b.phase = 'away';
           b.z = startZ;
-          b.timer = B.interval * (s.built.bus_shelter ? B.shelterIntervalMult : 1);
+          b.timer = B.interval * (s.built.bus_shelter ? B.shelterIntervalMult : 1) * this.upMult('academy_bus', -1);
           this.events.emit('busLeft', EMPTY);
         }
         break;
@@ -913,7 +1045,7 @@ export class Sim {
       t.repT = 0;
       this.events.emit('repStart', { traineeId: t.id, stationId: t.stationId });
     }
-    t.repT += dt / (cfg.repTime * this.perk('repTimeMult'));
+    t.repT += dt / (cfg.repTime * this.perk('repTimeMult') * this.stationRepMult(t.stationId));
     if (t.repT < 1) return;
     // rep complete
     t.repT = 0;
@@ -922,7 +1054,7 @@ export class Sim {
     const before = t.stats[st.stat];
     t.stats[st.stat] = Math.min(t.cap, before + cfg.statGain);
     const gain = t.stats[st.stat] - before;
-    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult'));
+    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult') * this.upMult('st:' + t.stationId, 1));
     const p = this.pile('st:' + t.stationId);
     if (p) p.amount += cash;
     t.reps++;
@@ -993,7 +1125,7 @@ export class Sim {
   transferValue(p: { position: Player['position']; stats: Player['stats']; rarity: Rarity }): number {
     const T = BALANCE.transfer;
     const ovr = computeOvr(p.position, p.stats);
-    return Math.max(5, Math.round((T.base * Math.pow(ovr / T.ovrRef, T.exp) * T.rarityMult[p.rarity] * this.perk('transferMult')) / 5) * 5);
+    return Math.max(5, Math.round((T.base * Math.pow(ovr / T.ovrRef, T.exp) * T.rarityMult[p.rarity] * this.perk('transferMult') * this.upMult('coach_negotiation', 1)) / 5) * 5);
   }
 
   /** Fictional buying club for a player (stable per id). */
@@ -1036,11 +1168,15 @@ export class Sim {
     const inKick = dist2(c.x, c.z, K.x, K.z) <= kr * kr;
     if (!inKick) this.latched.kickoff = false;
     if (this.prompt) return;
-    const g = inPodium && !this.latched.podium ? this.podiumGraduate() : undefined;
-    if (g) {
+    // the office computer: transfers (graduate waiting) and upgrades; re-opens when a new graduate sits down
+    const gid = this.podiumGraduate()?.id ?? 0;
+    // still standing there after closing it with a graduate waiting: re-open after a short pause
+    const nudge = gid !== 0 && s.time - this.dismissedAt > BALANCE.transfer.reopenSec;
+    if (inPodium && (!this.latched.podium || (gid !== 0 && gid !== this.promptedGrad) || nudge)) {
       this.prompt = 'podium';
       this.latched.podium = true;
-      this.events.emit('podiumOpen', { id: g.id });
+      this.promptedGrad = gid;
+      this.events.emit('podiumOpen', { id: gid });
     } else if (inKick && !this.latched.kickoff && this.matchAvailable()) {
       this.prompt = 'kickoff';
       this.latched.kickoff = true;
@@ -1051,6 +1187,7 @@ export class Sim {
   /** The UI closed a prompt without acting; it re-opens once the coach steps out and back in. */
   dismissPrompt(): void {
     this.prompt = null;
+    this.dismissedAt = this.state.time;
   }
 
   private sell(t: Trainee, fromPodium: boolean): number {
@@ -1074,7 +1211,6 @@ export class Sim {
     const s = this.state;
     const t = this.podiumGraduate();
     this.prompt = null;
-    this.latched.podium = false;
     if (!t) return;
     if (choice === 'sell') this.sell(t, true);
     else {
@@ -1101,6 +1237,9 @@ export class Sim {
       s.trainees = s.trainees.filter((o) => o !== t);
       this.events.emit('promoted', { id: t.id, replaced });
     }
+    // the office panel shows the next graduate straight away if they're already seated: don't re-open for them
+    // (one still walking in re-opens the computer when they sit down)
+    this.promptedGrad = this.podiumGraduate()?.id ?? 0;
     this.events.emit('saveNeeded', { reason: 'podium' });
     this.refreshObjective();
   }
@@ -1159,6 +1298,7 @@ export class Sim {
     const m = this.match;
     if (!m) return null;
     const r = finishMatch(this.rng, m, s.league, s.squad);
+    r.cash = Math.round(r.cash * this.upMult('academy_matchday', 1));
     this.match = null;
     this.addCash(r.cash);
     this.addXp(r.xp);
@@ -1242,26 +1382,26 @@ export class Sim {
               this.setGoal(f, crate.x - 0.6, crate.z + 0.3);
             }
           } else {
-            const h = this.staffHome(s.staff.indexOf(f));
+            const h = this.staffHome(this.ballBoyIndex(f));
             if (!f.goal && dist2(f.x, f.z, h.x, h.z) > 0.25) this.setGoal(f, h.x, h.z);
-            this.moveAgent(f, B.speed, dt);
+            this.moveAgent(f, this.ballBoySpeed(), dt);
           }
           break;
         }
         case 'toCrate':
-          if (this.moveAgent(f, B.speed, dt)) {
+          if (this.moveAgent(f, this.ballBoySpeed(), dt)) {
             f.state = 'loading';
             f.timer = 0;
           }
           break;
         case 'loading':
           f.timer += dt;
-          while (f.timer >= BALANCE.coach.pickupInterval * 1.5 && f.carry < B.carryCap) {
+          while (f.timer >= BALANCE.coach.pickupInterval * 1.5 && f.carry < this.ballBoyCarry()) {
             f.timer -= BALANCE.coach.pickupInterval * 1.5;
             f.carry++;
             this.events.emit('ballPicked', { carry: f.carry, byStaff: true });
           }
-          if (f.carry >= B.carryCap) {
+          if (f.carry >= this.ballBoyCarry()) {
             const need = this.neediestStation(1, f) ?? this.neediestStation(1);
             if (need) {
               f.target = need;
@@ -1272,7 +1412,7 @@ export class Sim {
           }
           break;
         case 'toBasket':
-          if (this.moveAgent(f, B.speed, dt)) {
+          if (this.moveAgent(f, this.ballBoySpeed(), dt)) {
             f.state = 'unloading';
             f.timer = 0;
           }

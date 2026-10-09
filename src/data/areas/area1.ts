@@ -146,6 +146,13 @@ export const AREA1: AreaDef = {
     { id: 'p_ballboy', area: 1, pos: { x: 5.5, z: 3.0 }, cost: 190, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
     { id: 'p_ballboy2', area: 1, pos: { x: 7.1, z: 2.2 }, cost: 150, stars: 1, xp: 10, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'ball_boy_2' }, icon: 'staff', nameKey: 'staff.ball_boy_2' },
     { id: 'p_match', area: 1, pos: { x: 13.6, z: 1.9 }, cost: 85, stars: 2, xp: 14, requires: ['p_cones_l2'], unlock: { type: 'object', id: 'match_pitch' }, icon: 'pitch', nameKey: 'obj.match_pitch', major: true },
+    // M3 staff: receptionist, one assistant coach per drill, accountant
+    { id: 'p_reception', area: 1, pos: { x: -11.5, z: -9.7 }, cost: 260, stars: 1, xp: 12, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'receptionist' }, icon: 'sign', nameKey: 'staff.receptionist' },
+    { id: 'p_asst_goal', area: 1, pos: { x: -2.4, z: -6.8 }, cost: 320, stars: 1, xp: 12, requires: ['p_goal_l2', 'p_sprint'], unlock: { type: 'staff', id: 'assistant:shooting_goal' }, icon: 'whistle', nameKey: 'staff.assistant_goal' },
+    { id: 'p_asst_cones', area: 1, pos: { x: 3.7, z: -7.2 }, cost: 380, stars: 1, xp: 12, requires: ['p_cones_l2', 'p_asst_goal'], unlock: { type: 'staff', id: 'assistant:dribble_cones' }, icon: 'whistle', nameKey: 'staff.assistant_cones' },
+    { id: 'p_asst_wall', area: 1, pos: { x: 15.9, z: -7.0 }, cost: 460, stars: 1, xp: 12, requires: ['p_wall_l2', 'p_asst_cones'], unlock: { type: 'staff', id: 'assistant:passing_wall' }, icon: 'whistle', nameKey: 'staff.assistant_wall' },
+    { id: 'p_asst_track', area: 1, pos: { x: -13.6, z: 8.8 }, cost: 560, stars: 1, xp: 12, requires: ['p_track_l2', 'p_asst_wall'], unlock: { type: 'staff', id: 'assistant:sprint_track' }, icon: 'whistle', nameKey: 'staff.assistant_track' },
+    { id: 'p_accountant', area: 1, pos: { x: -9.0, z: 5.7 }, cost: 900, stars: 2, xp: 20, requires: ['p_reception', 'p_shelter'], unlock: { type: 'staff', id: 'accountant' }, icon: 'cash', nameKey: 'staff.accountant', major: true },
     { id: 'p_bench', area: 1, pos: { x: 3.4, z: -0.1 }, cost: 45, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'object', id: 'bench' }, icon: 'bench', nameKey: 'obj.bench' },
     { id: 'p_sprint', area: 1, pos: { x: 2.9, z: 10.45 }, cost: 140, stars: 2, xp: 12, requires: ['p_ballboy'], unlock: { type: 'station', id: 'sprint_track' }, icon: 'track', nameKey: 'station.sprint_track', major: true },
     { id: 'p_flags', area: 1, pos: { x: 5.9, z: 9.8 }, cost: 75, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'object', id: 'flags' }, icon: 'flag', nameKey: 'obj.flags' },
@@ -177,6 +184,15 @@ export const AREA1: AreaDef = {
     busPark: { x: 21.1, z: 4.2 },
     stadium: { plot: { x0: 64, z0: -10.5, x1: 96, z1: 9 }, road: { x0: 60, z0: 9, x1: 100, z1: 13.6 }, busStop: { x: 80, z: 11.3 } },
   },
+  staffSpots: {
+    receptionist: { x: -12.1, z: -10.1, yaw: Math.PI },
+    'assistant:shooting_goal': { x: -2.4, z: -6.8, yaw: -HALF_PI },
+    'assistant:dribble_cones': { x: 3.7, z: -7.2, yaw: -HALF_PI },
+    'assistant:passing_wall': { x: 15.9, z: -7.0, yaw: HALF_PI },
+    'assistant:sprint_track': { x: -13.6, z: 8.8, yaw: Math.PI },
+    accountant: { x: -9.0, z: 5.7, yaw: -HALF_PI },
+  },
+  safe: { x: -7.9, z: 5.6 },
   lockers: {
     // front bench first, then the back bench (both face the camera)
     seats: [

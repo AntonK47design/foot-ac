@@ -39,7 +39,7 @@ import { buildDiorama, buildStadium, buildUnlockable, type UnlockGeo } from './b
 import { PropKit } from './builders/football';
 import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
-import { Character, KITS, casualKit, type CharAnim } from './characters';
+import { Character, KITS, casualKit, type CharAnim, type Kit } from './characters';
 import { Fx } from './fx';
 import { G } from './geo';
 import { IconRenderer } from './icon-render';
@@ -53,6 +53,14 @@ const MAX_BALLS = 260;
 const MAX_BILLS = 420;
 const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
+/** Staff looks: model + kit per staff id (ball boys) or kind. */
+const STAFF_LOOK: Record<string, { model: CharacterKey; kit: Kit }> = {
+  ball_boy: { model: 'male-b', kit: KITS.staff },
+  ball_boy_2: { model: 'female-b', kit: KITS.staff },
+  receptionist: { model: 'female-a', kit: { shirt: 0xffffff, shorts: 0x2f6bff, socks: 0x2f6bff, trim: 0x2f6bff } },
+  assistant: { model: 'male-d', kit: { shirt: 0xffd23f, shorts: 0x1f2f5c, socks: 0x1f2f5c, trim: 0x1f2f5c } },
+  accountant: { model: 'female-c', kit: { shirt: 0x3a4256, shorts: 0x3a4256, socks: 0x1d2433, trim: 0xffffff } },
+};
 /** Root lift while sitting so the hips rest on the bench seat (bench top 0.53 m, sit-clip hips ≈ 0.05 m). */
 const SIT_LIFT = 0.47;
 const ADULT_SCALE = 1.85;
@@ -152,6 +160,9 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
       break;
     case 'cooler':
       k.waterCooler();
+      break;
+    case 'whistle':
+      k.stopwatchStand();
       break;
     case 'pitch':
       k.place(0, 0, 0.4).goal(1.8, 1.0, 0.7);
@@ -318,7 +329,7 @@ export class GameView {
     coachIcon.seek(0);
     this.hud.setPortrait(this.icons.render('portrait', coachIcon.root, { yaw: 0.35, pitch: 0.15, zoom: 2.2, focusY: 0.78 }));
     // pre-render the whole icon atlas, then free the offscreen context
-    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler', 'pitch', 'podium']) this.iconUrl(id);
+    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler', 'pitch', 'podium', 'whistle']) this.iconUrl(id);
     for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) this.iconUrl('lane', st);
     this.icons.dispose();
     this.iconsDone = true;
@@ -345,7 +356,7 @@ export class GameView {
   private unlockKeys(): Array<{ id: string; lanes: number }> {
     const s = this.sim.state;
     const out: Array<{ id: string; lanes: number }> = [];
-    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'match_pitch']) if (s.built[id]) out.push({ id, lanes: 1 });
+    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'match_pitch', 'accountant']) if (s.built[id]) out.push({ id, lanes: 1 });
     for (const [id, ss] of Object.entries(s.stations)) out.push({ id, lanes: ss.lanes });
     return out;
   }
@@ -500,7 +511,21 @@ export class GameView {
       this.celebrateUntil = this.time + 1.2;
     });
     ev.on('staffHired', (e) => {
-      this.hud.toast(t('toast.hired', { name: t('staff.' + e.id) }), 'good', 3200);
+      const kind = e.id.startsWith('assistant:') ? 'assistant' : e.id;
+      const key = hasKey('toast.hired.' + kind) ? 'toast.hired.' + kind : 'toast.hired';
+      this.hud.toast(t(key, { name: t('staff.' + e.id) }), 'good', 3200);
+    });
+    ev.on('upgraded', (e) => {
+      this.audio.play('unlock');
+      this.haptic(15);
+      const P = this.sim.area.office.computer;
+      this.fx.burst(P.x, 1.4, P.z, 30, 0.6);
+      if (hasKey('up.' + e.id)) this.hud.toast(t('toast.upgraded', { name: t('up.' + e.id) }), 'good', 1800);
+    });
+    ev.on('cashToSafe', (e) => {
+      const p = this.sim.pile(e.pileId);
+      const sf = this.sim.area.safe;
+      if (p) this.fx.coins.spawn(p.x, 0.4, p.z, sf.x, 0.6, sf.z, 0.7);
     });
   }
 
@@ -642,17 +667,22 @@ export class GameView {
       for (let i = 0; i < c.carry; i++) ballAt(cx + fx * 0.48, 0.78 + i * 0.3, cz + fz * 0.48, i * 0.7);
     }
 
-    // ── staff
+    // ── staff (ball boys walk; receptionist, assistant coaches and the accountant work from their spots)
+    const deskBusy = !!sim.deskTrainee();
     for (const f of s.staff) {
       const fx = f.px + (f.x - f.px) * alpha;
       const fz = f.pz + (f.z - f.pz) * alpha;
-      const a = this.actorNamed('staff:' + f.id, f.id === 'ball_boy' ? 'male-b' : 'female-b', KITS.staff, ADULT_SCALE, fx, fz);
+      const look = STAFF_LOOK[f.kind === 'ball_boy' ? f.id : f.kind] ?? STAFF_LOOK.ball_boy;
+      const a = this.actorNamed('staff:' + f.id, look.model, look.kit, ADULT_SCALE, fx, fz);
       a.seen = frameId;
       a.yaw = lerpAngle(a.yaw, f.yaw, 1 - Math.exp(-dt * 12));
       a.c.root.position.set(fx, 0, fz);
       a.c.root.rotation.y = a.yaw + YAW_OFFSET;
       a.c.setCarry(f.carry > 0);
-      a.c.play(f.moving ? 'walk' : 'idle');
+      if (f.kind === 'ball_boy') a.c.play(f.moving ? 'walk' : 'idle');
+      else if (f.kind === 'receptionist') a.c.play(deskBusy && c.deskT > 0 ? 'interact' : 'idle');
+      else if (f.kind === 'assistant') a.c.play((this.time + f.x) % 5 < 1.2 ? 'cheer' : 'idle');
+      else a.c.play('idle');
       const dx = Math.sin(a.yaw + YAW_OFFSET);
       const dz = Math.cos(a.yaw + YAW_OFFSET);
       for (let i = 0; i < f.carry; i++) ballAt(fx + dx * 0.48, 0.78 + i * 0.3, fz + dz * 0.48, i);
@@ -665,7 +695,8 @@ export class GameView {
       const n = Math.min(ss.balls, 8);
       for (let i = 0; i < n; i++) ballAt(st.basket.x - 0.4 + (i % 4) * 0.27, 1.02 + Math.floor(i / 4) * 0.22, st.basket.z + 0.02, i);
       const low = ss.balls === 0 && ss.occupants.some((o) => o > 0);
-      this.labels.place('chip:' + id, st.basket.x + 0.9, 1.0, st.basket.z + 0.3, '', `<div class="chip-supply${low ? ' low' : ''}">${icon('ball')}<b>${ss.balls}/${st.cfg.basketCap}</b></div>`);
+      const lv = sim.upLevel('st:' + id);
+      this.labels.place('chip:' + id, st.basket.x + 0.9, 1.0, st.basket.z + 0.3, '', `<div class="chip-supply${low ? ' low' : ''}">${icon('ball')}<b>${ss.balls}/${st.cfg.basketCap}</b>${lv > 0 ? `<i class="lv">Lv ${lv + 1}</i>` : ''}</div>`);
     }
 
     // ── trainees
@@ -750,7 +781,7 @@ export class GameView {
     // ── locked expansions
     for (const gh of AREA1_LAYOUT.ghosts) {
       const r = gh.rect;
-      this.labels.place('gh:' + gh.id, r.x1 - 0.6, 2.2, r.z1 + 0.5, '', `<div class="lock-sign">${icon('lock')}<span>${gh.label}</span><b>${t('area.coming_soon')}</b></div>`);
+      this.labels.place('gh:' + gh.id, r.x1 - 0.6, 2.2, r.z1 + 0.5, '', `<div class="lock-sign">${icon('lock')}<span>${t('area.2.sign')}</span><b>${t('area.2.req', { stars: sim.world.totalStars })} · ${t('area.coming_soon')}</b></div>`);
     }
 
     for (const u of this.unlocks.values()) this.updateNets(u, dt);

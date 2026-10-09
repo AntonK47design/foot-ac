@@ -44,6 +44,8 @@ export const MIGRATIONS: Record<number, Migration> = {
   },
   // 2 → 3: M2 adds podium queue, squad, league, match timer and records (defaults filled in normalize)
   2: (raw) => ({ ...raw, v: 3 }),
+  // 3 → 4: M3 adds office upgrades and fixed-spot staff (defaults filled in normalize)
+  3: (raw) => ({ ...raw, v: 4 }),
 };
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
@@ -90,6 +92,7 @@ export function normalize(blob: SaveBlob, area: AreaDef): SaveBlob {
   g.squad = Array.isArray(g.squad) ? g.squad : [];
   g.league = g.league && Array.isArray(g.league.table) ? g.league : newLeague(0, 1);
   g.matchNextAt = typeof g.matchNextAt === 'number' ? g.matchNextAt : 0;
+  g.upgrades = g.upgrades && typeof g.upgrades === 'object' ? g.upgrades : {};
   g.records = { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0, ...((g.records ?? {}) as Partial<SimState['records']>) };
   g.stats = { signed: 0, reps: 0, graduated: 0, unlocks: 0, ballsDelivered: 0, cashCollected: 0, ...((g.stats ?? {}) as Partial<SimState['stats']>) };
   for (const t of g.trainees) {

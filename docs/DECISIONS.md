@@ -73,3 +73,22 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Flow:** graduates walk to the office and sit on a 4-seat waiting bench (a full bench auto-sells the next graduate, so training never blocks). The coach stands at the computer behind the desk to open the same SELL / PROMOTE card panel ("Transfer desk"), one graduate at a time.
     - **Data:** `AreaDef.office` (computer spot, bench seats, seat yaw) replaces `podium`. Sim and save names (`podiumQueue`, `toPodium` / `atPodium`, prompt `'podium'`) are kept for save compatibility.
     - **Later:** the M3 Office upgrades will live in this room too. Only the Gym stays as a locked teaser.
+50. **M3 staff.** Staff now come in kinds: `ball_boy` (walks crate → baskets) and fixed-spot staff from `AreaDef.staffSpots`.
+    - **Receptionist** ($260): signs trainees on their own at 1.6× the coach's sign time. The coach at the desk adds their own rate.
+    - **Assistant Coach** per drill ($320–560, one after another): drill rep time ×0.8.
+    - **Accountant** ($900): drains every cash pile into an office **safe** (12 $/s, faster for big piles), shown with coin arcs, so late game you collect in one place.
+    - Ball-boy idle spots now count ball boys only.
+    - Area 1 has 22 pads / 30 stars.
+51. **Manager's Office upgrades** (`data/upgrades.ts`, `state.upgrades`, save v4). The office computer always opens the **Office panel** (Transfers / Coach / Staff / Drills / Academy).
+    - **Upgrades:** 14 upgrades with 4–5 levels each: coach speed, carry, sign time and negotiation; ball-boy speed and carry; receptionist speed; coaching badges; drill levels (faster reps and higher fees); away-fans match cash; bus timetable.
+    - **Cost and effects:** cost = base × growth^level. Effects are read through `Sim.coachSpeed() / carryCap() / signTime() / stationRepMult() / upMult()`.
+    - **Objective:** "Office: buy an upgrade" appears only when the upgrade costs ≤ 50% of the next pad, so upgrades never stall the pad path.
+52. **Office computer prompt.** It re-opens:
+    - when a new graduate sits down while the coach is standing there;
+    - 4 s after closing it while a graduate is still waiting. Without this the coach could stand at the computer with the objective pointing at it and nothing happening; the bot found this as a 10-minute stall.
+    Deciding marks only an already-seated graduate as shown.
+53. **Balance through minute 20 (§5.2).**
+    - **New sim checks:** never > 60 s (focused) / 90 s (distracted) without a pad, upgrade or match between 3:00 and 20:00; average purchase gap in minutes 6–10 ≥ 18 s; ≥ 15 unlocks by 10:00.
+    - **Upgrade prices (sweep):** base ×5, growth 1.55–1.65.
+    - **Result:** 22–27 s average gaps in minutes 6–10, all pads by ~6 min, ~26 upgrades spread to ~19:50, 6 matches in 20 min.
+    - **Area 2:** the Gym teaser is now the "Training Ground · Area 2 · ★30 · Coming soon" sign.

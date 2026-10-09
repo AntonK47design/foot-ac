@@ -22,6 +22,10 @@ export interface BotReport {
   timeline: TimelineEntry[];
   marks: Record<string, number>;
   unlockTimes: number[];
+  upgradeTimes: number[];
+  matchTimes: number[];
+  /** Longest stretch between 3:00 and 20:00 without a pad, an upgrade or a match (§5.2 "never dead air"). */
+  midGameGap: { from: number; to: number; gap: number };
   longestPurchaseGap: { from: number; to: number; gap: number };
   longestUnaffordable: { from: number; gap: number };
   finalCash: number;
@@ -41,6 +45,8 @@ export function runBot(opts: BotOptions): BotReport {
   const timeline: TimelineEntry[] = [];
   const marks: Record<string, number> = {};
   const unlockTimes: number[] = [];
+  const upgradeTimes: number[] = [];
+  const matchTimes: number[] = [];
   const mark = (k: string, what?: string): void => {
     if (marks[k] !== undefined) return;
     marks[k] = sim.state.time;
@@ -123,21 +129,35 @@ export function runBot(opts: BotOptions): BotReport {
     }
     sim.tick(STEP);
     // podium / kick-off prompts (the UI panels in the real game)
-    if (sim.prompt === 'podium') {
-      const g = sim.podiumGraduate();
+    // every seated graduate gets a decision (the panel shows them one after another): sell for cash until
+    // there is a team bus, then build the squad, then only upgrade it
+    for (let g = sim.prompt === 'podium' ? sim.podiumGraduate() : undefined; g; g = sim.podiumGraduate()) {
       const weakest = sim.weakestSquadPlayer();
-      // sell for cash until there is a pitch to play on, then build the squad, then only upgrade it
       const pitch = !!sim.state.built[sim.area.matchPitch.objectId];
       const promote =
-        !!g &&
-        pitch &&
-        (sim.state.squad.length < BALANCE.squad.size || (weakest !== undefined && sim.ovr(g) > computeOvr(weakest.position, weakest.stats) + 2));
+        pitch && (sim.state.squad.length < BALANCE.squad.size || (weakest !== undefined && sim.ovr(g) > computeOvr(weakest.position, weakest.stats) + 2));
       sim.decideGraduate(promote ? 'promote' : 'sell');
+      sim.prompt = 'podium';
       mark(promote ? 'firstPromotion' : 'firstSale', promote ? 'first graduate promoted' : 'first transfer sale');
+    }
+    if (sim.prompt === 'podium') {
+      // office upgrades: cheapest first, without stalling the next pad
+      for (let n = 0; n < 6; n++) {
+        const up = sim.cheapestUpgrade();
+        const pads = sim.visiblePads();
+        let next = Infinity;
+        for (const p of pads) next = Math.min(next, sim.padRemaining(p));
+        if (!up || sim.state.cash < up.cost || (pads.length > 0 && up.cost > next * BALANCE.objectives.upgradeShare)) break;
+        sim.buyUpgrade(up.id);
+        upgradeTimes.push(sim.state.time);
+        mark('firstUpgrade', `first upgrade (${up.id})`);
+      }
+      sim.dismissPrompt();
     } else if (sim.prompt === 'kickoff') {
       const m = sim.startMatch();
       m.chances.forEach((c, i) => sim.resolveMatchChance(i, c.power ? opts.powerQuality ?? 0.65 : 0.5));
       const r = sim.finishCurrentMatch();
+      matchTimes.push(sim.state.time);
       mark('firstMatch', `first match ${r ? `${r.ourGoals}-${r.theirGoals}` : ''}`);
     }
 
@@ -173,11 +193,22 @@ export function runBot(opts: BotOptions): BotReport {
     if (u - prev > longestPurchaseGap.gap && prev < horizon) longestPurchaseGap = { from: prev, to: u, gap: u - prev };
     prev = u;
   }
+  // mid-game: any progress event (pad, upgrade, match) counts
+  const events = [...unlockTimes, ...upgradeTimes, ...matchTimes].filter((t) => t >= 180 && t <= Math.min(1200, total)).sort((a, b) => a - b);
+  let midGameGap = { from: 180, to: 180, gap: 0 };
+  let p0 = 180;
+  for (const t of [...events, Math.min(1200, total)]) {
+    if (t - p0 > midGameGap.gap) midGameGap = { from: p0, to: t, gap: t - p0 };
+    p0 = t;
+  }
   void BALANCE;
   return {
     timeline,
     marks,
     unlockTimes,
+    upgradeTimes,
+    matchTimes,
+    midGameGap,
     longestPurchaseGap,
     longestUnaffordable,
     finalCash: sim.state.cash,

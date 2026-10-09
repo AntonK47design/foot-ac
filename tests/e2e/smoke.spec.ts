@@ -91,14 +91,23 @@ test.describe('desktop', () => {
     const P = await page.evaluate(() => (window.__wk as unknown as W).sim.area.office.computer);
     // wait for the graduate to sit down in the office, then go to the computer
     await expect.poll(async () => page.evaluate(() => ((window.__wk as unknown as W).sim.state.podiumQueue as number[]).length), { timeout: 5000 }).toBe(1);
-    await page.waitForTimeout(9000);
+    await expect
+      .poll(async () => page.evaluate(() => !!(window.__wk as unknown as { sim: { podiumGraduate(): unknown } }).sim.podiumGraduate()), { timeout: 30_000 })
+      .toBe(true);
     await tp(P.x, P.z);
-    await expect(page.locator('.podium-panel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.office-panel')).toBeVisible({ timeout: 10_000 });
     const stops = async (): Promise<number> => page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.filter((e) => e.msg === 'gameplayStop').length);
     expect(await stops()).toBe(1);
-    await page.locator('.podium-panel .btn-big.promote').click();
-    await expect(page.locator('.podium-panel')).toBeHidden();
+    await page.locator('.office-panel .btn-big.promote').click();
     expect(await page.evaluate(() => (window.__wk as unknown as W).sim.state.squad.length)).toBe(1);
+    // the office stays open on its upgrade tabs: buy one, then close
+    await page.locator('.office-panel .tab').nth(1).click();
+    await page.evaluate(() => ((window.__wk as unknown as W).sim.state.cash = 1000));
+    await page.locator('.office-panel .tab').nth(1).click();
+    await page.locator('.office-panel .up-item .btn-big.sell').first().click();
+    expect(await page.evaluate(() => Object.keys((window.__wk as unknown as W).sim.state.upgrades as object).length)).toBe(1);
+    await page.locator('.office-panel .btn-round.close').click();
+    await expect(page.locator('.office-panel')).toBeHidden();
     await expect(page.locator('.btn-side').first()).toBeVisible();
     // kick off: the cinematic plays, the Power Shot meter takes Space, results stop gameplay
     const K = await page.evaluate(() => (window.__wk as unknown as W).sim.area.matchPitch.kickoff);

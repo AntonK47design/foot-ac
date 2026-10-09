@@ -115,6 +115,13 @@ export function computeObjective(sim: Sim): Objective | null {
     }
   }
 
+  // 6b. an upgrade at the office computer (only when it doesn't stall saving up for the next pad)
+  const up = sim.cheapestUpgrade();
+  if (up && s.cash + 1e-6 >= up.cost && (!cheapest || up.cost <= sim.padRemaining(cheapest) * BALANCE.objectives.upgradeShare)) {
+    const P = area.office.computer;
+    return { key: 'obj.upgrade', icon: 'podium', x: P.x, z: P.z, targetId: 'office', radius: BALANCE.transfer.zoneRadius };
+  }
+
   // 7. any decent pile
   if (pileTotal >= BALANCE.objectives.minPileWorth) {
     const p = nearestPile();
@@ -139,7 +146,7 @@ export function computeObjective(sim: Sim): Objective | null {
 function ballObjective(sim: Sim, stationId: string): Objective {
   const c = sim.state.coach;
   const crate = sim.area.crate.spot;
-  const cap = BALANCE.coach.carryCap;
+  const cap = sim.carryCap();
   const zr = BALANCE.crate.zoneRadius;
   const nearCrate = dist2(c.x, c.z, crate.x, crate.z) <= zr * zr;
   if (c.carry >= cap || (c.carry > 0 && !nearCrate)) {

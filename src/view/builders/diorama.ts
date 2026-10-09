@@ -493,6 +493,13 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
     case 'bus_shelter':
       kit.place(at.x, at.z).dugout(1.8);
       break;
+    case 'accountant': {
+      // office safe next to the accountant's spot
+      const sf = AREA1.safe;
+      kit.place(sf.x + 0.3, sf.z - 0.8, -HALF_PI).safe();
+      aoBlobs.push({ x: sf.x + 0.3, z: sf.z - 0.8, r: 0.6 });
+      break;
+    }
     case 'match_pitch': {
       // Team Bus stop by the gate: matches are played away at the stadium
       const K = AREA1.matchPitch.kickoff;

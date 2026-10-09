@@ -277,3 +277,125 @@ export class LeaguePanel extends Panel {
     this.show();
   }
 }
+
+export type OfficeTab = 'transfers' | 'coach' | 'staff' | 'stations' | 'academy';
+
+export interface UpgradeRow {
+  id: string;
+  tab: OfficeTab;
+  name: string;
+  icon: string;
+  level: number;
+  max: number;
+  cost: number | null;
+  /** Requirement text when not yet available. */
+  locked: string | null;
+  /** Effect now → after the next level. */
+  effect: string;
+}
+
+export interface OfficeData {
+  cash: number;
+  transfer: PodiumInfo | null;
+  waiting: number;
+  rows: UpgradeRow[];
+}
+
+/** Manager's Office computer: transfer decisions + upgrade tabs (GDD §4.7). */
+export class OfficePanel extends Panel {
+  private tab: OfficeTab = 'coach';
+  private data: (() => OfficeData) | null = null;
+  private cb: { sell(): void; promote(): void; buy(id: string): void } | null = null;
+  private readonly tabsEl: HTMLDivElement;
+  private readonly content: HTMLDivElement;
+
+  constructor(parent: HTMLElement, hooks: PanelHooks) {
+    super(parent, hooks, 'office-panel');
+    this.tabsEl = document.createElement('div');
+    this.tabsEl.className = 'tabs';
+    this.content = document.createElement('div');
+    this.content.className = 'tab-content';
+    this.body.append(this.tabsEl, this.content);
+  }
+
+  open(data: () => OfficeData, cb: { sell(): void; promote(): void; buy(id: string): void }): void {
+    this.data = data;
+    this.cb = cb;
+    this.tab = data().transfer ? 'transfers' : this.tab === 'transfers' ? 'coach' : this.tab;
+    this.title.textContent = t('office.title');
+    this.render();
+    this.show();
+  }
+
+  /** Re-render with fresh data (after a purchase or a decision). */
+  refresh(): void {
+    if (this.isOpen) this.render();
+  }
+
+  private render(): void {
+    const d = this.data?.();
+    const cb = this.cb;
+    if (!d || !cb) return;
+    this.tabsEl.innerHTML = '';
+    for (const id of ['transfers', 'coach', 'staff', 'stations', 'academy'] as OfficeTab[]) {
+      const b = document.createElement('button');
+      b.className = 'tab' + (id === this.tab ? ' sel' : '');
+      const badge = id === 'transfers' && d.waiting > 0 ? `<i class="tab-badge">${d.waiting}</i>` : '';
+      b.innerHTML = `${t('office.tab.' + id)}${badge}`;
+      b.addEventListener('click', () => {
+        this.tab = id;
+        this.render();
+      });
+      this.tabsEl.appendChild(b);
+    }
+    const c = this.content;
+    c.innerHTML = '';
+    if (this.tab === 'transfers') {
+      const info = d.transfer;
+      if (!info) {
+        c.innerHTML = `<div class="empty">${t('office.no_graduates')}</div>`;
+        return;
+      }
+      c.innerHTML = `<div class="podium-card">${cardHtml(info.card)}</div>`;
+      const row = document.createElement('div');
+      row.className = 'choice-row';
+      row.appendChild(button(t('podium.sell', { price: formatCash(info.price) }), 'sell', () => cb.sell(), t('podium.to_club', { club: info.buyer })));
+      const sub = info.replaces
+        ? t('podium.replaces', { name: info.replaces.name, ovr: info.replaces.ovr, price: formatCash(info.replaces.price) })
+        : t('podium.squad_count', { n: info.squadCount, size: info.squadSize });
+      row.appendChild(button(t('podium.promote'), 'promote', () => cb.promote(), sub));
+      c.appendChild(row);
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'up-list';
+    for (const r of d.rows.filter((x) => x.tab === this.tab)) {
+      const item = document.createElement('div');
+      item.className = 'up-item' + (r.locked ? ' locked' : '');
+      const pips = Array.from({ length: r.max }, (_, i) => `<i class="${i < r.level ? 'on' : ''}"></i>`).join('');
+      item.innerHTML = `<span class="up-icon">${icon(r.icon)}</span><div class="up-text"><b>${esc(r.name)}</b><span class="up-pips">${pips}</span><small>${esc(r.locked ?? r.effect)}</small></div>`;
+      const b = document.createElement('button');
+      if (r.locked) {
+        b.className = 'btn-big small neutral';
+        b.innerHTML = `<span>${icon('lock')}</span>`;
+        b.disabled = true;
+      } else if (r.cost === null) {
+        b.className = 'btn-big small neutral';
+        b.innerHTML = `<span>${t('office.max')}</span>`;
+        b.disabled = true;
+      } else {
+        const ok = d.cash + 1e-6 >= r.cost;
+        b.className = 'btn-big small ' + (ok ? 'sell' : 'neutral');
+        b.innerHTML = `<span>${formatCash(r.cost)}</span>`;
+        b.disabled = !ok;
+        b.addEventListener('click', () => {
+          cb.buy(r.id);
+          this.render();
+        });
+      }
+      item.appendChild(b);
+      list.appendChild(item);
+    }
+    c.appendChild(list);
+  }
+}
