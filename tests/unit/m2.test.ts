@@ -28,9 +28,9 @@ function player(id: number, ovr: number): Player {
   };
 }
 
-/** Puts a ready-made graduate on the podium (skips training). */
+/** Puts a ready-made graduate on the office bench (skips training). */
 function graduate(sim: Sim, ovr = 50): Trainee {
-  const t = createTrainee(new Rng(sim.state.nextId), sim.state.nextId++, AREA1.podium.top.x, AREA1.podium.top.z, { rarity: 'rare' });
+  const t = createTrainee(new Rng(sim.state.nextId), sim.state.nextId++, AREA1.office.seats[0]!.x, AREA1.office.seats[0]!.z, { rarity: 'rare' });
   for (const k of ['PAC', 'SHO', 'PAS', 'DRI'] as const) t.stats[k] = ovr;
   t.state = 'atPodium';
   sim.state.trainees.push(t);
@@ -44,15 +44,15 @@ function standAt(sim: Sim, x: number, z: number): void {
   sim.tick(DT);
 }
 
-describe('M2: podium and transfers', () => {
-  it('opens the podium prompt when the coach steps up, and selling pays the transfer value', () => {
+describe('M2: office transfer desk', () => {
+  it('opens the transfer prompt at the office computer, and selling pays the transfer value', () => {
     const sim = new Sim(createInitialState(undefined, 2));
     const g = graduate(sim, 52);
     const opened: number[] = [];
     sim.events.on('podiumOpen', (e) => opened.push(e.id));
     const sold: number[] = [];
     sim.events.on('sold', (e) => sold.push(e.price));
-    const P = AREA1.podium.coachSpot;
+    const P = AREA1.office.computer;
     standAt(sim, P.x, P.z);
     expect(sim.prompt).toBe('podium');
     expect(opened).toEqual([g.id]);
@@ -68,7 +68,7 @@ describe('M2: podium and transfers', () => {
   it('dismissing re-opens only after the coach leaves the zone', () => {
     const sim = new Sim(createInitialState(undefined, 2));
     graduate(sim);
-    const P = AREA1.podium.coachSpot;
+    const P = AREA1.office.computer;
     standAt(sim, P.x, P.z);
     sim.dismissPrompt();
     standAt(sim, P.x, P.z);
@@ -94,17 +94,17 @@ describe('M2: podium and transfers', () => {
     expect(sim.state.cash).toBeGreaterThan(cash);
   });
 
-  it('a full podium line never blocks graduation (auto-sale)', () => {
+  it('a full office bench never blocks graduation (auto-sale)', () => {
     const sim = new Sim(createInitialState(undefined, 2));
-    for (let i = 0; i < 1 + AREA1.podium.line.length; i++) graduate(sim);
-    expect(sim.state.podiumQueue).toHaveLength(1 + AREA1.podium.line.length);
+    for (let i = 0; i < AREA1.office.seats.length; i++) graduate(sim);
+    expect(sim.state.podiumQueue).toHaveLength(AREA1.office.seats.length);
     const extra = createTrainee(new Rng(1), 999, 0, 0);
     sim.state.trainees.push(extra);
     const cash = sim.state.cash;
     (sim as unknown as { graduate(t: Trainee): void }).graduate(extra);
     expect(extra.state).toBe('leaving');
     expect(sim.state.cash).toBeGreaterThan(cash);
-    expect(sim.state.podiumQueue).toHaveLength(1 + AREA1.podium.line.length);
+    expect(sim.state.podiumQueue).toHaveLength(AREA1.office.seats.length);
   });
 });
 

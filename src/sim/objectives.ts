@@ -34,10 +34,10 @@ export function computeObjective(sim: Sim): Objective | null {
     if (p && p.amount > 0) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
-  // 2. a graduate waits on the podium: sell or promote (the big payout moment)
+  // 2. a graduate waits in the office: sell or promote at the computer (the big payout moment)
   const grad = sim.podiumGraduate();
   if (grad) {
-    const P = area.podium.coachSpot;
+    const P = area.office.computer;
     return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
   }
 

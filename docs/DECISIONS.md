@@ -69,3 +69,7 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **The trip:** the bus pulls away (camera follows), a "Off to Sunday Park Stadium…" travel card covers the jump, the bus pulls up at the stadium, our team runs out of the door, and the match plays. After the results, a "Heading home…" card brings the camera back to the coach.
     - **Choreography:** scales with the pitch size. Skip also skips the trip.
     - **Sim:** unchanged apart from the kick-off position. Retuned the Team Bus to $85 because of the longer walk to the gate.
+49. **The podium is replaced by a transfer desk in the Manager's Office** (playtest idea). The Office construction site becomes a real cutaway room south-west of the clubhouse: wood floor, low 1.3 m walls (the busy walkway runs right behind it), doorways east and south, a manager's desk with computer, tactics-board and poster decals, a shelf and plants.
+    - **Flow:** graduates walk to the office and sit on a 4-seat waiting bench (a full bench auto-sells the next graduate, so training never blocks). The coach stands at the computer behind the desk to open the same SELL / PROMOTE card panel ("Transfer desk"), one graduate at a time.
+    - **Data:** `AreaDef.office` (computer spot, bench seats, seat yaw) replaces `podium`. Sim and save names (`podiumQueue`, `toPodium` / `atPodium`, prompt `'podium'`) are kept for save compatibility.
+    - **Later:** the M3 Office upgrades will live in this room too. Only the Gym stays as a locked teaser.

@@ -158,15 +158,16 @@ export const AREA1: AreaDef = {
     { id: 'starter_a', pos: { x: -4.8, z: -1.6 }, amount: 15 },
     { id: 'starter_b', pos: { x: -2.6, z: -0.6 }, amount: 25 },
   ],
-  podium: {
-    pos: { x: -9.6, z: -1.4 },
-    top: { x: -9.6, z: -1.45 },
-    coachSpot: { x: -9.6, z: -0.05 },
-    line: [
-      { x: -11.3, z: -0.7 },
-      { x: -12.3, z: -0.7 },
-      { x: -13.3, z: -0.7 },
+  office: {
+    computer: { x: -10.0, z: 2.05 },
+    // waiting bench along the west wall, facing into the room
+    seats: [
+      { x: -12.45, z: 3.2 },
+      { x: -12.45, z: 4.1 },
+      { x: -12.45, z: 5.0 },
+      { x: -12.45, z: 5.9 },
     ],
+    seatYaw: -Math.PI / 2,
   },
   matchPitch: {
     objectId: 'match_pitch',
@@ -214,14 +215,21 @@ export const AREA1: AreaDef = {
     { x0: 0.6, z0: -2.55, x1: 6.2, z1: -2.25 },
     { x0: 7.8, z0: -2.55, x1: 12.2, z1: -2.25 },
     { x0: 13.8, z0: -2.55, x1: 16.7, z1: -2.25 },
-    // plaza furniture: tactics board, outside bench, graduation podium, construction-site bench
+    // plaza furniture: tactics board, outside bench, park bench, bench by the planters
     { x0: -6.7, z0: -1.15, x1: -5.7, z1: -0.45 },
     { x0: -15.15, z0: -2.3, x1: -12.85, z1: -1.7 },
-    { x0: -10.5, z0: -1.85, x1: -8.7, z1: -0.95 },
     { x0: -0.4, z0: 6.8, x1: 1.6, z1: 7.25 },
     { x0: -15.9, z0: 3.5, x1: -15.3, z1: 5.7 },
-    // construction sites (office, gym) behind fences
-    { x0: -13.0, z0: 1.2, x1: -6.6, z1: 6.75 },
+    // Manager's Office: walls (east doorway z 2.8–4.4, front doorway x −10.8…−9.2), desk, waiting bench
+    { x0: -13.15, z0: 1.25, x1: -6.85, z1: 1.55 },
+    { x0: -13.15, z0: 1.25, x1: -12.85, z1: 6.75 },
+    { x0: -7.15, z0: 1.25, x1: -6.85, z1: 2.8 },
+    { x0: -7.15, z0: 4.4, x1: -6.85, z1: 6.75 },
+    { x0: -13.15, z0: 6.45, x1: -10.8, z1: 6.75 },
+    { x0: -9.2, z0: 6.45, x1: -6.85, z1: 6.75 },
+    { x0: -11.25, z0: 2.6, x1: -8.75, z1: 3.5 },
+    { x0: -12.85, z0: 2.7, x1: -12.2, z1: 6.4 },
+    // construction site (gym) behind fences
     { x0: 10.4, z0: 2.6, x1: 16.2, z1: 8.55 },
   ],
 };

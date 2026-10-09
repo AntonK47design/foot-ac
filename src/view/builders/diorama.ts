@@ -313,16 +313,17 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   // ── clubhouse walls (cutaway): full back/side walls, front stubs with doorways
   for (const room of L.rooms) {
     const r = room.rect;
-    wall(b, r.x0, r.z0, r.x1, r.z0, WALL_H, 1);
+    const H = room.wallH ?? WALL_H;
+    wall(b, r.x0, r.z0, r.x1, r.z0, H, 1);
     aoStrips.push({ x0: r.x0, z0: r.z0 + WALL_T / 2, x1: r.x1, z1: r.z0 + WALL_T / 2, w: 0.7 });
-    if (room === L.rooms[0]) {
-      wall(b, r.x0, r.z0, r.x0, r.z1, WALL_H, -1);
+    if (room === L.rooms[0] || room.westWall) {
+      wall(b, r.x0, r.z0, r.x0, r.z1, H, -1);
       aoStrips.push({ x0: r.x0 + WALL_T / 2, z0: r.z0, x1: r.x0 + WALL_T / 2, z1: r.z1, w: 0.7 });
     }
     if (room.eastDoor) {
-      wall(b, r.x1, r.z0, r.x1, room.eastDoor[0], WALL_H, 1);
-      wall(b, r.x1, room.eastDoor[1], r.x1, r.z1, WALL_H, 1);
-    } else wall(b, r.x1, r.z0, r.x1, r.z1, WALL_H, 1);
+      wall(b, r.x1, r.z0, r.x1, room.eastDoor[0], H, 1);
+      wall(b, r.x1, room.eastDoor[1], r.x1, r.z1, H, 1);
+    } else wall(b, r.x1, r.z0, r.x1, r.z1, H, 1);
     wall(b, r.x0, r.z1, room.door[0], r.z1, STUB_H, 1);
     wall(b, room.door[1], r.z1, r.x1, r.z1, STUB_H, 1);
     b.at(G.rbox(0.03), COL.trim, (room.door[0] + room.door[1]) / 2, 0.025, r.z1 + 0.45, 0, room.door[1] - room.door[0] - 0.2, 0.03, 0.7);
@@ -382,11 +383,22 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   props.put('bench', 0.6, 7.0, 0, 5);
   kit.place(-1.6, 7.3).bin();
   aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 }, { x: -1.6, z: 7.3, r: 0.35 });
-  // graduation podium (prebuilt): faces the plaza
-  const pod = AREA1.podium.pos;
-  kit.place(pod.x, pod.z).podium();
-  aoBlobs.push({ x: pod.x, z: pod.z, r: 1.3 });
-  anchors.podium = { x: pod.x, z: pod.z };
+  // ── Manager's Office: transfer desk with computer, waiting bench for graduates
+  const of = L.rooms.find((r) => r.id === 'office')?.rect;
+  if (of) {
+    const pc = AREA1.office.computer;
+    kit.place(pc.x, pc.z + 0.95).desk();
+    aoBlobs.push({ x: pc.x, z: pc.z + 0.95, r: 1.5 });
+    anchors.office = { x: pc.x, z: pc.z };
+    kit.place(of.x0 + 0.55, (of.z0 + of.z1) / 2 + 0.75, HALF_PI).bench(3.4);
+    aoStrips.push({ x0: of.x0 + 0.3, z0: of.z0 + 1.2, x1: of.x0 + 0.3, z1: of.z1 - 0.3, w: 0.6 });
+    decals.add('tactics', 1.2, 0.74, trs(pc.x, 0.78, of.z0 + WALL_T / 2 + 0.02));
+    decals.add('posterD', 0.6, 0.6, trs(of.x0 + 1.9, 0.75, of.z0 + WALL_T / 2 + 0.02));
+    props.put('shelf_B_large_decorated', of.x0 + 1.0, of.z0 + 0.4, 0, 0.7);
+    props.put('cactus_medium_A', of.x1 - 0.45, of.z1 - 0.6, 0, 0.85);
+    props.put('cactus_small_A', of.x1 - 0.4, of.z0 + 0.5, 0, 0.9);
+    props.put('rug_oval_A', pc.x + 0.4, of.z0 + 3.4, 0, 0.9, 0.015, 0);
+  }
   props.put('streetlight', 16.3, L.gate.z + 2.0, -HALF_PI, 4, 0, 0.1);
   props.put('streetlight', -5.6, 7.8, 0, 4, 0, 0.1);
   props.put('firehydrant', 16.35, -1.9, 0, 3.5);
@@ -426,9 +438,6 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     anchors['ghost:' + gh.id] = { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 };
     anchors['ghostSign:' + gh.id] = { x: r.x1 - 0.6, z: r.z1 + 0.5 };
   }
-  props.put('Box_A', -14.0, 6.6, 0.4, 1.1);
-  props.put('Barrel_A', -14.4, 7.4, 0, 0.7);
-  props.put('Pallet_Small_Decorated_A', -5.9, 2.2, 0.2, 0.55);
   kit.place(-15.4, 2.4).planter();
   aoBlobs.push({ x: -15.4, z: 2.4, r: 0.55 });
   kit.place(-15.6, 4.6, Math.PI / 2).bench(2.2);

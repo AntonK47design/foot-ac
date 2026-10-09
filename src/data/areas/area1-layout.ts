@@ -12,6 +12,10 @@ export interface Room {
   door: [number, number];
   /** Doorway in the east wall, z range (shared walls). */
   eastDoor?: [number, number];
+  /** Full-height west wall (rooms that don't share it). */
+  westWall?: boolean;
+  /** Wall height (m); low walls for rooms with traffic behind them. */
+  wallH?: number;
 }
 
 export interface Layout {
@@ -35,6 +39,7 @@ export const AREA1_LAYOUT: Layout = {
   rooms: [
     { id: 'reception', rect: { x0: -16.4, z0: -11.4, x1: -10.4, z1: -4.8 }, floor: 'tilesTeal', door: [-13.3, -11.5], eastDoor: [-8.6, -7.2] },
     { id: 'changing', rect: { x0: -10.4, z0: -11.4, x1: -5.2, z1: -4.8 }, floor: 'rubberBlue', door: [-8.6, -7.0] },
+    { id: 'office', rect: { x0: -13.0, z0: 1.4, x1: -7.0, z1: 6.6 }, floor: 'wood', door: [-10.8, -9.2], eastDoor: [2.8, 4.4], westWall: true, wallH: 1.3 },
   ],
   pitch: { x0: -3.8, z0: -11.4, x1: 16.4, z1: -2.4 },
   pitchGates: [
@@ -47,7 +52,6 @@ export const AREA1_LAYOUT: Layout = {
   passDeck: { x0: 10.4, z0: -11.0, x1: 15.6, z1: -3.0 },
   sprintTrack: { x0: -16.2, z0: 9.4, x1: 2.4, z1: 11.5 },
   ghosts: [
-    { id: 'office', rect: { x0: -13.0, z0: 1.2, x1: -6.6, z1: 6.4 }, label: 'Office', price: 600 },
     { id: 'gym', rect: { x0: 10.4, z0: 2.6, x1: 16.2, z1: 8.2 }, label: 'Gym', price: 900 },
   ],
   busStop: { x: 18.8, z: 0.4 },

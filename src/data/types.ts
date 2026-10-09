@@ -109,8 +109,11 @@ export interface AreaDef {
   starterPiles: StarterPile[];
   /** Changing-room bench seats where signed trainees put on the academy kit. */
   lockers: { seats: V2[]; yaw: number };
-  /** Graduation podium: the graduate stands on `top`, others wait on `line`; the coach decides at `coachSpot`. */
-  podium: { pos: V2; top: V2; coachSpot: V2; line: V2[] };
+  /**
+   * Manager's Office: graduates wait on the bench `seats` (first = next up); the coach decides at the `computer`.
+   * (Sim names keep "podium" for save compatibility.)
+   */
+  office: { computer: V2; seats: V2[]; seatYaw: number };
   /**
    * Matches are played away at the stadium (a separate island reached by the team bus). `objectId` unlocks the
    * Team Bus stop; the coach boards at `kickoff`; `rect` is the stadium pitch (world coords, far from the academy).

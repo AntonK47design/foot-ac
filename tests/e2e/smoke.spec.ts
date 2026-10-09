@@ -70,12 +70,12 @@ test.describe('desktop', () => {
     expect(log2.filter((m) => m === 'gameplayStart').length).toBe(2);
   });
 
-  test('podium choice, squad and a full match with a Power Shot', async ({ page }) => {
+  test('office transfer choice, squad and a full match with a Power Shot', async ({ page }) => {
     test.setTimeout(150_000);
     const errors = attachConsole(page);
     await page.goto('/');
     await waitForGameplay(page);
-    type W = { sim: { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> }; state: Record<string, unknown> & { coach: { x: number; z: number; px: number; pz: number }; squad: unknown[]; cash: number }; spawnTrainee(): { stats: Record<string, number> } | undefined; graduate(t: unknown): void; area: { podium: { coachSpot: { x: number; z: number } }; matchPitch: { kickoff: { x: number; z: number } } } } };
+    type W = { sim: { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> }; state: Record<string, unknown> & { coach: { x: number; z: number; px: number; pz: number }; squad: unknown[]; cash: number }; spawnTrainee(): { stats: Record<string, number> } | undefined; graduate(t: unknown): void; area: { office: { computer: { x: number; z: number } }; matchPitch: { kickoff: { x: number; z: number } } } } };
     await page.evaluate(() => {
       const sim = (window.__wk as unknown as W).sim;
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
@@ -88,8 +88,8 @@ test.describe('desktop', () => {
         c.x = c.px = x as number;
         c.z = c.pz = z as number;
       }, [x, z]);
-    const P = await page.evaluate(() => (window.__wk as unknown as W).sim.area.podium.coachSpot);
-    // wait for the graduate to walk onto the podium, then step up
+    const P = await page.evaluate(() => (window.__wk as unknown as W).sim.area.office.computer);
+    // wait for the graduate to sit down in the office, then go to the computer
     await expect.poll(async () => page.evaluate(() => ((window.__wk as unknown as W).sim.state.podiumQueue as number[]).length), { timeout: 5000 }).toBe(1);
     await page.waitForTimeout(9000);
     await tp(P.x, P.z);

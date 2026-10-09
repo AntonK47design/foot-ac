@@ -74,27 +74,6 @@ export class PropKit {
     this.add(G.cyl(8), C.steel, 0, h, -d, 0, 0.06, w, 0.06, 0, Math.PI / 2);
   }
 
-  /** Graduation podium: 2nd / 1st / 3rd blocks on a blue plinth with a star backdrop. Local: front faces +z. */
-  podium(): void {
-    this.add(G.rbox(0.06), C.blueDark, 0, 0.04, 0, 0, 2.0, 0.08, 1.0);
-    // 1st (centre, gold top), 2nd (left, silver), 3rd (right, bronze)
-    this.add(G.rbox(0.06), C.blue, 0, 0.24, 0, 0, 0.75, 0.4, 0.8);
-    this.add(G.rbox(0.05), C.gold, 0, 0.45, 0, 0, 0.77, 0.04, 0.82);
-    this.add(G.rbox(0.06), C.blue, -0.64, 0.17, 0, 0, 0.55, 0.26, 0.74);
-    this.add(G.rbox(0.05), C.steel, -0.64, 0.31, 0, 0, 0.57, 0.04, 0.76);
-    this.add(G.rbox(0.06), C.blue, 0.64, 0.13, 0, 0, 0.55, 0.18, 0.74);
-    this.add(G.rbox(0.05), 0xd08a4e, 0.64, 0.23, 0, 0, 0.57, 0.04, 0.76);
-    // step numbers as small white tiles
-    this.add(G.box(), C.white, 0, 0.26, 0.405, 0, 0.16, 0.2, 0.01);
-    this.add(G.box(), C.white, -0.64, 0.17, 0.375, 0, 0.12, 0.12, 0.01);
-    this.add(G.box(), C.white, 0.64, 0.13, 0.375, 0, 0.12, 0.08, 0.01);
-    // backdrop board with academy stripes and stars
-    for (const sx of [-0.95, 0.95]) this.add(G.cyl(8), C.steelDark, sx, 0.9, -0.55, 0, 0.07, 1.8, 0.07);
-    this.add(G.rbox(0.06), C.blue, 0, 1.45, -0.55, 0, 2.0, 0.85, 0.08);
-    this.add(G.rbox(0.04), C.yellow, 0, 1.15, -0.5, 0, 2.0, 0.08, 0.02);
-    for (const sx of [-0.6, 0, 0.6]) this.add(G.sphere(8, 6), C.gold, sx, 1.55, -0.5, 0, 0.16, 0.16, 0.04);
-  }
-
   /** Small corner flag. */
   cornerFlag(x: number, z: number, color = C.yellow): void {
     this.add(G.cyl(6), C.white, x, 0.45, z, 0, 0.04, 0.9, 0.04);

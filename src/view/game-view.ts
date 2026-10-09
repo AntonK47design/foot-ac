@@ -55,8 +55,6 @@ const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
 /** Root lift while sitting so the hips rest on the bench seat (bench top 0.53 m, sit-clip hips ≈ 0.05 m). */
 const SIT_LIFT = 0.47;
-/** Top of the podium's 1st-place block. */
-const PODIUM_LIFT = 0.47;
 const ADULT_SCALE = 1.85;
 const HEAD_Y = 1.45;
 const RARITY_CLS: Record<Rarity, string> = { common: 'r-common', rare: 'r-rare', epic: 'r-epic', wonderkid: 'r-wonderkid' };
@@ -159,7 +157,7 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
       k.place(0, 0, 0.4).goal(1.8, 1.0, 0.7);
       break;
     case 'podium':
-      k.podium();
+      k.desk();
       break;
     case 'sign':
       k.desk();
@@ -298,7 +296,7 @@ export class GameView {
     };
 
     this.podiumRing = makePad(PALETTE.star, 0x1d2433, 1.0, 0.6);
-    const pc = sim.area.podium.coachSpot;
+    const pc = sim.area.office.computer;
     this.podiumRing.position.set(pc.x, 0.035, pc.z);
     scene.add(this.podiumRing);
     this.kickoffRing = makePad(PALETTE.blue, 0x1d2433, 1.0, 0.6);
@@ -476,7 +474,7 @@ export class GameView {
       this.audio.play('register');
       this.audio.play('coin', 1.2);
       this.haptic(25);
-      const P = this.sim.area.podium.top;
+      const P = this.sim.area.office.computer;
       const c = this.sim.state.coach;
       for (let i = 0; i < 16; i++) this.fx.coins.spawn(P.x, 1.6, P.z, c.x + (Math.random() - 0.5) * 0.6, 1.4, c.z + (Math.random() - 0.5) * 0.6, 0.45 + i * 0.03);
       this.fx.burst(P.x, 1.4, P.z, 50, 0.8);
@@ -487,7 +485,7 @@ export class GameView {
     ev.on('promoted', (e) => {
       this.audio.play('cheer');
       this.audio.play('levelup');
-      const P = this.sim.area.podium.top;
+      const P = this.sim.area.office.computer;
       this.fx.burst(P.x, 1.6, P.z, 70, 1);
       const p = this.sim.state.squad.find((q) => q.id === e.id);
       if (p) this.hud.toast(t('toast.promoted', { name: p.name.split(' ')[0] ?? p.name }), 'good', 3000);
@@ -875,14 +873,13 @@ export class GameView {
     } else if (tr.state === 'seated' || tr.state === 'changing') {
       anim = 'sit';
     } else if (tr.state === 'atPodium') {
-      // on top: a little celebration every few seconds
-      anim = sim.state.podiumQueue[0] === tr.id && (this.time + tr.id) % 4 < 1.1 ? 'cheer' : 'idle';
+      // waiting on the office bench for the coach's transfer decision
+      anim = 'sit';
     } else if (tr.moving) {
       anim = tr.state === 'leaving' ? 'run' : 'walk';
     }
     a.yaw = lerpAngle(a.yaw, yaw, 1 - Math.exp(-dt * 14));
-    const onTop = tr.state === 'atPodium' && sim.state.podiumQueue[0] === tr.id;
-    const ly = anim === 'sit' ? SIT_LIFT : onTop ? PODIUM_LIFT : 0;
+    const ly = anim === 'sit' ? SIT_LIFT : 0;
     a.y = (a.y ?? ly) + (ly - (a.y ?? ly)) * (1 - Math.exp(-dt * 12));
     a.c.root.position.set(x, a.y, z);
     a.c.root.rotation.y = a.yaw + YAW_OFFSET;
@@ -891,15 +888,15 @@ export class GameView {
     const ovr = sim.ovr(tr);
     const rc = RARITY_CLS[tr.rarity];
     const key = 'tl:' + tr.id;
-    if (tr.state === 'atPodium' || tr.state === 'toPodium') {
-      const top = sim.state.podiumQueue[0] === tr.id;
+    if ((tr.state === 'atPodium' || tr.state === 'toPodium') && sim.state.podiumQueue[0] === tr.id) {
+      // next graduate up for a transfer decision: name, OVR and transfer value
       this.labels.place(
         key,
         x,
-        HEAD_Y + 0.35 + (top ? PODIUM_LIFT : 0),
+        HEAD_Y + 0.25,
         z,
         '',
-        `<div class="card grad${top ? ' top' : ''}"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span>${top ? `<span class="val">${formatCash(sim.transferValue(tr))}</span>` : ''}</div>`,
+        `<div class="card grad top"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span><span class="val">${formatCash(sim.transferValue(tr))}</span></div>`,
       );
     } else if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
       this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);

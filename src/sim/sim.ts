@@ -962,8 +962,8 @@ export class Sim {
     this.addXp(BALANCE.xp.perGraduation);
     t.stationId = null;
     this.events.emit('graduated', { id: t.id });
-    if (s.podiumQueue.length >= 1 + this.area.podium.line.length) {
-      // podium line full: the club's scouts take the graduate at the standard fee (never blocks training)
+    if (s.podiumQueue.length >= this.area.office.seats.length) {
+      // office bench full: the club's scouts take the graduate at the standard fee (never blocks training)
       this.sell(t, false);
     } else {
       s.podiumQueue.push(t.id);
@@ -976,13 +976,13 @@ export class Sim {
 
   // ───────────────────────────── podium, transfers, squad (M2) ─────────────────────────────
 
-  /** Where the i-th waiting graduate stands (0 = on top of the podium). */
+  /** Office bench seat of the i-th waiting graduate (0 = next up). "Podium" names are kept for save compatibility. */
   podiumSlot(i: number): { x: number; z: number } {
-    const P = this.area.podium;
-    return i === 0 ? P.top : (P.line[i - 1] ?? P.line[P.line.length - 1] ?? P.top);
+    const seats = this.area.office.seats;
+    return seats[Math.min(i, seats.length - 1)] ?? this.area.office.computer;
   }
 
-  /** The graduate standing on the podium (ready for the coach's decision). */
+  /** The graduate whose transfer the coach decides next (seated in the office). */
   podiumGraduate(): Trainee | undefined {
     const id = this.state.podiumQueue[0];
     const t = id !== undefined ? this.trainee(id) : undefined;
@@ -1019,9 +1019,7 @@ export class Sim {
         t.goal = null;
         t.moving = false;
         t.state = 'atPodium';
-        // face the coach's spot (top) or along the line
-        const c = this.area.podium.coachSpot;
-        t.yaw = yawFor(c.x - t.x, c.z - t.z);
+        t.yaw = this.area.office.seatYaw;
       }
     }
   }
@@ -1029,7 +1027,7 @@ export class Sim {
   private updatePrompts(): void {
     const s = this.state;
     const c = s.coach;
-    const P = this.area.podium.coachSpot;
+    const P = this.area.office.computer;
     const pr = BALANCE.transfer.zoneRadius;
     const inPodium = dist2(c.x, c.z, P.x, P.z) <= pr * pr;
     if (!inPodium) this.latched.podium = false;
