@@ -99,22 +99,13 @@ export function claimDaily(state: SimState, now: number, rng: Rng, tz?: number):
 
 // ───────────────────────────── daily quests ─────────────────────────────
 
-const QUEST_POOL: Array<{ kind: QuestKind; target: number; cash: number; tickets: number }> = [
-  { kind: 'sign', target: 10, cash: 400, tickets: 1 },
-  { kind: 'reps', target: 120, cash: 500, tickets: 0 },
-  { kind: 'win', target: 2, cash: 600, tickets: 1 },
-  { kind: 'sell', target: 3, cash: 600, tickets: 1 },
-  { kind: 'upgrade', target: 2, cash: 500, tickets: 1 },
-  { kind: 'graduate', target: 4, cash: 500, tickets: 1 },
-  { kind: 'collect', target: 3000, cash: 400, tickets: 1 },
-];
 
 /** New quests at local midnight (3 distinct kinds, scaled by level). Returns true when refreshed. */
 export function refreshQuests(state: SimState, now: number, rng: Rng, tz?: number): boolean {
   const today = dayKey(now, tz);
   const q = state.meta.quests;
   if (q.day === today || !unlocked(state, 'quests')) return false;
-  const pool = [...QUEST_POOL];
+  const pool = [...BALANCE.meta.quests.pool];
   const list: Quest[] = [];
   const scale = 1 + BALANCE.meta.quests.levelScale * (state.level - 1);
   for (let i = 0; i < BALANCE.meta.quests.perDay && pool.length; i++) {

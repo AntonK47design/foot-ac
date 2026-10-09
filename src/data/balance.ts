@@ -151,7 +151,20 @@ export const BALANCE = {
       { prospect: 'epic' as Rarity, tickets: 5 },
     ] as Array<{ cash?: number; tickets?: number; prospect?: Rarity }>,
     dailyLevelScale: 0.5,
-    quests: { perDay: 3, levelScale: 0.5 },
+    /** Quest cash ≈ 15–25 s of income at the level (tickets are the real prize); targets/cash scale with level. */
+    quests: {
+      perDay: 3,
+      levelScale: 0.4,
+      pool: [
+        { kind: 'sign', target: 10, cash: 200, tickets: 1 },
+        { kind: 'reps', target: 120, cash: 250, tickets: 0 },
+        { kind: 'win', target: 2, cash: 300, tickets: 1 },
+        { kind: 'sell', target: 3, cash: 300, tickets: 1 },
+        { kind: 'upgrade', target: 2, cash: 250, tickets: 1 },
+        { kind: 'graduate', target: 4, cash: 250, tickets: 1 },
+        { kind: 'collect', target: 3000, cash: 200, tickets: 1 },
+      ] as Array<{ kind: 'sign' | 'reps' | 'win' | 'sell' | 'upgrade' | 'graduate' | 'collect'; target: number; cash: number; tickets: number }>,
+    },
     /** Scout missions: duration (s), cost, and the rarity floor of the prospect found. */
     scout: {
       local: { sec: 300, cash: 400, tickets: 0, floor: 'common' as Rarity, wonderkid: 0.01 },

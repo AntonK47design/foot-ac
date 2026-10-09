@@ -106,3 +106,4 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **gameplayStart:** at boot the panel delays `gameplayStart()` until Collect. New players never see it, so §2 "no menu before gameplay" still holds for the first session.
 56. **Academy customisation deferred** (user request). The GDD §4.9 kit/colour cosmetics are not in M4. The day-7 reward that would have been a kit is 5 Scout Tickets.
 57. **Account nudge:** a guest is asked once to log in, after 5 min of play with ≥ 70% of the stars, and only if the SDK supports accounts. The game then calls `showAuthPrompt()`.
+58. **Quest cash lowered** (playtest: "quests pay too much"). They used to pay ~1 min of income (e.g. $2,400 at Lv 7). Now each quest pays about 15–25 s of income: base $200–300 × (1 + 0.4 × (level − 1)), so ~$500–850 at Lv 7. Scout Tickets are the main prize. The quest pool moved to `balance.ts`.
