@@ -39,3 +39,8 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 30. **KayKit scale fixes**: Furniture/Restaurant bits are modelled at ~2× real scale (×0.45–0.85); City Builder bits at ~0.2× (×4–6). Brown KayKit trash bags read as rocks → replaced with coded academy bins.
 31. **Contact AO** = merged radial/linear gradient decals (under props, along wall bases) + baked vertex AO on coded geometry; no SSAO/post.
 32. **Pads 1.3 m** (was 2.2 m). Ghost holograms render after pads (`renderOrder`), price label sits on the front half of the pad so it never covers the ghost.
+33. **Gameplay moved onto the diorama** with the same pad/station ids. Save v2 migration flags `relayout`; on load the sim puts the coach at spawn and each trainee/staff at the logical spot for its state, while cash, pads, stations and stats are kept.
+34. **Retune for the bigger layout** (longer walks, gate detours): coach 6.0 m/s, training fees +1, Ball Boy $175 after bench + cone lane 2, flags $75 after the wall, cooler after the sprint track. Bot: first automation 2:15 (focused) / 2:50 (distracted); all §5.1 beats pass.
+35. **Arriving trainees go straight to a free desk** instead of sitting first (the reception is far from the bus).
+36. **Icon atlas** rendered once at start in a separate short-lived WebGL context (toDataURL), then disposed: no `readPixels` stall warnings on the main context.
+37. **Initial download** now includes the Area 1 GLBs (characters + props): ~1.7 MB transferred, within the 6 MB art-bible budget. The KayKit city pack is not shipped until a later area needs it.
