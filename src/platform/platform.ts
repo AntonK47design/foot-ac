@@ -105,9 +105,9 @@ export class Platform {
     this.adapter.dataRemove(key);
   }
 
-  /** Test builds only (exposed via window.__wk): turn ads on without VITE_ADS. */
+  /** Test builds only (exposed via window.__wk): turn ads on without VITE_ADS. A no-op in release builds. */
   enableAdsForTesting(): void {
-    this.adsEnabled = true;
+    if (import.meta.env?.DEV || import.meta.env?.VITE_TEST_HOOKS === '1' || import.meta.env?.MODE === 'test' || import.meta.env?.MODE === 'e2e') this.adsEnabled = true;
   }
 
   get adsAvailable(): boolean {
