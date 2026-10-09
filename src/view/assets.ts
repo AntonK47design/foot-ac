@@ -51,6 +51,14 @@ export async function loadArea1Assets(onProgress?: (k: number) => void): Promise
     characters.set(k, { scene: g.scene });
     for (const c of g.animations) clips.set(c.name, c);
   });
+  // layered variants: legs-only locomotion + arms-only "holding" pose (carry while walking)
+  const isArm = (n: string): boolean => n.startsWith('arm-');
+  for (const name of ['idle', 'walk', 'sprint']) {
+    const c = clips.get(name);
+    if (c) clips.set(name + ':legs', new AnimationClip(name + ':legs', c.duration, c.tracks.filter((t) => !isArm(t.name))));
+  }
+  const hold = clips.get('holding-both');
+  if (hold) clips.set('hold:arms', new AnimationClip('hold:arms', hold.duration, hold.tracks.filter((t) => isArm(t.name))));
   return { props, characters, clips };
 }
 

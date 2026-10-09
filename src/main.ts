@@ -16,6 +16,8 @@ import { AudioSystem } from './view/audio';
 import { GameView } from './view/game-view';
 import { autoTier, FpsWatchdog, type Tier } from './view/quality';
 import { RenderCore } from './view/renderer';
+import { loadArea1Assets } from './view/assets';
+import type { Objective } from './sim/objectives';
 
 declare global {
   interface Window {
@@ -80,7 +82,17 @@ async function boot(): Promise<void> {
     }
   };
 
-  const view = new GameView(core, sim, hud, audio, worldUi, haptic);
+  // Area 1 assets (characters + props) load before gameplayStart; the boot bar shows only if this takes > 1 s
+  const assets = await loadArea1Assets();
+  const vignette = document.createElement('div');
+  vignette.className = 'vignette';
+  gameEl.insertBefore(vignette, inputLayer);
+  const view = new GameView(core, sim, hud, audio, worldUi, haptic, assets);
+  const setObjective = (o: Objective | null): void => {
+    if (!o) return hud.setObjective(null);
+    const station = sim.world.pads.get(o.targetId)?.unlock;
+    hud.setObjective(o, view.iconUrl(o.icon, station && station.type === 'lane' ? station.station : undefined));
+  };
   // the mock reports 'desktop' everywhere; a coarse primary pointer means touch (phones, tablets, touch emulation)
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const initialMethod: InputMethod = device !== 'desktop' || coarse ? 'touch' : 'keyboard';
@@ -126,7 +138,7 @@ async function boot(): Promise<void> {
       audio.applyVolume();
       if (langChanged) {
         applyLocale();
-        hud.setObjective(sim.objective);
+        setObjective(sim.objective);
       }
       if (gfxChanged) {
         core.applyTier(pickTier());
@@ -142,7 +154,7 @@ async function boot(): Promise<void> {
       sim.loadState(createInitialState(AREA1, newSeed()));
       view.resetVisuals();
       hud.setCash(sim.state.cash, true);
-      hud.setObjective(sim.objective);
+      setObjective(sim.objective);
       hintDone = false;
       persist('reset');
       hud.toast(t('toast.reset_done'));
@@ -166,7 +178,7 @@ async function boot(): Promise<void> {
   updateHint();
 
   // ── sim → platform / analytics / save hooks
-  sim.events.on('objectiveChanged', (e) => hud.setObjective(e.objective));
+  sim.events.on('objectiveChanged', (e) => setObjective(e.objective));
   sim.events.on('saveNeeded', (e) => persist(e.reason));
   sim.events.on('unlocked', () => {
     platform.reportCompletion(sim.completionPct());
@@ -182,7 +194,7 @@ async function boot(): Promise<void> {
     }
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
-  hud.setObjective(sim.objective);
+  setObjective(sim.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());
   platform.setContext({ area: 1, academyLevel: sim.state.level, saveVersion: SAVE_VERSION, build: BUILD });

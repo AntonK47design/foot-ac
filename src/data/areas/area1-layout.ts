@@ -40,6 +40,7 @@ export const AREA1_LAYOUT: Layout = {
   pitchGates: [
     [1.0, 2.6],
     [6.2, 7.8],
+    [9.8, 11.4],
   ],
   shootingLane: { x0: -0.4, z0: -8.9, x1: 4.2, z1: -2.6 },
   dribbleStrip: { x0: 5.0, z0: -8.6, x1: 7.6, z1: -2.8 },

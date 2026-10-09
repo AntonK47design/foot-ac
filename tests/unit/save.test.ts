@@ -79,6 +79,22 @@ describe('save', () => {
     expect(r.blob?.game.cash).toBe(0);
   });
 
+  it('migrates v1 saves onto the new layout (economy kept, agents re-placed)', () => {
+    const sim = playedSim();
+    sim.state.coach.x = 99;
+    sim.state.coach.z = 99;
+    const raw = JSON.stringify({ v: 1, created: 0, lastSeen: 0, game: sim.state, settings: DEFAULT_SETTINGS, stats: { playSec: 0, sessions: 1, firstDay: '' } });
+    const r = parseSave(raw, AREA1);
+    expect(r.blob?.v).toBe(SAVE_VERSION);
+    const sim2 = new Sim(r.blob!.game);
+    expect(sim2.state.coach.x).toBe(AREA1.spawn.x);
+    expect(sim2.state.cash).toBe(sim.state.cash);
+    expect(sim2.state.pads.p_goal?.done).toBe(true);
+    expect(sim2.state.flags.relayout).toBeUndefined();
+    for (let i = 0; i < 600; i++) sim2.tick(1 / 60);
+    for (const t of sim2.state.trainees) expect(sim2.nav.isBlocked(t.x, t.z) && t.state !== 'training').toBe(false);
+  });
+
   it('adds pads introduced by newer content', () => {
     const game = createInitialState();
     delete (game.pads as Record<string, unknown>).p_track_l2;

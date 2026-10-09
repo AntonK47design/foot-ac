@@ -105,7 +105,7 @@ export class Sim {
   paying = false;
   private objT = 0;
   private readonly rng: Rng;
-  private readonly seatPos: Array<{ x: number; z: number }> = [];
+  private readonly seatPos: Array<{ x: number; z: number; yaw: number }> = [];
 
   constructor(
     public state: SimState = createInitialState(),
@@ -115,6 +115,7 @@ export class Sim {
     this.rng = new Rng(state.rng);
     this.nav = new NavGrid(area.navBounds, 0.5, this.world.walkable());
     this.rebuildWorld();
+    this.syncLayout();
     this.objective = computeObjective(this);
   }
 
@@ -124,14 +125,94 @@ export class Sim {
     this.rng.state = state.rng;
     this.objective = null;
     this.rebuildWorld();
+    this.syncLayout();
     this.refreshObjective();
+  }
+
+  /** Pile positions always follow the current layout; old saves (flags.relayout) get agents snapped to safe spots. */
+  syncLayout(): void {
+    const s = this.state;
+    for (const p of s.piles) {
+      let pos: { x: number; z: number } | undefined;
+      if (p.id === 'desk') pos = this.area.desk.pile;
+      else if (p.id.startsWith('st:')) pos = this.world.stations.get(p.id.slice(3))?.pile;
+      else pos = this.area.starterPiles.find((sp) => sp.id === p.id)?.pos;
+      if (pos) {
+        p.x = pos.x;
+        p.z = pos.z;
+      }
+    }
+    if (s.flags.relayout) {
+      delete s.flags.relayout;
+      this.relayout();
+    }
+  }
+
+  /** Moves every agent to the logical spot for its state on the current layout (layout migrations). */
+  relayout(): void {
+    const s = this.state;
+    const c = s.coach;
+    c.x = c.px = this.area.spawn.x;
+    c.z = c.pz = this.area.spawn.z;
+    c.vx = c.vz = 0;
+    const door = this.area.gate.door;
+    for (const t of s.trainees) {
+      let p: { x: number; z: number } = door;
+      t.goal = null;
+      t.path = [];
+      switch (t.state) {
+        case 'arriving':
+        case 'seated': {
+          const sp = this.seatPos[t.seat];
+          if (sp) p = sp;
+          t.state = 'seated';
+          t.yaw = sp?.yaw ?? 0;
+          break;
+        }
+        case 'toDesk':
+        case 'atDesk':
+          p = this.area.desk.traineeSpot;
+          t.state = 'atDesk';
+          break;
+        case 'queued':
+          if (t.stationId) {
+            const ss = s.stations[t.stationId];
+            p = this.world.queueSlot(this.station(t.stationId), Math.max(0, ss?.queue.indexOf(t.id) ?? 0));
+          }
+          break;
+        case 'toLane':
+        case 'training':
+          if (t.stationId) {
+            const l = this.station(t.stationId).lanes[t.lane];
+            if (l) p = l.spot;
+            t.state = 'training';
+            t.repActive = false;
+            t.repT = 0;
+          }
+          break;
+        case 'leaving':
+          this.setGoal(t, door.x, door.z);
+          break;
+      }
+      t.x = t.px = p.x;
+      t.z = t.pz = p.z;
+    }
+    const h = this.staffHome();
+    for (const f of s.staff) {
+      f.x = f.px = h.x;
+      f.z = f.pz = h.z;
+      f.goal = null;
+      f.path = [];
+      f.state = 'idle';
+      f.target = null;
+    }
   }
 
   // ───────────────────────────── world / helpers ─────────────────────────────
 
   rebuildWorld(): void {
     const s = this.state;
-    const obs: Rect[] = [];
+    const obs: Rect[] = [...this.area.obstacles];
     for (const [id, o] of this.world.objects) if (s.built[id]) obs.push(...o.footprint);
     for (const [id, st] of this.world.stations) {
       const ss = s.stations[id];
@@ -142,7 +223,7 @@ export class Sim {
     this.obstacles = obs;
     this.nav.rebuild(obs, BALANCE.trainee.radius);
     this.seatPos.length = 0;
-    for (const o of this.area.objects) if (s.built[o.id] && o.seats) for (const p of o.seats) this.seatPos.push(p);
+    for (const o of this.area.objects) if (s.built[o.id] && o.seats) for (const p of o.seats) this.seatPos.push({ x: p.x, z: p.z, yaw: o.seatYaw ?? Math.PI });
     while (s.seats.length < this.seatPos.length) s.seats.push(0);
     // all agents must re-path
     for (const t of s.trainees) t.path = [];
@@ -670,7 +751,8 @@ export class Sim {
     for (const t of s.trainees) if (t.state === 'toDesk' || t.state === 'atDesk') deskBusy = true;
     if (!deskBusy) {
       let next: Trainee | undefined;
-      for (const t of s.trainees) if (t.state === 'seated' && (!next || t.arrivalOrder < next.arrivalOrder)) next = t;
+      // the earliest arrival goes to the free desk — straight from the bus if nobody is seated before them
+      for (const t of s.trainees) if ((t.state === 'seated' || t.state === 'arriving') && (!next || t.arrivalOrder < next.arrivalOrder)) next = t;
       if (next) {
         if (next.seat >= 0) s.seats[next.seat] = 0;
         next.seat = -1;
@@ -685,7 +767,7 @@ export class Sim {
         case 'arriving':
           if (this.moveAgent(t, speed, dt)) {
             t.state = 'seated';
-            t.yaw = Math.PI; // face north, towards the desk side
+            t.yaw = this.seatPos[t.seat]?.yaw ?? Math.PI;
           }
           break;
         case 'seated':
@@ -694,7 +776,8 @@ export class Sim {
         case 'toDesk':
           if (this.moveAgent(t, speed, dt)) {
             t.state = 'atDesk';
-            t.yaw = yawFor(-1, 0);
+            const d = this.area.desk;
+            t.yaw = yawFor(d.coachSpot.x - d.traineeSpot.x, d.coachSpot.z - d.traineeSpot.z);
           }
           break;
         case 'atDesk':

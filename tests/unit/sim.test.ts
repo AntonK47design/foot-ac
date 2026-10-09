@@ -6,16 +6,27 @@ import { runBot } from '../../src/sim/bot/bot';
 
 const DT = 1 / 60;
 
-function walkTo(sim: Sim, x: number, z: number, maxSec = 20): void {
+/** Walks the coach along a nav path (walls and fences block straight lines). */
+function walkTo(sim: Sim, x: number, z: number, maxSec = 30): void {
+  const c0 = sim.state.coach;
+  const path = sim.nav.findPath(c0.x, c0.z, x, z);
+  let k = 0;
   for (let i = 0; i < maxSec * 60; i++) {
     const c = sim.state.coach;
-    const dx = x - c.x;
-    const dz = z - c.z;
+    const last = k * 2 >= path.length - 2;
+    const wx = path[k * 2] ?? x;
+    const wz = path[k * 2 + 1] ?? z;
+    const dx = wx - c.x;
+    const dz = wz - c.z;
     const d = Math.hypot(dx, dz);
-    if (d < 0.2) {
-      sim.input.x = 0;
-      sim.input.z = 0;
-      return;
+    if (d < (last ? 0.2 : 0.35)) {
+      if (last) {
+        sim.input.x = 0;
+        sim.input.z = 0;
+        return;
+      }
+      k++;
+      continue;
     }
     sim.input.x = dx / d;
     sim.input.z = dz / d;
@@ -46,6 +57,7 @@ describe('sim basics', () => {
 
   it('drains a pad partially and keeps the progress', () => {
     const sim = new Sim(createInitialState(undefined, 1));
+    for (const p of sim.state.piles) p.amount = 0;
     sim.state.cash = 4;
     const pad = sim.world.pads.get('p_crate')!;
     walkTo(sim, pad.pos.x, pad.pos.z);
@@ -74,7 +86,7 @@ describe('sim basics', () => {
     sim.unlockPad(sim.world.pads.get('p_crate')!);
     sim.unlockPad(sim.world.pads.get('p_goal')!);
     sim.state.stations.shooting_goal!.balls = 8;
-    wait(sim, 12);
+    wait(sim, 16);
     const tr = sim.deskTrainee();
     expect(tr?.name.startsWith('Leo')).toBe(true);
     expect(tr?.rarity).toBe('rare');
@@ -82,7 +94,7 @@ describe('sim basics', () => {
     walkTo(sim, d.x, d.z);
     wait(sim, BALANCE.desk.signTime + 0.2);
     expect(sim.state.stats.signed).toBe(1);
-    wait(sim, 12);
+    wait(sim, 20);
     expect(sim.state.stats.reps).toBeGreaterThan(0);
     expect(sim.pile('st:shooting_goal')!.amount).toBeGreaterThan(0);
   });

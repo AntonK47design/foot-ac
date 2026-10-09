@@ -61,24 +61,5 @@
       "towelrail",
       "door_A"
     ]
-  },
-  "city": {
-    "file": "city.glb",
-    "area1": false,
-    "bytes": 251868,
-    "models": [
-      "building_A",
-      "building_B",
-      "building_C",
-      "building_D",
-      "building_E",
-      "building_F",
-      "building_G",
-      "building_H",
-      "car_hatchback",
-      "car_sedan",
-      "car_taxi",
-      "watertower"
-    ]
   }
 }

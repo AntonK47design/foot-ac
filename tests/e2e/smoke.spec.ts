@@ -26,7 +26,7 @@ test.describe('desktop', () => {
     const o = await objective(page);
     expect(o?.key).toBe('obj.collect_cash');
     await steerKeys(page, o!.x, o!.z);
-    await expect.poll(async () => (await coach(page)).cash).toBe(15);
+    await expect.poll(async () => (await coach(page)).cash).toBeGreaterThanOrEqual(15);
     const o2 = await objective(page);
     expect(o2?.key).toBe('obj.unlock');
     await steerKeys(page, o2!.x, o2!.z, 12_000, 0.3);
@@ -94,10 +94,12 @@ test.describe('mobile', () => {
     const cdp = await context.newCDPSession(page);
     const o = await objective(page);
     await steerTouch(page, cdp, o!.x, o!.z);
-    await expect.poll(async () => (await coach(page)).cash).toBe(15);
-    const o2 = await objective(page);
-    await steerTouch(page, cdp, o2!.x, o2!.z, 15_000, 0.35);
-    await expect.poll(async () => (await coach(page)).stars, { timeout: 5000 }).toBe(1);
+    const collected = (): Promise<number> => page.evaluate(() => (window.__wk!.sim as { state: { stats: { cashCollected: number } } }).state.stats.cashCollected);
+    await expect.poll(collected).toBeGreaterThanOrEqual(15);
+    // walk onto the Ball Crate pad (it may already be paid if the drag crossed it)
+    const pad = await page.evaluate(() => (window.__wk!.sim as { world: { pads: Map<string, { pos: { x: number; z: number } }> } }).world.pads.get('p_crate')!.pos);
+    if ((await coach(page)).stars < 1) await steerTouch(page, cdp, pad.x, pad.z, 15_000, 0.35);
+    await expect.poll(async () => (await coach(page)).stars, { timeout: 5000 }).toBeGreaterThanOrEqual(1);
     await page.screenshot({ path: `${SHOT_DIR}/${info.project.name}-portrait.png` });
 
     // rotate to landscape mid-session

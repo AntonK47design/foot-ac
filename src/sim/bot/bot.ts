@@ -96,7 +96,7 @@ export function runBot(opts: BotOptions): BotReport {
       sim.input.z = wander.z * 0.5;
     } else if (obj) {
       const c = sim.state.coach;
-      const key = obj.targetId + ':' + obj.x.toFixed(2) + ':' + obj.z.toFixed(2);
+      const key = obj.targetId + ':' + obj.x.toFixed(2) + ':' + obj.z.toFixed(2) + ':' + Math.floor(t / 2);
       if (key !== pathKey) {
         pathKey = key;
         path = sim.nav.findPath(c.x, c.z, obj.x, obj.z);

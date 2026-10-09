@@ -102,6 +102,8 @@ export class Character {
   private time = 0;
   /** Accumulated time for throttled animation updates (far / off-screen). */
   private pending = 0;
+  private carrying = false;
+  private hold: AnimationAction | null = null;
 
   constructor(assets: Assets, key: CharacterKey, kit: Kit | null, scale = 1) {
     const a = assets.characters.get(key);
@@ -130,6 +132,20 @@ export class Character {
     void assets;
   }
 
+  /** Arms hold a stack in front while the legs keep walking (layered clips). */
+  setCarry(on: boolean): void {
+    if (on === this.carrying) return;
+    this.carrying = on;
+    if (!this.hold) this.hold = this.actions.get('hold:arms') ?? null;
+    if (this.hold) {
+      if (on) this.hold.reset().fadeIn(0.15).play();
+      else this.hold.fadeOut(0.15);
+    }
+    const s = this.state;
+    this.state = null;
+    if (s) this.play(s, 0.15);
+  }
+
   /** Switches animation with a short cross-fade. One-shots return to `after`. */
   play(anim: CharAnim, fade = 0.18, speed = 1): void {
     if (this.time < this.oneShotUntil && !ONE_SHOT[anim]) return;
@@ -137,7 +153,9 @@ export class Character {
       if (this.current) this.current.timeScale = speed;
       return;
     }
-    const next = this.actions.get(CLIP[anim]);
+    const base = CLIP[anim];
+    const layered = this.carrying && (anim === 'idle' || anim === 'walk' || anim === 'run');
+    const next = this.actions.get(layered ? base + ':legs' : base);
     if (!next) return;
     next.reset();
     next.enabled = true;

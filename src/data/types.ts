@@ -57,8 +57,10 @@ export interface ObjectDef {
   footprint: Rect[];
   /** decor variant for the view */
   variant?: string;
-  /** For chairs: seat positions (world). */
+  /** For benches: seat positions (world). */
   seats?: V2[];
+  /** Sim yaw for seated trainees (see sim/geom yawFor). */
+  seatYaw?: number;
 }
 
 export type Unlock =
@@ -107,4 +109,8 @@ export interface AreaDef {
   starterPiles: StarterPile[];
   /** Ambient kids passing a ball (view only). */
   ambientKids: V2[];
+  /** Static obstacles (walls, fences, fixed furniture) — always present. */
+  obstacles: Rect[];
+  /** Walkable rects for NPC navigation (plot + street corridor to the bus). */
+  walkable: Rect[];
 }

@@ -3,7 +3,7 @@ import type { Position, Rarity, StationKind, Stat } from './types';
 /** All gameplay tunables. Systems must not contain magic numbers. */
 export const BALANCE = {
   coach: {
-    speed: 5.4,
+    speed: 6.0,
     accel: 50,
     radius: 0.35,
     carryCap: 5,
@@ -73,9 +73,9 @@ export const BALANCE = {
   } as Record<Position, Record<Stat, number>>,
   positionWeights: { GK: 10, DF: 30, MF: 30, FW: 30 } as Record<Position, number>,
   stations: {
-    shoot: { repTime: 2.4, cashPerRep: 5, statGain: 1, ballsPerRep: 1, basketCap: 8 },
-    dribble: { repTime: 3.0, cashPerRep: 6, statGain: 1, ballsPerRep: 1, basketCap: 8 },
-    pass: { repTime: 2.6, cashPerRep: 7, statGain: 1, ballsPerRep: 1, basketCap: 8 },
+    shoot: { repTime: 2.4, cashPerRep: 6, statGain: 1, ballsPerRep: 1, basketCap: 8 },
+    dribble: { repTime: 3.0, cashPerRep: 7, statGain: 1, ballsPerRep: 1, basketCap: 8 },
+    pass: { repTime: 2.6, cashPerRep: 8, statGain: 1, ballsPerRep: 1, basketCap: 8 },
     sprint: { repTime: 3.2, cashPerRep: 9, statGain: 1, ballsPerRep: 0, basketCap: 0 },
   } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number }>,
   staff: {

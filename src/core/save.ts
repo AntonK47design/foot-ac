@@ -31,6 +31,16 @@ type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 export const MIGRATIONS: Record<number, Migration> = {
   // 0 → 1: pre-release blobs stored the sim state at the top level
   0: (raw) => ({ v: 1, created: raw.created ?? Date.now(), lastSeen: raw.lastSeen ?? Date.now(), game: raw.game ?? raw.sim, settings: raw.settings, stats: raw.stats }),
+  // 1 → 2: Area 1 moved onto the diorama layout (art overhaul). Economy is kept; agents are re-placed on load.
+  1: (raw) => {
+    const game = raw.game as Record<string, unknown> | undefined;
+    if (game && typeof game === 'object') {
+      const flags = (game.flags ?? {}) as Record<string, boolean>;
+      flags.relayout = true;
+      game.flags = flags;
+    }
+    return { ...raw, v: 2 };
+  },
 };
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {

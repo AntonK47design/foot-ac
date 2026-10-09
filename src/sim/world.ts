@@ -70,15 +70,8 @@ export class WorldGeo {
     return { x: st.queueStart.x + st.queueStep.x * i, z: st.queueStart.z + st.queueStep.z * i };
   }
 
-  /** Static walkable rects for NPC navigation: area bounds + gate corridor. */
+  /** Static walkable rects for NPC navigation (plot + street corridor to the bus). */
   walkable(): Rect[] {
-    const a = this.area;
-    const gate: Rect = {
-      x0: a.bounds.x1 - 1,
-      z0: a.gate.inside.z - 1.4,
-      x1: a.navBounds.x1,
-      z1: a.gate.inside.z + 1.4,
-    };
-    return [a.bounds, gate];
+    return this.area.walkable;
   }
 }

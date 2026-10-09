@@ -5,7 +5,8 @@ import { brotliCompressSync, gzipSync, constants } from 'node:zlib';
 
 const DIST = process.argv[2] ?? 'dist';
 const KB = 1024;
-const BUDGET = { initialGzip: 3 * 1024 * KB, initialHardRaw: 5 * 1024 * KB, jsBrotli: 400 * KB, files: 1500, total: 250 * 1024 * KB };
+/** ART_BIBLE §10: initial ≤ 6 MB, hard cap 10 MB. */
+const BUDGET = { initialGzip: 6 * 1024 * KB, initialHardRaw: 10 * 1024 * KB, jsBrotli: 400 * KB, files: 1500, total: 250 * 1024 * KB };
 
 interface ManifestChunk {
   file: string;
@@ -32,6 +33,16 @@ const visit = (key: string): void => {
   for (const i of c.imports ?? []) visit(i);
 };
 for (const [k, c] of Object.entries(manifest)) if (c.isEntry) visit(k);
+// game assets loaded before gameplayStart (public/assets/manifest.json, area1 groups)
+const gameManifest = join(DIST, 'assets', 'manifest.json');
+if (existsSync(gameManifest)) {
+  const gm = JSON.parse(readFileSync(gameManifest, 'utf8')) as Record<string, { file: string; area1: boolean }>;
+  for (const g of Object.values(gm)) {
+    if (!g.area1) continue;
+    if (g.file.endsWith('/')) for (const f of readdirSync(join(DIST, 'assets', g.file))) initial.add(join('assets', g.file, f));
+    else initial.add(join('assets', g.file));
+  }
+}
 // assets referenced from CSS (fonts)
 for (const f of [...initial]) {
   if (!f.endsWith('.css')) continue;
@@ -82,8 +93,8 @@ console.log(rows.join('\n'));
 console.log(`  total: ${(raw / KB).toFixed(1)} KB raw · ${(gz / KB).toFixed(1)} KB transferred (gzip) · JS ${(jsBr / KB).toFixed(1)} KB brotli`);
 console.log(`Bundle: ${files} files, ${(total / KB).toFixed(1)} KB total`);
 const fails: string[] = [];
-if (gz > BUDGET.initialGzip) fails.push(`initial transfer ${(gz / KB).toFixed(0)} KB > 3 MB`);
-if (raw > BUDGET.initialHardRaw) fails.push(`initial raw ${(raw / KB).toFixed(0)} KB > 5 MB hard cap`);
+if (gz > BUDGET.initialGzip) fails.push(`initial transfer ${(gz / KB).toFixed(0)} KB > 6 MB`);
+if (raw > BUDGET.initialHardRaw) fails.push(`initial raw ${(raw / KB).toFixed(0)} KB > 10 MB hard cap`);
 if (jsBr > BUDGET.jsBrotli) fails.push(`JS ${(jsBr / KB).toFixed(0)} KB brotli > 400 KB`);
 if (files > BUDGET.files) fails.push(`${files} files > 1500`);
 if (total > BUDGET.total) fails.push('bundle > 250 MB');

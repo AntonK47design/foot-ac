@@ -150,18 +150,78 @@ function wall(b: Batch, x0: number, z0: number, x1: number, z1: number, h: numbe
   }
 }
 
-/** Builds the whole Area 1 diorama. */
-export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama {
-  const root = new Group();
+/** Shared build context: everything is merged at finalize(). */
+interface Ctx {
+  assets: Assets;
+  L: Layout;
+  b: Batch;
+  decals: DecalBatch;
+  kit: PropKit;
+  props: PropMerger;
+  extra: Mesh[];
+  nets: Mesh[];
+  aoBlobs: Array<{ x: number; z: number; r: number }>;
+  aoStrips: Array<{ x0: number; z0: number; x1: number; z1: number; w: number }>;
+  anchors: Diorama['anchors'];
+  root: Group;
+}
+
+function newCtx(assets: Assets, L: Layout): Ctx {
   const b = new Batch();
   const decals = new DecalBatch();
-  const kit = new PropKit(b, decals);
-  const props = new PropMerger(assets);
-  const extra: Mesh[] = [];
-  const nets: Mesh[] = [];
-  const aoBlobs: Array<{ x: number; z: number; r: number }> = [];
-  const aoStrips: Array<{ x0: number; z0: number; x1: number; z1: number; w: number }> = [];
-  const anchors: Diorama['anchors'] = {};
+  return { assets, L, b, decals, kit: new PropKit(b, decals), props: new PropMerger(assets), extra: [], nets: [], aoBlobs: [], aoStrips: [], anchors: {}, root: new Group() };
+}
+
+function finalize(c: Ctx, mat: Material): Diorama {
+  const { root } = c;
+  const ao = aoTextures();
+  const blobs: BufferGeometry[] = [];
+  for (const f of [...c.aoBlobs, ...c.props.footprints]) {
+    const g = flat(f.r * 2.4, f.r * 2.4);
+    g.translate(f.x, 0.026, f.z);
+    blobs.push(g);
+  }
+  if (blobs.length) {
+    const m = new Mesh(mergeGeometries(blobs, false), new MeshBasicMaterial({ map: ao.radial, transparent: true, depthWrite: false }));
+    m.renderOrder = 2;
+    c.extra.push(m);
+  }
+  const strips: BufferGeometry[] = [];
+  for (const s of c.aoStrips) {
+    const len = Math.hypot(s.x1 - s.x0, s.z1 - s.z0);
+    const ry = Math.atan2(-(s.z1 - s.z0), s.x1 - s.x0);
+    const g = flat(len, s.w);
+    g.translate(0, 0, s.w / 2);
+    g.rotateY(ry);
+    g.translate(s.x0 + (s.x1 - s.x0) / 2, 0.027, s.z0 + (s.z1 - s.z0) / 2);
+    strips.push(g);
+  }
+  if (strips.length) {
+    const m = new Mesh(mergeGeometries(strips, false), new MeshBasicMaterial({ map: ao.linear, transparent: true, depthWrite: false }));
+    m.renderOrder = 2;
+    c.extra.push(m);
+  }
+  if (!c.b.empty) {
+    const statics = c.b.build(mat, true);
+    statics.castShadow = true;
+    statics.receiveShadow = true;
+    root.add(statics);
+  }
+  for (const m of c.props.build()) root.add(m);
+  const d = c.decals.build();
+  if (d) root.add(d);
+  for (const m of c.extra) root.add(m);
+  root.traverse((o: Object3D) => {
+    o.matrixAutoUpdate = false;
+    o.updateMatrix();
+  });
+  return { root, nets: c.nets, anchors: c.anchors };
+}
+
+/** Everything that exists from the start (plot, rooms, pitch surfaces and fence, plaza decor, ghosts). */
+export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { b, kit, props, decals, root, aoBlobs, aoStrips, anchors, extra } = c;
   const P = L.plot;
 
   // ── plot block + curb (raised island in the void)
@@ -187,12 +247,14 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.75, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
   for (let z = street.z0 + 1; z < street.z1; z += 3) b.add(flat(0.16, 1.6), 0xf4f0e4, trs(street.x0 + 3.2, -0.28, z));
   kit.place(L.gate.x + 0.6, L.busStop.z - 1.6).busStopSign();
+  // gate gap in the curb (ramp)
+  b.at(G.rbox(0.06), 0xd9cfb6, P.x1 - 0.2, -0.12, L.gate.z, 0, 1.0, 0.3, 1.8, 0, 0.3);
 
-  // ── plaza paving (base layer) + zone floors
+  // ── plaza paving (base layer) + room floors
   root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0 + curbW, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
-  for (const room of L.rooms) root.add(floor(room.floor, room.rect, 0.012, room.floor === 'tilesTeal' ? 1 : 1));
+  for (const room of L.rooms) root.add(floor(room.floor, room.rect, 0.012, 1));
 
-  // ── pitch: turf with mowing stripes, crisp lines, fence
+  // ── pitch: turf with mowing stripes, crisp lines, fence, floodlights
   const pitch = L.pitch;
   const turf = floor('turf', pitch, 0.012, 2);
   const tt = (turf.material as MeshLambertMaterial).map;
@@ -205,24 +267,21 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   b.add(flat(pl.x1 - pl.x0, lw), COL.line, trs((pl.x0 + pl.x1) / 2, ly, pl.z1));
   b.add(flat(lw, pl.z1 - pl.z0), COL.line, trs(pl.x0, ly, (pl.z0 + pl.z1) / 2));
   b.add(flat(lw, pl.z1 - pl.z0), COL.line, trs(pl.x1, ly, (pl.z0 + pl.z1) / 2));
-  // drill surfaces
   root.add(floor('astro', L.dribbleStrip, 0.022, 1));
   root.add(floor('deck', L.passDeck, 0.022, 2));
   b.at(G.rbox(0.03), 0x9a6435, (L.passDeck.x0 + L.passDeck.x1) / 2, 0.02, (L.passDeck.z0 + L.passDeck.z1) / 2, 0, L.passDeck.x1 - L.passDeck.x0 + 0.12, 0.04, L.passDeck.z1 - L.passDeck.z0 + 0.12);
-  for (const r of [L.dribbleStrip]) {
-    b.add(flat(r.x1 - r.x0, 0.08), COL.line, trs((r.x0 + r.x1) / 2, 0.03, r.z0));
-    b.add(flat(r.x1 - r.x0, 0.08), COL.line, trs((r.x0 + r.x1) / 2, 0.03, r.z1));
-  }
-  // fence with gates on the south side
+  const r0 = L.dribbleStrip;
+  b.add(flat(r0.x1 - r0.x0, 0.08), COL.line, trs((r0.x0 + r0.x1) / 2, 0.03, r0.z0));
+  b.add(flat(r0.x1 - r0.x0, 0.08), COL.line, trs((r0.x0 + r0.x1) / 2, 0.03, r0.z1));
   const fz0 = pitch.z0;
   const fz1 = pitch.z1;
   kit.place(0, 0).fence(pitch.x0, fz0, pitch.x1, fz0);
   kit.place(0, 0).fence(pitch.x0, fz0, pitch.x0, fz1);
   kit.place(0, 0).fence(pitch.x1, fz0, pitch.x1, fz1);
   let gx = pitch.x0;
-  for (const [a, c] of L.pitchGates) {
+  for (const [a, cc] of L.pitchGates) {
     kit.place(0, 0).fence(gx, fz1, a, fz1);
-    gx = c;
+    gx = cc;
   }
   kit.place(0, 0).fence(gx, fz1, pitch.x1, fz1);
   for (const [x, z] of [
@@ -233,91 +292,36 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     kit.place(x, z, 0).floodlight();
     aoBlobs.push({ x, z, r: 0.7 });
   }
-
-  // shooting lane: goal + net + penalty spot + box + cart + mannequins + pop-up goal
+  // shooting-lane surface marks (box lines) are part of the pitch
   const sl = L.shootingLane;
   const gx0 = (sl.x0 + sl.x1) / 2;
   const goalZ = sl.z0 + 1.6;
-  kit.place(gx0, goalZ).goal(4.2, 1.9, 1.3);
-  anchors.goal = { x: gx0, z: goalZ };
-  b.add(flat(0.36, 0.36), COL.line, trs(gx0, ly, goalZ + 3.4, Math.PI / 4));
   b.add(flat(4.2 + 1.6, lw), COL.line, trs(gx0, ly, goalZ + 1.7));
   b.add(flat(lw, 1.7), COL.line, trs(gx0 - 2.9, ly, goalZ + 0.85));
   b.add(flat(lw, 1.7), COL.line, trs(gx0 + 2.9, ly, goalZ + 0.85));
-  {
-    const nm = netMaterial();
-    const back = new Mesh(new PlaneGeometry(4.2, 1.9, 14, 7), nm);
-    back.position.set(gx0, 0.95, goalZ - 1.3);
-    nets.push(back);
-    extra.push(back);
-    for (const sx of [-1, 1]) {
-      const side = new Mesh(new PlaneGeometry(1.3, 1.9), nm);
-      side.position.set(gx0 + sx * 2.1, 0.95, goalZ - 0.65);
-      side.rotation.y = HALF_PI;
-      extra.push(side);
-    }
-    const top = new Mesh(new PlaneGeometry(4.2, 1.3), nm);
-    top.rotation.x = -HALF_PI;
-    top.position.set(gx0, 1.9, goalZ - 0.65);
-    extra.push(top);
-  }
-  kit.place(sl.x0 + 0.75, sl.z1 - 0.8, 0.3).ballCart();
-  aoBlobs.push({ x: sl.x0 + 0.75, z: sl.z1 - 0.8, r: 0.8 });
-  anchors.ballCart = { x: sl.x0 + 0.75, z: sl.z1 - 0.8 };
-  kit.place(0, 0).mannequin(gx0 + 1.0, goalZ + 2.3, 0);
-  kit.place(0, 0).mannequin(gx0 + 1.6, goalZ + 2.3, 0);
-  kit.place(sl.x1 - 0.6, sl.z1 - 0.9, -0.5).popUpGoal();
-  anchors.shootSpot = { x: gx0 - 0.4, z: goalZ + 3.4 };
-
-  // dribble strip: slalom cones, poles at the end, agility ladder alongside
-  const ds = L.dribbleStrip;
-  const dcx = (ds.x0 + ds.x1) / 2;
-  for (let i = 0, z = ds.z1 - 1.4; z > ds.z0 + 1.2; z -= 0.9, i++) kit.place(0, 0).cone(dcx + (i % 2 ? 0.35 : -0.35), z);
-  kit.place(0, 0).pole(dcx - 0.6, ds.z0 + 0.6);
-  kit.place(0, 0).pole(dcx + 0.6, ds.z0 + 0.6);
-  kit.place(0, 0).pole(dcx, ds.z0 + 0.9);
-  kit.place(ds.x1 + 0.55, (ds.z0 + ds.z1) / 2).agilityLadder(4.4);
-  kit.place(0, 0).coneStack(ds.x0 - 0.45, ds.z1 - 0.3);
-  anchors.dribbleStart = { x: dcx, z: ds.z1 - 0.5 };
-
-  // passing deck: two rebound boards, ball rack
-  const pd2 = L.passDeck;
-  kit.place(pd2.x0 + 1.0, pd2.z0 + 0.5).reboundBoard(1.8);
-  kit.place(pd2.x1 - 1.0, pd2.z0 + 0.5).reboundBoard(1.8);
-  kit.place(pd2.x1 - 0.5, pd2.z1 - 0.9, -HALF_PI).ballRack(6);
-  anchors.passSpotA = { x: pd2.x0 + 1.0, z: pd2.z0 + 3.4 };
-  anchors.passSpotB = { x: pd2.x1 - 1.0, z: pd2.z0 + 3.4 };
-
-  // scoreboard + tactics board + dugout + banners around the pitch
   kit.place((pitch.x0 + pitch.x1) / 2 + 1.6, P.z0 + 0.05).scoreboard();
-  kit.place(pitch.x0 - 0.5, fz1 + 1.1, 0.35).tacticsBoard();
-  aoBlobs.push({ x: pitch.x0 - 0.5, z: fz1 + 1.1, r: 0.7 });
-  kit.place(10.0, fz1 + 1.5, Math.PI).dugout(3.2);
-  aoBlobs.push({ x: 10.0, z: fz1 + 1.4, r: 1.6 });
+  kit.place(-0.45, -0.9, 0.25).tacticsBoard();
+  aoBlobs.push({ x: -0.45, z: -0.9, r: 0.7 });
 
   // ── clubhouse walls (cutaway): full back/side walls, front stubs with doorways
   for (const room of L.rooms) {
     const r = room.rect;
     wall(b, r.x0, r.z0, r.x1, r.z0, WALL_H, 1);
     aoStrips.push({ x0: r.x0, z0: r.z0 + WALL_T / 2, x1: r.x1, z1: r.z0 + WALL_T / 2, w: 0.7 });
-    // west wall of the first room
     if (room === L.rooms[0]) {
       wall(b, r.x0, r.z0, r.x0, r.z1, WALL_H, -1);
       aoStrips.push({ x0: r.x0 + WALL_T / 2, z0: r.z0, x1: r.x0 + WALL_T / 2, z1: r.z1, w: 0.7 });
     }
-    // east wall (with optional doorway)
     if (room.eastDoor) {
       wall(b, r.x1, r.z0, r.x1, room.eastDoor[0], WALL_H, 1);
       wall(b, r.x1, room.eastDoor[1], r.x1, r.z1, WALL_H, 1);
     } else wall(b, r.x1, r.z0, r.x1, r.z1, WALL_H, 1);
-    // front stub with doorway
     wall(b, r.x0, r.z1, room.door[0], r.z1, STUB_H, 1);
     wall(b, room.door[1], r.z1, r.x1, r.z1, STUB_H, 1);
-    // door mat
     b.at(G.rbox(0.03), COL.trim, (room.door[0] + room.door[1]) / 2, 0.025, r.z1 + 0.45, 0, room.door[1] - room.door[0] - 0.2, 0.03, 0.7);
   }
 
-  // ── Reception interior
+  // ── Reception interior (desk + first waiting bench are prebuilt)
   const rc = L.rooms[0]?.rect as Rect;
   kit.place((rc.x0 + rc.x1) / 2 + 0.3, rc.z0 + 3.0).desk();
   anchors.desk = { x: (rc.x0 + rc.x1) / 2 + 0.3, z: rc.z0 + 3.0 };
@@ -325,9 +329,7 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   kit.place(rc.x0 + 1.1, rc.z0 + 0.45).trophyCabinet();
   aoStrips.push({ x0: rc.x0 + 0.3, z0: rc.z0 + 0.75, x1: rc.x0 + 1.9, z1: rc.z0 + 0.75, w: 0.4 });
   kit.place(rc.x0 + 0.55, rc.z1 - 2.0, HALF_PI).bench(2.4);
-  kit.place((rc.x0 + rc.x1) / 2 + 0.4, rc.z1 - 0.65, 0).bench(2.2, false);
   anchors.waitBench = { x: rc.x0 + 0.65, z: rc.z1 - 2.0, ry: HALF_PI };
-  anchors.waitBench2 = { x: (rc.x0 + rc.x1) / 2 + 0.4, z: rc.z1 - 0.65, ry: 0 };
   decals.add('posterA', 0.9, 0.9, trs(rc.x0 + 2.6, 1.6, rc.z0 + WALL_T / 2 + 0.02));
   decals.add('posterB', 0.9, 0.9, trs(rc.x0 + 3.8, 1.6, rc.z0 + WALL_T / 2 + 0.02));
   decals.add('posterC', 0.9, 0.9, trs(rc.x1 - 0.8, 1.6, rc.z0 + WALL_T / 2 + 0.02));
@@ -336,8 +338,6 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   props.put('rug_rectangle_stripes_A', (rc.x0 + rc.x1) / 2 + 0.3, rc.z0 + 4.3, HALF_PI, 0.85, 0.015, 0);
   props.put('lamp_standing', rc.x0 + 0.5, rc.z1 - 0.5, 0, 0.7);
   props.put('cabinet_small_decorated', rc.x1 - 1.6, rc.z0 + 0.45, 0, 0.7);
-  kit.place(rc.x1 - 0.55, rc.z1 - 0.6).waterCooler();
-  aoBlobs.push({ x: rc.x1 - 0.55, z: rc.z1 - 0.6, r: 0.5 });
 
   // ── Changing room interior
   const cr = L.rooms[1]?.rect as Rect;
@@ -353,25 +353,17 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   aoBlobs.push({ x: cr.x1 - 0.45, z: cr.z1 - 0.5, r: 0.35 });
   decals.add('banner', 0.9, 0.9, trs(cr.x1 - 0.7, 2.0, cr.z0 + WALL_T / 2 + 0.02));
 
-  // ── plaza: track with hurdles, flags, plants, benches, bins, lights
+  // ── plaza: track surface, plants, benches, bins, lights, outside bench
   const tr = L.sprintTrack;
-  const track = floor('tartan', tr, 0.014, 1);
-  root.add(track);
-  const lanes = 2;
-  const laneW = (tr.z1 - tr.z0) / lanes;
-  for (let i = 0; i <= lanes; i++) b.add(flat(tr.x1 - tr.x0, 0.06), 0xf6e7d8, trs((tr.x0 + tr.x1) / 2, 0.022, tr.z0 + i * laneW));
+  root.add(floor('tartan', tr, 0.014, 1));
+  const laneW = (tr.z1 - tr.z0) / 2;
+  for (let i = 0; i <= 2; i++) b.add(flat(tr.x1 - tr.x0, 0.06), 0xf6e7d8, trs((tr.x0 + tr.x1) / 2, 0.022, tr.z0 + i * laneW));
   b.add(flat(0.12, tr.z1 - tr.z0), 0xffffff, trs(tr.x1 - 0.6, 0.022, (tr.z0 + tr.z1) / 2));
   for (let i = 0; i < 8; i++)
     for (let j = 0; j < 2; j++) b.add(flat(0.13, (tr.z1 - tr.z0) / 8), (i + j) % 2 ? 0x1d2433 : 0xffffff, trs(tr.x0 + 0.5 + j * 0.13, 0.023, tr.z0 + ((i + 0.5) * (tr.z1 - tr.z0)) / 8));
-  for (let k = 0; k < 3; k++) for (let l = 0; l < lanes; l++) kit.place(0, 0).hurdle(tr.x0 + 4 + k * 3.2, tr.z0 + (l + 0.5) * laneW, HALF_PI);
-  kit.place(tr.x1 + 0.6, tr.z0 - 0.3).stopwatchStand();
   anchors.trackStart = { x: tr.x1 - 1.0, z: tr.z0 + laneW / 2 };
-
-  const fx = [-2.8, 3.0, 6.5];
-  fx.forEach((x, i) => kit.place(x, P.z1 - 0.7).flagpole(i % 2 ? 0xffd23f : 0x2f6bff));
   for (const [x, z] of [
-    [-1.2, -1.6],
-    [4.0, -1.6],
+    [-1.8, -1.7],
     [-12.8, 6.0],
     [2.5, 6.0],
   ] as Array<[number, number]>) {
@@ -379,29 +371,19 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     aoBlobs.push({ x, z, r: 0.55 });
   }
   props.put('bench', 0.6, 5.7, 0, 5);
-  props.put('bench', 6.2, 1.0, Math.PI, 5);
-  kit.place(7.4, 1.0).bin();
-  aoBlobs.push({ x: 7.4, z: 1.0, r: 0.35 });
   kit.place(-1.6, 6.0).bin();
-  aoBlobs.push({ x: -1.6, z: 6.0, r: 0.35 });
+  kit.place(7.4, 1.0).bin();
+  aoBlobs.push({ x: 7.4, z: 1.0, r: 0.35 }, { x: -1.6, z: 6.0, r: 0.35 });
   props.put('streetlight', 12.9, 1.6 + 2.6, -HALF_PI, 4, 0, 0.1);
-  props.put('streetlight', -6.2, 5.6, 0, 4, 0, 0.1);
-  props.put('firehydrant', 12.8, -1.0, 0, 3.5);
+  props.put('streetlight', -6.2, 6.4, 0, 4, 0, 0.1);
+  props.put('firehydrant', 12.8, -1.6, 0, 3.5);
   props.put('bush', -12.9, 8.9, 0, 5);
   props.put('bush', 13.0, 8.9, 0, 5);
   props.put('bush', 12.9, -9.2, 0, 5);
-  // ball crate area (coach refills here)
-  const cx = -1.0;
-  const cz = 0.9;
-  props.put('crate', cx, cz, 0.15, 0.45);
-  kit.place(0, 0);
-  for (let i = 0; i < 6; i++) kit.ball(cx - 0.26 + (i % 3) * 0.26, 0.47 + Math.floor(i / 3) * 0.12, cz - 0.1 + Math.floor(i / 3) * 0.17, 0.26);
-  anchors.crate = { x: cx, z: cz + 1.0 };
-  kit.place(cx + 1.7, cz - 0.4, -0.3).ballRack(6);
-  aoBlobs.push({ x: cx + 1.7, z: cz - 0.4, r: 0.8 });
-  kit.place(0, 0).coneStack(cx - 1.2, cz - 0.6);
-  kit.place(0, 0).coneStack(cx - 1.55, cz - 0.3);
-  // waiting bench outside the reception + bin
+  kit.place(0.7, 0.5, -0.3).ballRack(6);
+  aoBlobs.push({ x: 0.7, z: 0.5, r: 0.8 });
+  kit.place(0, 0).coneStack(-2.2, 0.3);
+  kit.place(0, 0).coneStack(-2.55, 0.6);
   kit.place(-10.6, -1.5, 0).bench(2.2);
   anchors.outsideBench = { x: -10.6, z: -1.5, ry: 0 };
   kit.place(-12.5, -1.6).bin();
@@ -419,16 +401,15 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     const gb = new Batch();
     const w = r.x1 - r.x0;
     const d = r.z1 - r.z0;
-    gb.at(G.box(), 0xffffff, (r.x0 + r.x1) / 2, 0.8, r.z0 + 0.1, 0, w, 1.6, 0.16);
-    gb.at(G.box(), 0xffffff, r.x0 + 0.08, 0.8, (r.z0 + r.z1) / 2, 0, 0.16, 1.6, d);
-    gb.at(G.box(), 0xffffff, r.x1 - 0.08, 0.8, (r.z0 + r.z1) / 2, 0, 0.16, 1.6, d);
+    gb.at(G.box(), 0xffffff, (r.x0 + r.x1) / 2, 0.5, r.z0 + 0.1, 0, w, 1.0, 0.16);
+    gb.at(G.box(), 0xffffff, r.x0 + 0.08, 0.5, (r.z0 + r.z1) / 2, 0, 0.16, 1.0, d);
+    gb.at(G.box(), 0xffffff, r.x1 - 0.08, 0.5, (r.z0 + r.z1) / 2, 0, 0.16, 1.0, d);
     gb.at(G.box(), 0xffffff, (r.x0 + r.x1) / 2 - 0.6, 0.6, (r.z0 + r.z1) / 2, 0.2, 1.4, 1.2, 0.8);
-    const gm = gb.build(ghostMat);
-    extra.push(gm);
+    extra.push(gb.build(ghostMat));
     const eb = new Batch();
-    eb.at(G.box(), 0xffffff, (r.x0 + r.x1) / 2, 1.62, r.z0 + 0.1, 0, w, 0.05, 0.2);
-    eb.at(G.box(), 0xffffff, r.x0 + 0.08, 1.62, (r.z0 + r.z1) / 2, 0, 0.2, 0.05, d);
-    eb.at(G.box(), 0xffffff, r.x1 - 0.08, 1.62, (r.z0 + r.z1) / 2, 0, 0.2, 0.05, d);
+    eb.at(G.box(), 0xffffff, (r.x0 + r.x1) / 2, 1.02, r.z0 + 0.1, 0, w, 0.05, 0.2);
+    eb.at(G.box(), 0xffffff, r.x0 + 0.08, 1.02, (r.z0 + r.z1) / 2, 0, 0.2, 0.05, d);
+    eb.at(G.box(), 0xffffff, r.x1 - 0.08, 1.02, (r.z0 + r.z1) / 2, 0, 0.2, 0.05, d);
     extra.push(eb.build(ghostEdge));
     for (let x = r.x0 + 0.8; x < r.x1 - 0.5; x += 1.55) kit.place(0, 0).barrier(x, r.z1 + 0.35);
     kit.place(r.x1 - 0.6, r.z1 + 0.5).padlockSign();
@@ -441,52 +422,131 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   kit.place(-11.4, 3.0).planter();
   aoBlobs.push({ x: -11.4, z: 3.0, r: 0.55 });
   kit.place(-11.6, 4.6, Math.PI / 2).bench(2.2);
+  anchors.ambientBench = { x: -11.6, z: 4.6, ry: Math.PI / 2 };
   props.put('Pallet_Small_Decorated_A', 12.2, 3.0, 0.3, 0.55);
+  // anchors needed by the showcase / view
+  anchors.goal = { x: gx0, z: goalZ };
+  anchors.shootSpot = { x: gx0 - 0.4, z: goalZ + 3.4 };
+  anchors.dribbleStart = { x: (L.dribbleStrip.x0 + L.dribbleStrip.x1) / 2, z: L.dribbleStrip.z1 - 0.5 };
+  anchors.passSpotA = { x: L.passDeck.x0 + 1.0, z: L.passDeck.z0 + 3.4 };
+  anchors.passSpotB = { x: L.passDeck.x1 - 1.0, z: L.passDeck.z0 + 3.4 };
+  return finalize(c, mat);
+}
 
-  // ── contact AO decals (wall bases, under furniture)
-  const ao = aoTextures();
-  const blobs: BufferGeometry[] = [];
-  for (const f of [...aoBlobs, ...props.footprints]) {
-    const g = flat(f.r * 2.4, f.r * 2.4);
-    g.translate(f.x, 0.026, f.z);
-    blobs.push(g);
-  }
-  if (blobs.length) {
-    const m = new Mesh(mergeGeometries(blobs, false), new MeshBasicMaterial({ map: ao.radial, transparent: true, depthWrite: false }));
-    m.renderOrder = 2;
-    extra.push(m);
-  }
-  const strips: BufferGeometry[] = [];
-  for (const s of aoStrips) {
-    const len = Math.hypot(s.x1 - s.x0, s.z1 - s.z0);
-    const ry = Math.atan2(-(s.z1 - s.z0), s.x1 - s.x0);
-    const g = flat(len, s.w);
-    // gradient runs along local z: dark at the wall side
-    g.translate(0, 0, s.w / 2);
-    g.rotateY(ry);
-    g.translate(s.x0 + (s.x1 - s.x0) / 2, 0.027, s.z0 + (s.z1 - s.z0) / 2);
-    strips.push(g);
-  }
-  if (strips.length) {
-    const m = new Mesh(mergeGeometries(strips, false), new MeshBasicMaterial({ map: ao.linear, transparent: true, depthWrite: false }));
-    m.renderOrder = 2;
-    extra.push(m);
-  }
+/** World-space position helper for station local coords (rot 0 layouts). */
+export interface UnlockGeo {
+  center: { x: number; z: number };
+  lanes: Array<{ spot: { x: number; z: number }; target: { x: number; z: number } }>;
+  basket: { x: number; z: number } | null;
+}
 
-  // ── assemble
-  const statics = b.build(mat, true);
-  statics.castShadow = true;
-  statics.receiveShadow = true;
-  root.add(statics);
-  for (const m of props.build()) root.add(m);
-  const d = decals.build();
-  if (d) root.add(d);
-  for (const m of extra) root.add(m);
-  root.traverse((o: Object3D) => {
-    o.matrixAutoUpdate = false;
-    o.updateMatrix();
-  });
-  return { root, nets, anchors };
+/**
+ * Builds one unlockable piece (station equipment for `lanes` lanes, or a decor object) as its own group,
+ * so it can pop in when bought. Ids match the sim (station / object ids).
+ */
+export function buildUnlockable(id: string, lanes: number, assets: Assets, L: Layout, mat: Material, geo?: UnlockGeo): Diorama {
+  const c = newCtx(assets, L);
+  const { kit, props, aoBlobs, b } = c;
+  switch (id) {
+    case 'ball_crate': {
+      const cx = -1.0;
+      const cz = 0.9;
+      props.put('crate', cx, cz, 0.15, 0.45);
+      kit.place(0, 0);
+      for (let i = 0; i < 6; i++) kit.ball(cx - 0.26 + (i % 3) * 0.26, 0.47 + Math.floor(i / 3) * 0.12, cz - 0.1 + Math.floor(i / 3) * 0.17, 0.26);
+      break;
+    }
+    case 'chairs_2':
+      kit.place(-11.0, -3.25, 0).bench(2.2, false);
+      break;
+    case 'bench':
+      kit.place(4.4, -0.9, Math.PI).dugout(3.2);
+      aoBlobs.push({ x: 4.4, z: -0.9, r: 1.6 });
+      break;
+    case 'flags':
+      [4.4, 5.9, 7.4].forEach((x, i) => kit.place(x, 9.0).flagpole(i % 2 ? 0xffd23f : 0x2f6bff));
+      break;
+    case 'water_cooler':
+      kit.place(-3.0, -2.0).waterCooler();
+      aoBlobs.push({ x: -3.0, z: -2.0, r: 0.5 });
+      break;
+    case 'bus_shelter':
+      kit.place(12.3, -0.4).dugout(1.8);
+      break;
+    case 'shooting_goal': {
+      const sl = L.shootingLane;
+      const gx0 = (sl.x0 + sl.x1) / 2;
+      const goalZ = sl.z0 + 1.6;
+      kit.place(gx0, goalZ).goal(4.2, 1.9, 1.3);
+      const nm = netMaterial();
+      const back = new Mesh(new PlaneGeometry(4.2, 1.9, 14, 7), nm);
+      back.position.set(gx0, 0.95, goalZ - 1.3);
+      c.nets.push(back);
+      c.extra.push(back);
+      for (const sx of [-1, 1]) {
+        const side = new Mesh(new PlaneGeometry(1.3, 1.9), nm);
+        side.position.set(gx0 + sx * 2.1, 0.95, goalZ - 0.65);
+        side.rotation.y = HALF_PI;
+        c.extra.push(side);
+      }
+      const top = new Mesh(new PlaneGeometry(4.2, 1.3), nm);
+      top.rotation.x = -HALF_PI;
+      top.position.set(gx0, 1.9, goalZ - 0.65);
+      c.extra.push(top);
+      const bk = geo?.basket ?? { x: sl.x0 + 0.75, z: sl.z1 - 0.8 };
+      kit.place(bk.x, bk.z, 0.3).ballCart();
+      aoBlobs.push({ x: bk.x, z: bk.z, r: 0.8 });
+      kit.place(0, 0).mannequin(gx0 + 1.0, goalZ + 2.3, 0);
+      kit.place(0, 0).mannequin(gx0 + 1.6, goalZ + 2.3, 0);
+      for (const l of (geo?.lanes ?? []).slice(0, lanes)) b.add(flat(0.36, 0.36), COL.line, trs(l.spot.x, 0.021, l.spot.z, Math.PI / 4));
+      if (lanes > 1) kit.place(sl.x1 - 0.6, sl.z1 - 0.9, -0.5).popUpGoal();
+      break;
+    }
+    case 'dribble_cones': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) {
+        for (let i = 0, z = l.spot.z - 1.0; z > l.target.z + 0.6; z -= 0.9, i++) kit.place(0, 0).cone(l.spot.x + (i % 2 ? 0.3 : -0.3), z);
+        kit.place(0, 0).pole(l.target.x, l.target.z + 0.2);
+      }
+      const ds = L.dribbleStrip;
+      if (lanes > 1) kit.place(ds.x1 + 0.55, (ds.z0 + ds.z1) / 2).agilityLadder(4.4);
+      const bk = geo?.basket;
+      if (bk) {
+        kit.place(bk.x, bk.z, 0).ballRack(4);
+        aoBlobs.push({ x: bk.x, z: bk.z, r: 0.7 });
+      }
+      break;
+    }
+    case 'passing_wall': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) kit.place(l.target.x, l.target.z - 0.3).reboundBoard(1.8);
+      const bk = geo?.basket;
+      if (bk) {
+        kit.place(bk.x, bk.z, -HALF_PI).ballRack(6);
+        aoBlobs.push({ x: bk.x, z: bk.z, r: 0.8 });
+      }
+      break;
+    }
+    case 'sprint_track': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) for (let k = 0; k < 3; k++) kit.place(0, 0).hurdle(l.target.x + 3.2 + k * 3.2, l.spot.z, HALF_PI);
+      const tr = L.sprintTrack;
+      kit.place(tr.x1 + 0.4, tr.z0 - 0.35).stopwatchStand();
+      break;
+    }
+  }
+  return finalize(c, mat);
+}
+
+/** Showcase / capture: the whole academy built (base + every unlockable with all lanes). */
+export function buildFullDiorama(assets: Assets, L: Layout, mat: Material, geos: Record<string, UnlockGeo>): Diorama {
+  const base = buildDiorama(assets, L, mat);
+  for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) {
+    const u = buildUnlockable(id, 2, assets, L, mat, geos[id]);
+    base.root.add(u.root);
+    base.nets.push(...u.nets);
+  }
+  return base;
 }
 
 let netMat: MeshLambertMaterial | null = null;

@@ -1,20 +1,25 @@
 import {
+  Color,
+  DoubleSide,
   DynamicDrawUsage,
   ExtrudeGeometry,
-  Mesh,
-  Shape,
   Group,
   InstancedMesh,
+  Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Object3D,
   Plane,
   Raycaster,
+  RingGeometry,
+  Shape,
   Vector2,
   Vector3,
   type BufferAttribute,
 } from 'three';
 import { BALANCE } from '../data/balance';
-import type { PadDef, Rarity } from '../data/types';
+import { AREA1_LAYOUT } from '../data/areas/area1-layout';
+import type { IconId, PadDef, Rarity } from '../data/types';
 import { formatCash, t } from '../core/i18n';
 import type { Sim } from '../sim/sim';
 import type { Trainee } from '../sim/state';
@@ -23,15 +28,19 @@ import { firstName } from '../sim/players';
 import type { Hud } from '../ui/hud';
 import { icon } from '../ui/icons';
 import { LabelLayer, Popups, Projector, type ScreenPoint } from '../ui/labels';
+import type { Assets, CharacterKey } from './assets';
 import type { AudioSystem } from './audio';
 import { Batch } from './batch';
 import { ballGeometry } from './builders/ball';
-import { buildBus, buildObject, buildStation, type StationVisual } from './builders/props';
-import { buildWorld } from './builders/world';
+import { DecalBatch } from './builders/decals';
+import { buildDiorama, buildUnlockable, type UnlockGeo } from './builders/diorama';
+import { PropKit } from './builders/football';
+import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
+import { Character, KITS, casualKit, type CharAnim } from './characters';
 import { Fx } from './fx';
 import { G } from './geo';
-import { HumanoidRenderer, type Anim, type HumanoidSpec } from './humanoids';
+import { IconRenderer } from './icon-render';
 import { makePad, type PadMesh } from './pads';
 import { PALETTE } from './palette';
 import { TIERS } from './quality';
@@ -39,7 +48,16 @@ import type { RenderCore } from './renderer';
 
 const MAX_BALLS = 260;
 const MAX_BILLS = 420;
+const MAX_RINGS = 64;
+const KID_SCALE = 1.6;
+const ADULT_SCALE = 1.85;
+const HEAD_Y = 1.45;
 const RARITY_CLS: Record<Rarity, string> = { common: 'r-common', rare: 'r-rare', epic: 'r-epic', wonderkid: 'r-wonderkid' };
+const RARITY_COL: Record<Rarity, number> = { common: 0xa7b0be, rare: 0x3d8bff, epic: 0xa35cff, wonderkid: 0xffc83d };
+const KIDS_M: CharacterKey[] = ['male-a', 'male-e', 'male-f'];
+const KIDS_F: CharacterKey[] = ['female-b', 'female-c', 'female-d', 'female-e', 'female-f'];
+/** Kenney models face +z; sim yaw points a model's -z axis, so add π. */
+const YAW_OFFSET = Math.PI;
 
 interface Pop {
   obj: Object3D;
@@ -47,18 +65,27 @@ interface Pop {
   dur: number;
 }
 
-interface StationView extends StationVisual {
+interface UnlockView {
+  root: Group;
   lanes: number;
+  nets: Mesh[];
+  netRest: Float32Array[];
   ripple: number;
   rippleX: number;
 }
 
-interface CharState {
-  phase: number;
+interface PadView {
+  pad: PadMesh;
+  ghost: Group;
+}
+
+interface Actor {
+  c: Character;
   lx: number;
   lz: number;
   yaw: number;
   lastRep: number;
+  seen: number;
 }
 
 const dummy = new Object3D();
@@ -74,55 +101,90 @@ function tri(p: number): number {
   return p < 0.5 ? p * 2 : 2 - p * 2;
 }
 
+/** Small hologram / icon models per pad icon (ART_BIBLE §7). */
+function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string): Batch {
+  const b = new Batch();
+  const k = new PropKit(b, new DecalBatch());
+  k.place(0, 0);
+  const kind = id === 'lane' ? ({ shooting_goal: 'goal', dribble_cones: 'cones', passing_wall: 'wall', sprint_track: 'track' } as Record<string, IconId>)[station ?? ''] ?? 'goal' : id;
+  switch (kind) {
+    case 'ball':
+      k.ballRack(6);
+      break;
+    case 'goal':
+      k.popUpGoal();
+      break;
+    case 'cones':
+      k.cone(-0.4, 0.2, 1.4);
+      k.cone(0.3, -0.2, 1.4);
+      k.pole(0.05, 0.35);
+      break;
+    case 'wall':
+      k.reboundBoard(1.6);
+      break;
+    case 'track':
+      k.hurdle(0, 0);
+      break;
+    case 'chair':
+    case 'bench':
+      k.bench(2.0);
+      break;
+    case 'staff':
+      k.ballCart();
+      break;
+    case 'flag':
+      k.flagpole(0x2f6bff);
+      break;
+    case 'shelter':
+      k.dugout(1.6);
+      break;
+    case 'cooler':
+      k.waterCooler();
+      break;
+    case 'sign':
+      k.desk();
+      break;
+    case 'cash':
+    default:
+      b.at(G.rbox(0.25), 0x3ddc84, 0, 0.1, 0, 0.3, 0.9, 0.12, 0.5);
+      b.at(G.rbox(0.25), 0x3ddc84, 0, 0.24, 0, -0.2, 0.9, 0.12, 0.5);
+      b.at(G.box(), 0xb9ffd6, 0, 0.305, 0, -0.2, 0.3, 0.01, 0.3);
+  }
+  return b;
+}
+
 /** Everything visual: subscribes to sim events for juice and draws interpolated sim state. */
 export class GameView {
   readonly rig = new CameraRig();
   readonly projector: Projector;
   readonly labels: LabelLayer;
   readonly popups: Popups;
-  private readonly humans: HumanoidRenderer;
   private readonly fx: Fx;
   private readonly balls: InstancedMesh;
   private readonly bills: InstancedMesh;
+  private readonly rings: InstancedMesh;
   private readonly arrow: Group;
   private readonly bus: Group;
   private readonly deskRing: PadMesh;
-  private readonly pads = new Map<string, PadMesh>();
-  private readonly stations = new Map<string, StationView>();
-  private readonly objects = new Map<string, Group>();
+  private readonly unlocks = new Map<string, UnlockView>();
+  private readonly pads = new Map<string, PadView>();
+  private readonly actors = new Map<string, Actor>();
   private readonly pops: Pop[] = [];
-  private readonly chars = new Map<string, CharState>();
-  private readonly spec: HumanoidSpec = {
-    x: 0,
-    y: 0,
-    z: 0,
-    yaw: 0,
-    scale: 1,
-    skin: 0,
-    hairStyle: 0,
-    hairColor: 0,
-    face: 0,
-    shirt: 0,
-    shorts: 0,
-    socks: 0,
-    shoes: 0,
-    anim: 'idle',
-    phase: 0,
-    t: 0,
-    time: 0,
-    carrying: false,
-  };
+  private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide });
+  private readonly icons: IconRenderer;
+  private readonly iconUrls = new Map<string, string>();
   private time = 0;
   private stepT = 0;
-  private sway = { x: 0, z: 0, vx: 0, vz: 0 };
   private coachYaw = 0;
-  private readonly world: Group;
   private readonly raycaster = new Raycaster();
   private readonly groundPlane = new Plane(new Vector3(0, 1, 0), 0);
   private readonly ndc = new Vector2();
   private readonly hit = new Vector3();
   private celebrateUntil = 0;
-  private ambientT = 0;
+  private readonly geos: Record<string, UnlockGeo> = {};
+  private readonly ambient: Actor[] = [];
+  private ambientBall = { from: 0, t: 0 };
+  private readonly tmpColor = new Color();
 
   constructor(
     private readonly core: RenderCore,
@@ -131,17 +193,19 @@ export class GameView {
     private readonly audio: AudioSystem,
     uiRoot: HTMLElement,
     private readonly haptic: (ms: number) => void,
+    private readonly assets: Assets,
   ) {
     const scene = core.scene;
     this.projector = new Projector(this.rig.camera);
     this.labels = new LabelLayer(uiRoot, this.projector);
     this.popups = new Popups(uiRoot, this.projector, icon('coin'));
-    this.world = buildWorld(sim.area, core.mat, TIERS[core.tier].props);
-    for (const c of this.world.children) c.receiveShadow = true;
-    scene.add(this.world);
-    this.humans = new HumanoidRenderer(scene, core.charMat);
+    const base = buildDiorama(assets, AREA1_LAYOUT, core.mat);
+    scene.add(base.root);
     this.fx = new Fx(scene);
     this.fx.scale = TIERS[core.tier].particles;
+    this.icons = new IconRenderer(128);
+
+    for (const [id, st] of sim.world.stations) this.geos[id] = { center: st.def.center, lanes: st.lanes, basket: st.basket };
 
     const ballMat = new MeshLambertMaterial({ vertexColors: true });
     this.balls = new InstancedMesh(ballGeometry(), ballMat, MAX_BALLS);
@@ -159,7 +223,18 @@ export class GameView {
     this.bills.instanceMatrix.setUsage(DynamicDrawUsage);
     this.bills.count = 0;
     this.bills.frustumCulled = false;
+    this.bills.castShadow = true;
     scene.add(this.bills);
+
+    const ringGeo = new RingGeometry(0.34, 0.45, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    this.rings = new InstancedMesh(ringGeo, new MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false }), MAX_RINGS);
+    this.rings.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.rings.count = 0;
+    this.rings.frustumCulled = false;
+    this.rings.renderOrder = 3;
+    this.rings.setColorAt(0, this.tmpColor.set(0xffffff));
+    scene.add(this.rings);
 
     const shape = new Shape();
     shape.moveTo(0, 0);
@@ -173,61 +248,97 @@ export class GameView {
     const arrowGeo = new ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 2 });
     arrowGeo.translate(0, 0, -0.11);
     this.arrow = new Group();
-    const am = new Mesh(arrowGeo, new MeshLambertMaterial({ color: PALETTE.star, emissive: 0x7a5200 }));
-    this.arrow.add(am);
+    const arrowMesh = new Mesh(arrowGeo, new MeshLambertMaterial({ color: 0x4be37a, emissive: 0x157a35 }));
+    arrowMesh.scale.setScalar(0.62);
+    this.arrow.add(arrowMesh);
     this.arrow.visible = false;
     scene.add(this.arrow);
 
     this.bus = buildBus(core.mat);
     scene.add(this.bus);
 
-    this.deskRing = makePad(PALETTE.blue, PALETTE.padBase, 1.0, 0.72);
+    this.deskRing = makePad(PALETTE.blue, 0x1d2433, 1.0, 0.6);
     const ds = sim.area.desk.coachSpot;
-    this.deskRing.position.set(ds.x, 0.03, ds.z);
+    this.deskRing.position.set(ds.x, 0.035, ds.z);
     scene.add(this.deskRing);
 
+    this.makeAmbient();
     this.syncBuilt(false);
     this.wire();
+    // portrait (rendered from the real coach model)
+    const coachIcon = new Character(assets, 'male-c', KITS.coach, 1);
+    coachIcon.play('idle', 0);
+    coachIcon.seek(0);
+    this.hud.setPortrait(this.icons.render('portrait', coachIcon.root, { yaw: 0.35, pitch: 0.15, zoom: 2.2, focusY: 0.78 }));
+    // pre-render the whole icon atlas, then free the offscreen context
+    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler']) this.iconUrl(id);
+    for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) this.iconUrl('lane', st);
+    this.icons.dispose();
+  }
+
+  /** Icon atlas: objective/pad icons rendered from the real 3D models. */
+  iconUrl(id: string, station?: string): string {
+    const key = id + ':' + (station ?? '');
+    let url = this.iconUrls.get(key);
+    if (url) return url;
+    if (this.iconsDone) return this.iconUrls.get('cash:') ?? '';
+    const b = id === 'ball' ? null : buildIconModel(id as IconId, station);
+    const obj = b ? b.build(this.core.mat) : new Mesh(ballGeometry(), new MeshLambertMaterial({ vertexColors: true }));
+    url = this.icons.render(key, obj, { yaw: 0.5, pitch: 0.45 });
+    this.iconUrls.set(key, url);
+    return url;
+  }
+
+  private get iconsDone(): boolean {
+    return this.iconUrls.size >= 17;
   }
 
   // ───────────────────────────── building / syncing ─────────────────────────────
 
+  private unlockKeys(): Array<{ id: string; lanes: number }> {
+    const s = this.sim.state;
+    const out: Array<{ id: string; lanes: number }> = [];
+    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter']) if (s.built[id]) out.push({ id, lanes: 1 });
+    for (const [id, ss] of Object.entries(s.stations)) out.push({ id, lanes: ss.lanes });
+    return out;
+  }
+
   /** Creates meshes for everything built in the sim that has no visual yet (and lane upgrades). */
   syncBuilt(animate: boolean): void {
-    const s = this.sim.state;
-    for (const [id, o] of this.sim.world.objects) {
-      if (!s.built[id] || this.objects.has(id)) continue;
-      const g = buildObject(o.def, this.core.mat);
-      this.core.scene.add(g);
-      this.objects.set(id, g);
-      if (animate) this.pop(g);
-    }
-    for (const [id, ss] of Object.entries(s.stations)) {
-      const cur = this.stations.get(id);
-      if (cur && cur.lanes === ss.lanes) continue;
+    for (const { id, lanes } of this.unlockKeys()) {
+      const cur = this.unlocks.get(id);
+      if (cur && cur.lanes === lanes) continue;
       if (cur) this.core.scene.remove(cur.root);
-      const v = buildStation(this.sim.station(id), ss.lanes, this.core.mat);
-      this.core.scene.add(v.root);
-      this.stations.set(id, { ...v, lanes: ss.lanes, ripple: 0, rippleX: 0 });
-      if (animate) this.pop(v.root);
+      const d = buildUnlockable(id, lanes, this.assets, AREA1_LAYOUT, this.core.mat, this.geos[id]);
+      this.core.scene.add(d.root);
+      const v: UnlockView = {
+        root: d.root,
+        lanes,
+        nets: d.nets,
+        netRest: d.nets.map((n) => Float32Array.from((n.geometry.attributes.position as BufferAttribute).array as Float32Array)),
+        ripple: 0,
+        rippleX: 0,
+      };
+      this.unlocks.set(id, v);
+      if (animate) this.pop(d.root);
     }
   }
 
   /** Full rebuild after loading a different save (auth change / reset). */
   resetVisuals(): void {
-    for (const g of this.objects.values()) this.core.scene.remove(g);
-    for (const v of this.stations.values()) this.core.scene.remove(v.root);
-    for (const p of this.pads.values()) this.core.scene.remove(p);
-    this.objects.clear();
-    this.stations.clear();
+    for (const u of this.unlocks.values()) this.core.scene.remove(u.root);
+    for (const p of this.pads.values()) this.core.scene.remove(p.pad, p.ghost);
+    for (const a of this.actors.values()) this.core.scene.remove(a.c.root);
+    this.unlocks.clear();
     this.pads.clear();
-    this.chars.clear();
+    this.actors.clear();
     this.syncBuilt(false);
     const c = this.sim.state.coach;
     this.rig.snap(c.x, c.z);
   }
 
   private pop(obj: Object3D): void {
+    obj.matrixAutoUpdate = true;
     obj.scale.setScalar(0.01);
     this.pops.push({ obj, t: 0, dur: 0.55 });
   }
@@ -247,21 +358,21 @@ export class GameView {
     });
     ev.on('unlocked', (e) => {
       this.syncBuilt(true);
-      const pad = this.pads.get(e.padId);
-      if (pad) {
-        this.core.scene.remove(pad);
+      const pv = this.pads.get(e.padId);
+      if (pv) {
+        this.core.scene.remove(pv.pad, pv.ghost);
         this.pads.delete(e.padId);
       }
       this.audio.play('unlock');
       this.audio.play('pop');
       this.haptic(25);
       this.fx.burst(e.x, 0.8, e.z, 60);
+      this.dustRing(e.x, e.z);
       this.rig.shake(0.18);
       this.popups.text(e.x, 2.2, e.z, `+${e.stars} ★`, 'star');
       this.hud.bumpStars();
       if (e.major) {
-        const def = this.sim.world.pads.get(e.padId);
-        const u = def?.unlock;
+        const u = this.sim.world.pads.get(e.padId)?.unlock;
         if (u && u.type === 'station') {
           const c = this.sim.station(u.id).def.center;
           this.rig.panTo((c.x + e.x) / 2, (c.z + e.z) / 2);
@@ -281,11 +392,18 @@ export class GameView {
       if (tr) {
         this.fx.burst(tr.x, 1.2, tr.z, 24, 0.6);
         this.popups.text(tr.x, 2.0, tr.z, '✍ ' + firstName(tr), 'stat');
+        this.actorFor(tr).c.play('cheer', 0.1);
       }
     });
     ev.on('traineeArrived', (e) => {
       const tr = this.sim.trainee(e.id);
       if (tr && e.id === 1) this.hud.toast(t('toast.first_trainee', { name: firstName(tr) }), 'info');
+    });
+    ev.on('repStart', (e) => {
+      const tr = this.sim.trainee(e.traineeId);
+      if (!tr) return;
+      const kind = this.sim.station(e.stationId).kind;
+      if (kind === 'shoot' || kind === 'pass') this.actorFor(tr).c.play('kick', 0.08, 1.15);
     });
     ev.on('rep', (e) => {
       const tr = this.sim.trainee(e.traineeId);
@@ -298,6 +416,7 @@ export class GameView {
       this.audio.play('register');
       if (tr) {
         this.fx.burst(tr.x, 1.5, tr.z, 70);
+        this.actorFor(tr).c.play('cheer', 0.1);
         this.hud.toast(t('toast.graduated', { name: firstName(tr), cash: formatCash(e.bonus) }), 'gold');
       }
     });
@@ -312,6 +431,13 @@ export class GameView {
     ev.on('staffHired', (e) => {
       this.hud.toast(t('toast.hired', { name: t('staff.' + e.id) }), 'good', 3200);
     });
+  }
+
+  private dustRing(x: number, z: number): void {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      this.fx.puff(x + Math.cos(a) * 0.9, z + Math.sin(a) * 0.9, 0.35);
+    }
   }
 
   // ───────────────────────────── input helpers ─────────────────────────────
@@ -338,19 +464,66 @@ export class GameView {
     this.core.resize(w, h);
     this.rig.resize(w, h);
     this.projector.resize(w, h);
-    this.labels.topReserve = h > w ? 175 : 70;
+    this.labels.topReserve = h > w ? 175 : 80;
+  }
+
+  // ───────────────────────────── characters ─────────────────────────────
+
+  private actorFor(tr: Trainee): Actor {
+    const key = 't:' + tr.id;
+    let a = this.actors.get(key);
+    if (!a) {
+      const pool = tr.female ? KIDS_F : KIDS_M;
+      const model = pool[(tr.id * 7 + tr.look.hair) % pool.length] as CharacterKey;
+      const c = new Character(this.assets, model, casualKit(tr.id), KID_SCALE * (0.92 + (tr.age - 12) * 0.03));
+      this.core.scene.add(c.root);
+      a = { c, lx: tr.x, lz: tr.z, yaw: tr.yaw, lastRep: 0, seen: 0 };
+      this.actors.set(key, a);
+    }
+    return a;
+  }
+
+  private actorNamed(key: string, model: CharacterKey, kit: typeof KITS.academy, scale: number, x: number, z: number): Actor {
+    let a = this.actors.get(key);
+    if (!a) {
+      const c = new Character(this.assets, model, kit, scale);
+      this.core.scene.add(c.root);
+      a = { c, lx: x, lz: z, yaw: 0, lastRep: 0, seen: 0 };
+      this.actors.set(key, a);
+    }
+    return a;
+  }
+
+  /** View-only life for the first frame: kids in the changing room and two kids passing on the plaza. */
+  private makeAmbient(): void {
+    const L = AREA1_LAYOUT;
+    const cr = L.rooms[1]?.rect;
+    if (!cr) return;
+    const bx = (cr.x0 + cr.x1) / 2;
+    const bz = (cr.z0 + cr.z1) / 2 - 0.4;
+    const mk = (model: CharacterKey, kit: typeof KITS.academy, x: number, z: number, ry: number, anim: CharAnim): void => {
+      const c = new Character(this.assets, model, kit, KID_SCALE);
+      c.root.position.set(x, 0, z);
+      c.root.rotation.y = ry;
+      c.play(anim, 0);
+      c.seek((x * 7 + z * 3) % 1.5);
+      this.core.scene.add(c.root);
+      this.ambient.push({ c, lx: x, lz: z, yaw: ry, lastRep: 0, seen: 0 });
+    };
+    mk('female-d', KITS.academy, bx - 0.8, bz + 0.05, 0, 'sit');
+    mk('male-e', KITS.academy, bx + 0.9, bz + 0.9, -0.5, 'idle');
+    const k = this.sim.area.ambientKids;
+    const a = k[0];
+    const b = k[1];
+    if (a && b) {
+      mk('male-f', casualKit(31), a.x, a.z, Math.atan2(b.x - a.x, b.z - a.z), 'idle');
+      mk('female-b', casualKit(32), b.x, b.z, Math.atan2(a.x - b.x, a.z - b.z), 'idle');
+    }
+    const ob = { x: -11.6, z: 4.6 };
+    mk('female-e', casualKit(33), ob.x + 0.05, ob.z - 0.4, Math.PI / 2, 'sit');
   }
 
   // ───────────────────────────── per-frame ─────────────────────────────
-
-  private char(key: string, x: number, z: number, yaw: number): CharState {
-    let c = this.chars.get(key);
-    if (!c) {
-      c = { phase: 0, lx: x, lz: z, yaw, lastRep: 0 };
-      this.chars.set(key, c);
-    }
-    return c;
-  }
 
   frame(alpha: number, dt: number): void {
     this.time += dt;
@@ -360,14 +533,12 @@ export class GameView {
     const cx = c.px + (c.x - c.px) * alpha;
     const cz = c.pz + (c.z - c.pz) * alpha;
 
-    // camera
     const view = BALANCE.camera.baseView + s.stars * BALANCE.camera.viewPerStar;
     this.rig.setView(view);
     if (this.rig.panning && Math.hypot(sim.input.x, sim.input.z) > 0.2) this.rig.cancelPan();
     this.rig.update(dt, cx, cz, c.vx, c.vz);
     if (this.core.sun.castShadow) this.core.followSun(this.rig.focus.x, this.rig.focus.z);
 
-    // pop-in animations
     for (let i = this.pops.length - 1; i >= 0; i--) {
       const p = this.pops[i] as Pop;
       p.t += dt;
@@ -376,14 +547,15 @@ export class GameView {
       p.obj.scale.set(sc, sc * (1 + Math.sin(k * Math.PI) * 0.15), sc);
       if (k >= 1) {
         p.obj.scale.setScalar(1);
+        p.obj.updateMatrix();
+        p.obj.matrixAutoUpdate = false;
         this.pops.splice(i, 1);
       }
     }
 
     this.labels.begin();
-    this.humans.begin();
     let bi = 0;
-    const ballAt = (x: number, y: number, z: number, rot = 0, scale = 0.36): void => {
+    const ballAt = (x: number, y: number, z: number, rot = 0, scale = 0.28): void => {
       if (bi >= MAX_BALLS) return;
       dummy.position.set(x, y, z);
       dummy.rotation.set(rot, rot * 0.7, 0);
@@ -391,81 +563,100 @@ export class GameView {
       dummy.updateMatrix();
       this.balls.setMatrixAt(bi++, dummy.matrix);
     };
+    let ri = 0;
+    const ringAt = (x: number, z: number, rarity: Rarity): void => {
+      if (ri >= MAX_RINGS) return;
+      dummy.position.set(x, 0.035, z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      this.rings.setMatrixAt(ri, dummy.matrix);
+      this.rings.setColorAt(ri++, this.tmpColor.set(RARITY_COL[rarity]));
+    };
+    const frameId = Math.floor(this.time * 1000);
 
     // ── coach
-    const cs = this.char('coach', cx, cz, c.yaw);
-    const moved = Math.hypot(cx - cs.lx, cz - cs.lz);
-    cs.phase += moved * 3.1;
-    cs.lx = cx;
-    cs.lz = cz;
+    const coach = this.actorNamed('coach', 'male-c', KITS.coach, ADULT_SCALE, cx, cz);
+    coach.seen = frameId;
     const speed = Math.hypot(c.vx, c.vz);
     this.coachYaw = lerpAngle(this.coachYaw, c.yaw, 1 - Math.exp(-dt * 16));
+    coach.c.root.position.set(cx, 0, cz);
+    coach.c.root.rotation.y = this.coachYaw + YAW_OFFSET;
+    coach.c.setCarry(c.carry > 0);
     const moving = speed > 0.4;
+    if (this.time < this.celebrateUntil) coach.c.play('cheer');
+    else if (moving) coach.c.play(speed > 3.2 ? 'run' : 'walk', 0.15, speed > 3.2 ? speed / 5.5 : speed / 2.2);
+    else coach.c.play('idle');
     if (moving) {
       this.stepT += dt;
-      if (this.stepT > 0.16) {
+      if (this.stepT > 0.18) {
         this.stepT = 0;
         this.fx.puff(cx, cz);
       }
     }
-    const coachAnim: Anim = this.time < this.celebrateUntil ? 'celebrate' : moving ? 'run' : 'idle';
-    this.drawHuman(cx, 0, cz, this.coachYaw, 1.18, PALETTE.skin[1] as number, 5, PALETTE.coach.cap, 2, PALETTE.coach.top, PALETTE.coach.bottom, PALETTE.white, PALETTE.dark, coachAnim, cs.phase, 0, false);
-    // carry stack on the coach's back with spring sway
     {
-      const sw = this.sway;
-      const k = 60;
-      const d = 9;
-      sw.vx += (-c.vx * 0.05 - sw.x) * k * dt - sw.vx * d * dt;
-      sw.vz += (-c.vz * 0.05 - sw.z) * k * dt - sw.vz * d * dt;
-      sw.x += sw.vx * dt;
-      sw.z += sw.vz * dt;
-      const bx = Math.sin(this.coachYaw) * 0.34;
-      const bz = Math.cos(this.coachYaw) * 0.34;
-      for (let i = 0; i < c.carry; i++) {
-        const f = (i + 1) / Math.max(1, c.carry);
-        ballAt(cx + bx + sw.x * f * (i + 1) * 0.5, 0.82 + i * 0.36, cz + bz + sw.z * f * (i + 1) * 0.5, i * 0.7);
-      }
+      const fx = Math.sin(this.coachYaw + YAW_OFFSET);
+      const fz = Math.cos(this.coachYaw + YAW_OFFSET);
+      for (let i = 0; i < c.carry; i++) ballAt(cx + fx * 0.48, 0.78 + i * 0.3, cz + fz * 0.48, i * 0.7);
     }
 
     // ── staff
     for (const f of s.staff) {
       const fx = f.px + (f.x - f.px) * alpha;
       const fz = f.pz + (f.z - f.pz) * alpha;
-      const st = this.char('staff:' + f.id, fx, fz, f.yaw);
-      const m = Math.hypot(fx - st.lx, fz - st.lz);
-      st.phase += m * 3.3;
-      st.lx = fx;
-      st.lz = fz;
-      st.yaw = lerpAngle(st.yaw, f.yaw, 1 - Math.exp(-dt * 12));
-      this.drawHuman(fx, 0, fz, st.yaw, 1.0, PALETTE.skin[3] as number, 0, PALETTE.hair[0] as number, 4, PALETTE.staffBib, PALETTE.coach.bottom, PALETTE.white, PALETTE.dark, f.moving ? 'walk' : 'idle', st.phase, 0, false);
-      const bx = Math.sin(st.yaw) * 0.3;
-      const bz = Math.cos(st.yaw) * 0.3;
-      for (let i = 0; i < f.carry; i++) ballAt(fx + bx, 0.72 + i * 0.34, fz + bz, i);
+      const a = this.actorNamed('staff:' + f.id, 'male-b', KITS.staff, ADULT_SCALE, fx, fz);
+      a.seen = frameId;
+      a.yaw = lerpAngle(a.yaw, f.yaw, 1 - Math.exp(-dt * 12));
+      a.c.root.position.set(fx, 0, fz);
+      a.c.root.rotation.y = a.yaw + YAW_OFFSET;
+      a.c.setCarry(f.carry > 0);
+      a.c.play(f.moving ? 'walk' : 'idle');
+      const dx = Math.sin(a.yaw + YAW_OFFSET);
+      const dz = Math.cos(a.yaw + YAW_OFFSET);
+      for (let i = 0; i < f.carry; i++) ballAt(fx + dx * 0.48, 0.78 + i * 0.3, fz + dz * 0.48, i);
     }
 
-    // ── baskets
+    // ── baskets + supply chips
     for (const [id, ss] of Object.entries(s.stations)) {
       const st = sim.station(id);
       if (!st.basket) continue;
-      const n = ss.balls;
-      for (let i = 0; i < n; i++) {
-        const layer = Math.floor(i / 5);
-        const a = (i % 5) * 1.256 + layer * 0.6;
-        const r = layer === 0 ? 0.24 : 0.14;
-        ballAt(st.basket.x + Math.cos(a) * r, 0.42 + layer * 0.24, st.basket.z + Math.sin(a) * r, i);
-      }
+      const n = Math.min(ss.balls, 8);
+      for (let i = 0; i < n; i++) ballAt(st.basket.x - 0.4 + (i % 4) * 0.27, 1.02 + Math.floor(i / 4) * 0.22, st.basket.z + 0.02, i);
+      const low = ss.balls === 0 && ss.occupants.some((o) => o > 0);
+      this.labels.place('chip:' + id, st.basket.x + 0.9, 1.0, st.basket.z + 0.3, '', `<div class="chip-supply${low ? ' low' : ''}">${icon('ball')}<b>${ss.balls}/${st.cfg.basketCap}</b></div>`);
     }
 
     // ── trainees
     const deskT = sim.deskTrainee();
-    for (const tr of s.trainees) this.drawTrainee(tr, alpha, dt, ballAt, tr === deskT);
+    for (const tr of s.trainees) {
+      const a = this.drawTrainee(tr, alpha, dt, ballAt, tr === deskT);
+      a.seen = frameId;
+      ringAt(a.c.root.position.x, a.c.root.position.z, tr.rarity);
+    }
+    // remove actors of trainees that left
+    for (const [k, a] of this.actors) {
+      if (a.seen === frameId) continue;
+      this.core.scene.remove(a.c.root);
+      this.actors.delete(k);
+    }
 
-    // ── ambient kids passing a ball (life at t=0)
-    this.drawAmbient(dt, ballAt);
+    // ── ambient life
+    this.updateAmbient(dt, ballAt);
+
+    // animation update (far characters at 30 Hz)
+    const fxp = this.rig.focus.x;
+    const fzp = this.rig.focus.z;
+    for (const a of this.actors.values()) {
+      const p = a.c.root.position;
+      a.c.update(dt, Math.hypot(p.x - fxp, p.z - fzp) > 13 ? 30 : 60);
+    }
+    for (const a of this.ambient) a.c.update(dt, 30);
 
     this.balls.count = bi;
     this.balls.instanceMatrix.needsUpdate = true;
-    this.humans.end();
+    this.rings.count = ri;
+    this.rings.instanceMatrix.needsUpdate = true;
+    if (this.rings.instanceColor) this.rings.instanceColor.needsUpdate = true;
 
     // ── cash piles
     let bn = 0;
@@ -475,19 +666,17 @@ export class GameView {
       for (let i = 0; i < count && bn < MAX_BILLS; i++) {
         const layer = Math.floor(i / 4);
         const q = i % 4;
-        const ox = q % 2 ? 0.38 : -0.38;
-        const oz = q < 2 ? -0.22 : 0.22;
-        dummy.position.set(p.x + ox, 0.05 + layer * 0.095, p.z + oz);
+        dummy.position.set(p.x + (q % 2 ? 0.38 : -0.38), 0.05 + layer * 0.095, p.z + (q < 2 ? -0.22 : 0.22));
         dummy.rotation.set(0, ((i * 37) % 10) * 0.03 - 0.15, 0);
         dummy.scale.setScalar(1);
         dummy.updateMatrix();
         this.bills.setMatrixAt(bn++, dummy.matrix);
       }
+      if (p.amount >= BALANCE.objectives.minPileWorth) this.labels.place('pile:' + p.id, p.x, 0.7 + Math.min(28, Math.ceil(p.amount / 5)) * 0.024 + Math.sin(this.time * 3) * 0.05, p.z, '', `<div class="floater">+${formatCash(p.amount)}</div>`);
     }
     this.bills.count = bn;
     this.bills.instanceMatrix.needsUpdate = true;
 
-    // ── pads
     this.updatePads();
 
     // ── desk ring + full tag
@@ -500,80 +689,40 @@ export class GameView {
       this.labels.place('desk-full', d.x, 1.6, d.z, '', `<div class="tag-full">${t('desk.full')}</div>`);
     }
 
-    // ── locked area sign
-    const b = sim.area.bounds;
-    this.labels.place('area2', 0, 2.9, b.z0 - 3.1, '', `<div class="area-sign">${icon('lock')}<span>${t('area.2.locked')}<br><small>${t('area.coming_soon')}</small></span></div>`);
+    // ── locked expansions
+    for (const gh of AREA1_LAYOUT.ghosts) {
+      const r = gh.rect;
+      this.labels.place('gh:' + gh.id, r.x1 - 0.6, 2.2, r.z1 + 0.5, '', `<div class="lock-sign">${icon('lock')}<span>${gh.label}</span><b>${t('area.coming_soon')}</b></div>`);
+    }
 
-    // ── stations: net ripple
-    for (const v of this.stations.values()) this.updateNet(v, dt);
+    for (const u of this.unlocks.values()) this.updateNets(u, dt);
 
     // ── bus
     const busZ = s.bus.pz + (s.bus.z - s.bus.pz) * alpha;
-    this.bus.position.set(sim.area.gate.busStop.x, 0, busZ);
+    this.bus.position.set(sim.area.gate.busStop.x, -0.3, busZ);
     this.bus.visible = s.bus.phase !== 'away';
-    if (this.bus.visible) this.bus.position.y = s.bus.phase === 'stopped' ? Math.abs(Math.sin(this.time * 10)) * 0.02 : 0;
+    if (this.bus.visible && s.bus.phase === 'stopped') this.bus.position.y = -0.3 + Math.abs(Math.sin(this.time * 10)) * 0.02;
 
-    // ── objective arrow
     this.updateArrow(cx, cz);
-
     this.fx.update(dt, this.time);
     this.labels.end();
     this.hud.update(dt);
     this.core.renderer.render(this.core.scene, this.rig.camera);
   }
 
-  private drawHuman(
-    x: number,
-    y: number,
-    z: number,
-    yaw: number,
-    scale: number,
-    skin: number,
-    hairStyle: number,
-    hairColor: number,
-    face: number,
-    shirt: number,
-    shorts: number,
-    socks: number,
-    shoes: number,
-    anim: Anim,
-    phase: number,
-    tt: number,
-    carrying: boolean,
-  ): void {
-    const s = this.spec;
-    s.x = x;
-    s.y = y;
-    s.z = z;
-    s.yaw = yaw;
-    s.scale = scale;
-    s.skin = skin;
-    s.hairStyle = hairStyle;
-    s.hairColor = hairColor;
-    s.face = face;
-    s.shirt = shirt;
-    s.shorts = shorts;
-    s.socks = socks;
-    s.shoes = shoes;
-    s.anim = anim;
-    s.phase = phase;
-    s.t = tt;
-    s.time = this.time + x * 0.37;
-    s.carrying = carrying;
-    this.humans.add(s);
-  }
-
-  private drawTrainee(tr: Trainee, alpha: number, dt: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void, atDesk: boolean): void {
+  private drawTrainee(tr: Trainee, alpha: number, dt: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void, atDesk: boolean): Actor {
     const sim = this.sim;
+    const a = this.actorFor(tr);
     let x = tr.px + (tr.x - tr.px) * alpha;
     let z = tr.pz + (tr.z - tr.pz) * alpha;
-    const key = 't:' + tr.id;
-    const cs = this.char(key, x, z, tr.yaw);
     let yaw = tr.yaw;
-    let anim: Anim = 'idle';
-    let tt = 0;
-    let y = 0;
+    let anim: CharAnim = 'idle';
+    let animSpeed = 1;
     const signed = !(tr.state === 'arriving' || tr.state === 'seated' || tr.state === 'toDesk' || tr.state === 'atDesk');
+    if (signed && !a.c.root.userData.kit) {
+      a.c.setKit(this.assets, KITS.academy);
+      a.c.root.userData.kit = true;
+    }
     if (tr.state === 'training' && tr.stationId) {
       const st = sim.station(tr.stationId);
       const lane = st.lanes[tr.lane];
@@ -584,58 +733,54 @@ export class GameView {
         const len = Math.hypot(dx, dz) || 1;
         const ux = dx / len;
         const uz = dz / len;
-        const fx = x + ux * 0.32;
-        const fz = z + uz * 0.32;
+        const fx = x + ux * 0.4;
+        const fz = z + uz * 0.4;
+        const strike = 0.45;
         switch (st.kind) {
           case 'shoot':
           case 'pass': {
             if (tr.repActive) {
-              anim = 'kick';
-              tt = p;
-              const strike = 0.45;
-              if (cs.lastRep < strike && p >= strike) this.audio.play('kick', 0.9 + Math.random() * 0.2);
-              if (p < strike) ballAt(fx, 0.18, fz);
+              if (a.lastRep < strike && p >= strike) this.audio.play('kick', 0.9 + Math.random() * 0.2);
+              if (p < strike) ballAt(fx, 0.15, fz);
               else if (st.kind === 'shoot') {
                 const k = Math.min(1, (p - strike) / 0.22);
                 const bx = fx + (lane.target.x - fx) * k;
                 const bz = fz + (lane.target.z - fz) * k;
-                const by = 0.18 + Math.sin(k * Math.PI * 0.8) * 1.2 + k * 0.4;
-                if (k < 1) ballAt(bx, by, bz, p * 30);
-                else ballAt(lane.target.x, Math.max(0.18, 0.9 - (p - strike - 0.22) * 3), lane.target.z, 0);
-                if (cs.lastRep < strike + 0.22 && p >= strike + 0.22) {
-                  const v = this.stations.get(tr.stationId);
-                  if (v) {
-                    v.ripple = 1;
-                    v.rippleX = lane.target.x - st.def.center.x;
+                if (k < 1) ballAt(bx, 0.15 + Math.sin(k * Math.PI * 0.8) * 1.1 + k * 0.4, bz, p * 30);
+                else ballAt(lane.target.x, Math.max(0.15, 0.9 - (p - strike - 0.22) * 3), lane.target.z, 0);
+                if (a.lastRep < strike + 0.22 && p >= strike + 0.22) {
+                  const u = this.unlocks.get(tr.stationId);
+                  if (u) {
+                    u.ripple = 1;
+                    u.rippleX = lane.target.x - (AREA1_LAYOUT.shootingLane.x0 + AREA1_LAYOUT.shootingLane.x1) / 2;
                   }
                   this.audio.play('net');
                   this.fx.burst(lane.target.x, 1.0, lane.target.z, 8, 0.4);
                 }
               } else {
-                // pass: out to the wall and back
                 const out = Math.min(1, (p - strike) / 0.18);
                 const back = Math.max(0, Math.min(1, (p - strike - 0.18) / 0.25));
                 const k = out - back;
-                ballAt(fx + (lane.target.x - fx) * k, 0.2 + Math.sin(k * Math.PI) * 0.2, fz + (lane.target.z - fz) * k, p * 20);
-                if (cs.lastRep < strike + 0.18 && p >= strike + 0.18) this.audio.play('kick', 1.3);
+                ballAt(fx + (lane.target.x - fx) * k, 0.18 + Math.sin(k * Math.PI) * 0.2, fz + (lane.target.z - fz) * k, p * 20);
+                if (a.lastRep < strike + 0.18 && p >= strike + 0.18) this.audio.play('kick', 1.3);
               }
-            }
+            } else ballAt(fx, 0.15, fz);
+            anim = 'idle';
             break;
           }
           case 'dribble': {
             if (tr.repActive) {
               const k = tri(p);
               const along = k * len;
-              const weave = Math.sin(along * 2.7) * 0.32 * Math.min(1, along);
-              const px = -uz;
-              const pz = ux;
-              x = lane.spot.x + ux * along + px * weave;
-              z = lane.spot.z + uz * along + pz * weave;
+              const weave = Math.sin(along * 3.0) * 0.3 * Math.min(1, along);
+              x = lane.spot.x + ux * along - uz * weave;
+              z = lane.spot.z + uz * along + ux * weave;
               yaw = p < 0.5 ? Math.atan2(-ux, -uz) : Math.atan2(ux, uz);
               anim = 'run';
-              const dirSign = p < 0.5 ? 1 : -1;
-              ballAt(x + ux * 0.35 * dirSign, 0.18, z + uz * 0.35 * dirSign, p * 40);
-            } else ballAt(fx, 0.18, fz);
+              animSpeed = 0.9;
+              const dir = p < 0.5 ? 1 : -1;
+              ballAt(x + ux * 0.4 * dir, 0.15, z + uz * 0.4 * dir, p * 40);
+            } else ballAt(fx, 0.15, fz);
             break;
           }
           case 'sprint': {
@@ -645,86 +790,56 @@ export class GameView {
               z = lane.spot.z + uz * len * k;
               yaw = p < 0.45 ? Math.atan2(-ux, -uz) : Math.atan2(ux, uz);
               anim = p < 0.45 ? 'run' : 'walk';
+              animSpeed = p < 0.45 ? 1.4 : 1;
             }
             break;
           }
         }
-        cs.lastRep = p;
+        a.lastRep = p;
       }
     } else if (tr.state === 'seated') {
       anim = 'sit';
-      y = 0;
-      yaw = 0;
     } else if (tr.moving) {
       anim = tr.state === 'leaving' ? 'run' : 'walk';
     }
-    const moved = Math.hypot(x - cs.lx, z - cs.lz);
-    cs.phase += moved * 3.3;
-    cs.lx = x;
-    cs.lz = z;
-    cs.yaw = lerpAngle(cs.yaw, yaw, 1 - Math.exp(-dt * 14));
-    const L = tr.look;
-    const casual = PALETTE.casual[tr.id % PALETTE.casual.length] as number;
-    const casual2 = PALETTE.casual[(tr.id * 3 + 2) % PALETTE.casual.length] as number;
-    this.drawHuman(
-      x,
-      y,
-      z,
-      cs.yaw,
-      0.92 + (tr.age - 12) * 0.03,
-      PALETTE.skin[L.skin] as number,
-      tr.female && L.hair === 0 ? 2 : L.hair,
-      PALETTE.hair[L.hairColor] as number,
-      L.face,
-      signed ? PALETTE.blue : casual,
-      signed ? PALETTE.white : casual2,
-      signed ? PALETTE.yellow : PALETTE.white,
-      signed ? PALETTE.dark : 0xe94b3c,
-      anim,
-      cs.phase,
-      tt,
-      false,
-    );
-    // label: full card at the desk / arriving, compact OVR chip otherwise
+    a.yaw = lerpAngle(a.yaw, yaw, 1 - Math.exp(-dt * 14));
+    a.c.root.position.set(x, 0, z);
+    a.c.root.rotation.y = a.yaw + YAW_OFFSET;
+    a.c.play(anim, 0.18, animSpeed);
+    // label
     const ovr = sim.ovr(tr);
     const rc = RARITY_CLS[tr.rarity];
-    const headY = 1.75;
+    const key = 'tl:' + tr.id;
     if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
-      this.labels.place(key, x, headY + 0.1, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="chip ${rc}">${ovr}</span></div>`);
+      this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
-      this.labels.place(key, x, headY + 0.2, z, '', `<div class="bubble need">${icon('ball')}</div>`);
+      this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble need">${icon('ball')}<span class="emo">😟</span></div>`);
     } else if (tr.state === 'seated' && tr.waitT > BALANCE.trainee.moodWaitSec) {
-      this.labels.place(key, x, headY - 0.2, z, '', `<div class="bubble">😴</div>`);
+      this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<div class="bubble">⏳<span class="emo">😴</span></div>`);
     } else {
-      this.labels.place(key, x, headY, z, '', `<span class="chip ${rc}">${ovr}</span>`);
+      this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${rc}">${ovr}</span>`);
     }
+    return a;
   }
 
-  private ambientBall = { from: 0, t: 0 };
-
-  private drawAmbient(dt: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void): void {
+  private updateAmbient(dt: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void): void {
     const kids = this.sim.area.ambientKids;
     const a = kids[0];
     const b = kids[1];
-    if (!a || !b) return;
-    this.ambientT += dt;
+    const ka = this.ambient[2];
+    const kb = this.ambient[3];
+    if (!a || !b || !ka || !kb) return;
     const ab = this.ambientBall;
-    ab.t += dt / 1.4;
+    ab.t += dt / 1.5;
     if (ab.t >= 1) {
       ab.t = 0;
       ab.from = 1 - ab.from;
+      (ab.from === 0 ? ka : kb).c.play('kick', 0.08, 1.2);
     }
     const from = ab.from === 0 ? a : b;
     const to = ab.from === 0 ? b : a;
-    const yawAB = Math.atan2(-(b.x - a.x), -(b.z - a.z));
-    const yawBA = Math.atan2(-(a.x - b.x), -(a.z - b.z));
-    const kickT = ab.t < 0.3 ? ab.t / 0.3 * 0.6 : 1;
-    this.drawHuman(a.x, 0, a.z, yawAB, 0.95, PALETTE.skin[2] as number, 1, PALETTE.hair[1] as number, 0, PALETTE.casual[0] as number, PALETTE.casual[5] as number, PALETTE.white, 0xe94b3c, ab.from === 0 ? 'kick' : 'idle', 0, kickT, false);
-    this.drawHuman(b.x, 0, b.z, yawBA, 0.9, PALETTE.skin[4] as number, 2, PALETTE.hair[4] as number, 2, PALETTE.casual[4] as number, PALETTE.casual[2] as number, PALETTE.white, 0x339af0, ab.from === 1 ? 'kick' : 'idle', 0, kickT, false);
-    const k = Math.max(0, (ab.t - 0.18) / 0.82);
-    const x = from.x + (to.x - from.x) * k;
-    const z = from.z + (to.z - from.z) * k;
-    ballAt(x, 0.18 + Math.sin(k * Math.PI) * 0.9, z, this.ambientT * 8);
+    const k = Math.max(0, (ab.t - 0.3) / 0.7);
+    ballAt(from.x + (to.x - from.x) * k, 0.15 + Math.sin(k * Math.PI) * 0.8, from.z + (to.z - from.z) * k, this.time * 8);
   }
 
   private updatePads(): void {
@@ -734,29 +849,40 @@ export class GameView {
     const seen = new Set<string>();
     for (const p of visible) {
       seen.add(p.id);
-      let m = this.pads.get(p.id);
-      if (!m) {
-        m = makePad(PALETTE.cash, PALETTE.padBase);
-        m.position.set(p.pos.x, 0.03, p.pos.z);
-        this.core.scene.add(m);
-        this.pads.set(p.id, m);
-        this.pop(m);
+      let pv = this.pads.get(p.id);
+      if (!pv) {
+        const pad = makePad(PALETTE.cash, 0x1d2433, 0.42, 0.62);
+        pad.position.set(p.pos.x, 0.035, p.pos.z);
+        this.core.scene.add(pad);
+        const ghost = new Group();
+        const station = p.unlock.type === 'lane' ? p.unlock.station : undefined;
+        const gm = buildIconModel(p.icon, station).build(this.ghostMat);
+        gm.renderOrder = 6;
+        ghost.add(gm);
+        ghost.position.set(p.pos.x, 0.45, p.pos.z);
+        ghost.scale.setScalar(0.55);
+        this.core.scene.add(ghost);
+        pv = { pad, ghost };
+        this.pads.set(p.id, pv);
+        this.pop(pad);
       }
       const paid = s.pads[p.id]?.paid ?? 0;
-      const u = m.material.uniforms;
+      const u = pv.pad.material.uniforms;
       u.uProgress!.value = paid / p.cost;
       u.uTime!.value = this.time;
       const afford = s.cash + 1e-6 >= sim.padRemaining(p);
       u.uGlow!.value = afford ? 1 : 0;
+      pv.ghost.position.y = 0.45 + Math.sin(this.time * 2.2 + p.pos.x) * 0.08;
+      pv.ghost.rotation.y = Math.sin(this.time * 0.8 + p.pos.z) * 0.35;
       if (sim.paying && s.coach.padId === p.id && Math.random() < 0.5) {
         this.fx.coins.spawn(s.coach.x, 1.4, s.coach.z, p.pos.x, 0.1, p.pos.z, 0.35);
         this.audio.play('coin', 0.8 + (paid / p.cost) * 0.6);
       }
-      this.labels.place('pad:' + p.id, p.pos.x, 0.25, p.pos.z + 0.95, '', this.padTag(p, afford));
+      this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford));
     }
-    for (const [id, m] of this.pads) {
+    for (const [id, pv] of this.pads) {
       if (seen.has(id)) continue;
-      this.core.scene.remove(m);
+      this.core.scene.remove(pv.pad, pv.ghost);
       this.pads.delete(id);
     }
   }
@@ -764,25 +890,26 @@ export class GameView {
   private padTag(p: PadDef, afford: boolean): string {
     const rem = Math.ceil(this.sim.padRemaining(p));
     const name = p.unlock.type === 'staff' ? t('pad.hire', { name: t(p.nameKey) }) : t(p.nameKey);
-    return `<div class="pad-tag${afford ? ' ok' : ''}"><span class="ic">${icon(p.icon)}</span>${formatCash(rem)}<span class="nm">${name}</span></div>`;
+    return `<div class="pad2${afford ? ' ok' : ''}"><div class="pad2-price">${icon('cash')}<b>${formatCash(rem)}</b></div><div class="pad2-name">${icon(p.icon)}<i>${t('pad.unlock')}</i>${name}</div></div>`;
   }
 
-  private updateNet(v: StationView, dt: number): void {
-    if (!v.net || !v.netRest) return;
-    if (v.ripple <= 0) return;
-    v.ripple = Math.max(0, v.ripple - dt * 1.6);
-    const pos = v.net.geometry.attributes.position as BufferAttribute;
-    const arr = pos.array as Float32Array;
-    const rest = v.netRest;
-    const age = 1 - v.ripple;
-    for (let i = 0; i < pos.count; i++) {
-      const x = rest[i * 3] as number;
-      const y = rest[i * 3 + 1] as number;
-      const d = Math.hypot(x - v.rippleX, y + 0.2);
-      const amp = v.ripple * v.ripple * 0.45 * Math.exp(-d * 1.2);
-      arr[i * 3 + 2] = (rest[i * 3 + 2] as number) - amp * Math.cos(age * 18 - d * 5);
-    }
-    pos.needsUpdate = true;
+  private updateNets(u: UnlockView, dt: number): void {
+    if (u.ripple <= 0) return;
+    u.ripple = Math.max(0, u.ripple - dt * 1.6);
+    const age = 1 - u.ripple;
+    u.nets.forEach((net, ni) => {
+      const pos = net.geometry.attributes.position as BufferAttribute;
+      const arr = pos.array as Float32Array;
+      const rest = u.netRest[ni] as Float32Array;
+      for (let i = 0; i < pos.count; i++) {
+        const x = rest[i * 3] as number;
+        const y = rest[i * 3 + 1] as number;
+        const d = Math.hypot(x - u.rippleX, y + 0.2);
+        const amp = u.ripple * u.ripple * 0.4 * Math.exp(-d * 1.2);
+        arr[i * 3 + 2] = (rest[i * 3 + 2] as number) - amp * Math.cos(age * 18 - d * 5);
+      }
+      pos.needsUpdate = true;
+    });
   }
 
   private updateArrow(cx: number, cz: number): void {
@@ -795,9 +922,9 @@ export class GameView {
     }
     const near = Math.hypot(o.x - cx, o.z - cz) < o.radius * 0.8;
     this.arrow.visible = !near;
-    this.arrow.position.set(o.x, 2.3 + Math.abs(Math.sin(this.time * 4)) * 0.45, o.z);
-    this.arrow.rotation.y = this.time * 1.8;
-    // edge arrow when off-screen
+    this.arrow.position.set(o.x, 1.9 + Math.abs(Math.sin(this.time * 4)) * 0.4, o.z);
+    // face the camera (camera never rotates); tilt back so it reads from the 52° view
+    this.arrow.rotation.set(-0.5, 0, 0);
     const p = this.projector.project(o.x, 0.5, o.z, sp);
     const w = this.projector.w;
     const h = this.projector.h;
@@ -807,7 +934,6 @@ export class GameView {
       edge.classList.add('hidden');
       return;
     }
-    // direction from screen centre (coach) to target
     const cp = this.projector.project(cx, 0.5, cz, { x: 0, y: 0, visible: true });
     let dx = p.x - cp.x;
     let dy = p.y - cp.y;
@@ -816,22 +942,17 @@ export class GameView {
       dy = -dy;
     }
     const ang = Math.atan2(dy, dx);
-    const ex = Math.max(m, Math.min(w - m, w / 2 + Math.cos(ang) * w));
-    const ey = Math.max(m * 2.2, Math.min(h - m, h / 2 + Math.sin(ang) * h));
-    // project onto the screen border along the direction
     const kx = Math.cos(ang) !== 0 ? (Math.cos(ang) > 0 ? w - m - w / 2 : m - w / 2) / Math.cos(ang) : Infinity;
     const ky = Math.sin(ang) !== 0 ? (Math.sin(ang) > 0 ? h - m - h / 2 : m * 2.2 - h / 2) / Math.sin(ang) : Infinity;
     const k = Math.min(Math.abs(kx), Math.abs(ky));
-    const px = Number.isFinite(k) ? w / 2 + Math.cos(ang) * k : ex;
-    const py = Number.isFinite(k) ? h / 2 + Math.sin(ang) * k : ey;
+    const px = w / 2 + Math.cos(ang) * k;
+    const py = h / 2 + Math.sin(ang) * k;
     edge.style.transform = `translate3d(${px}px, ${py}px, 0) rotate(${ang}rad)`;
     edge.classList.remove('hidden');
   }
 
   setTierEffects(): void {
-    const spec = TIERS[this.core.tier];
-    this.fx.scale = spec.particles;
-    this.humans.setShadows(spec.shadows);
+    this.fx.scale = TIERS[this.core.tier].particles;
   }
 
   /** Debug info for the overlay. */
@@ -840,4 +961,3 @@ export class GameView {
     return { calls: info.calls, tris: info.triangles };
   }
 }
-

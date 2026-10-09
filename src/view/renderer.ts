@@ -1,6 +1,7 @@
 import {
   ACESFilmicToneMapping,
   DirectionalLight,
+  Color,
   Fog,
   HemisphereLight,
   MeshLambertMaterial,
@@ -9,8 +10,6 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three';
-import { makeSkyTexture } from './builders/world';
-import { PALETTE } from './palette';
 import { TIERS, type Tier } from './quality';
 
 /** Renderer, scene, lights and the shared vertex-colour material. */
@@ -42,20 +41,21 @@ export class RenderCore {
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.type = PCFShadowMap;
-    this.scene.background = makeSkyTexture();
-    this.scene.fog = new Fog(PALETTE.skyBottom, 70, 200);
-    this.hemi = new HemisphereLight(0xe8f6ff, 0x6fcf5a, 1.25);
+    // ART_BIBLE: dark desaturated void around a bright plot; hemisphere ground tinted towards the void
+    this.scene.background = new Color(0x241e33);
+    this.scene.fog = new Fog(0x241e33, 60, 140);
+    this.hemi = new HemisphereLight(0xeef4ff, 0x5a4c66, 1.45);
     this.scene.add(this.hemi);
-    this.sun = new DirectionalLight(0xfff2dc, 2.3);
+    this.sun = new DirectionalLight(0xfff0d6, 2.4);
     this.sun.position.set(-10, 22, 12);
     this.sun.shadow.mapSize.set(1024, 1024);
     const sc = this.sun.shadow.camera;
-    sc.left = -22;
-    sc.right = 22;
-    sc.top = 22;
-    sc.bottom = -22;
+    sc.left = -16;
+    sc.right = 16;
+    sc.top = 16;
+    sc.bottom = -16;
     sc.near = 1;
     sc.far = 70;
     this.sun.shadow.bias = -0.0008;
@@ -71,6 +71,9 @@ export class RenderCore {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, spec.dprCap));
     this.renderer.shadowMap.enabled = spec.shadows;
     this.sun.castShadow = spec.shadows;
+    this.sun.shadow.mapSize.set(spec.shadowMap, spec.shadowMap);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
     this.renderer.setSize(this.width, this.height, false);
     // materials need a recompile when shadows toggle
     this.mat.needsUpdate = true;
@@ -85,7 +88,7 @@ export class RenderCore {
 
   /** Keeps the shadow frustum centred on the action. */
   followSun(x: number, z: number): void {
-    this.sun.position.set(x - 10, 22, z + 12);
+    this.sun.position.set(x - 8, 20, z + 10);
     this.sun.target.position.set(x, 0, z);
     this.sun.target.updateMatrixWorld();
   }

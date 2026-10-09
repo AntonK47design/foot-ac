@@ -1063,10 +1063,10 @@ body {
 /* ───────── portrait phone layout ───────── */
 @media (orientation: portrait) and (max-width: 760px) {
   .hud-tc {
-    top: calc(var(--sat) + var(--gap) * 2 + var(--btn));
+    top: calc(var(--sat) + var(--gap) * 2 + var(--btn) * 1.55);
   }
   .objective {
-    top: calc(var(--sat) + var(--gap) * 3 + var(--btn) + var(--fs) * 2);
+    top: calc(var(--sat) + var(--gap) * 3 + var(--btn) * 1.55 + var(--fs) * 2.4);
     right: auto;
     left: 50%;
     transform: translateX(-50%);
@@ -1076,7 +1076,7 @@ body {
     animation: pop-in-c 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
   }
   .toasts {
-    top: calc(var(--sat) + var(--gap) * 4 + var(--btn) + var(--fs) * 4.4);
+    top: calc(var(--sat) + var(--gap) * 4 + var(--btn) * 1.55 + var(--fs) * 5.2);
   }
   .overlay {
     place-items: end center;

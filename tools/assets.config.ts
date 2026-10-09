@@ -108,22 +108,4 @@ export const GROUPS: AssetGroup[] = [
       ...f('kaykit/restaurant-bits', 'kaykit-restaurant', ['crate', 'chair_stool', 'towelrail', 'door_A']),
     },
   },
-  {
-    id: 'city',
-    area1: false,
-    models: f('kaykit/city-builder-bits', 'kaykit-city', [
-      'building_A',
-      'building_B',
-      'building_C',
-      'building_D',
-      'building_E',
-      'building_F',
-      'building_G',
-      'building_H',
-      'car_hatchback',
-      'car_sedan',
-      'car_taxi',
-      'watertower',
-    ]),
-  },
 ];

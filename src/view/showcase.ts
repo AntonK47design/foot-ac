@@ -28,7 +28,9 @@ import { LabelLayer, Projector } from '../ui/labels';
 import { Batch } from './batch';
 import { CHARACTER_KEYS, loadArea1Assets, type CharacterKey } from './assets';
 import { ballGeometry } from './builders/ball';
-import { buildDiorama } from './builders/diorama';
+import { buildFullDiorama, type UnlockGeo } from './builders/diorama';
+import { AREA1 } from '../data/areas/area1';
+import { WorldGeo } from '../sim/world';
 import { DecalBatch } from './builders/decals';
 import { PropKit } from './builders/football';
 import { CameraRig } from './camera';
@@ -83,7 +85,10 @@ export async function runShowcase(root: HTMLElement): Promise<void> {
 
   const assets = await loadArea1Assets();
   const mat = new MeshLambertMaterial({ vertexColors: true });
-  const dio = buildDiorama(assets, L, mat);
+  const wg = new WorldGeo(AREA1);
+  const geos: Record<string, UnlockGeo> = {};
+  for (const [id, st] of wg.stations) geos[id] = { center: st.def.center, lanes: st.lanes, basket: st.basket };
+  const dio = buildFullDiorama(assets, L, mat, geos);
   scene.add(dio.root);
   const A = dio.anchors;
   const anchor = (k: string): { x: number; z: number; ry?: number } => {
@@ -115,7 +120,7 @@ export async function runShowcase(root: HTMLElement): Promise<void> {
   // reception: kids waiting on the benches (casual clothes), one at the desk
   const wb = anchor('waitBench');
   for (let i = 0; i < 3; i++) add(nextKid(), casualKit(i + 2), wb.x + 0.05, wb.z - 0.8 + i * 0.8, Math.PI / 2 - 0.5, 'sit', KID, { rarity: (['common', 'rare', 'common'] as Rarity[])[i], label: () => '' });
-  const wb2 = anchor('waitBench2');
+  const wb2 = { x: -11.0, z: -3.25 };
   add(nextKid(), casualKit(7), wb2.x - 0.5, wb2.z + 0.05, 0, 'sit', KID, { rarity: 'epic' });
   const desk = anchor('desk');
   add('male-d', KITS.staff, desk.x, desk.z - 0.75, 0, 'idle', ADULT);
@@ -262,7 +267,7 @@ export async function runShowcase(root: HTMLElement): Promise<void> {
 
   // ── HUD + world UI
   const hud = new Hud(root);
-  const icons = new IconRenderer(renderer, 128);
+  const icons = new IconRenderer(128);
   const coachIcon = new Character(assets, 'male-c', KITS.coach, 1);
   coachIcon.play('idle', 0);
   coachIcon.seek(0);

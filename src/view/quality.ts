@@ -9,12 +9,13 @@ export interface TierSpec {
   particles: number;
   antialias: boolean;
   props: number;
+  shadowMap: number;
 }
 
 export const TIERS: Record<Tier, TierSpec> = {
-  high: { dprCap: 2, shadows: true, particles: 1, antialias: true, props: 1 },
-  mid: { dprCap: 1.5, shadows: false, particles: 0.75, antialias: true, props: 1 },
-  low: { dprCap: 1, shadows: false, particles: 0.4, antialias: false, props: 0.6 },
+  high: { dprCap: 2, shadows: true, particles: 1, antialias: true, props: 1, shadowMap: 2048 },
+  mid: { dprCap: 1.5, shadows: true, particles: 0.75, antialias: true, props: 1, shadowMap: 1024 },
+  low: { dprCap: 1, shadows: false, particles: 0.4, antialias: false, props: 0.6, shadowMap: 512 },
 };
 
 interface NavigatorExtras {
