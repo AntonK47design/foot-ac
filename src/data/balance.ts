@@ -49,7 +49,6 @@ export const BALANCE = {
     moodWaitSec: 18,
     /** Seconds without progress before the stuck watchdog teleports an NPC. */
     stuckSec: 3,
-    graduationBonus: 30,
     /** Seconds on the changing-room bench putting on the academy kit after signing. */
     changeTime: 1.6,
     initialChairs: 3,
@@ -83,12 +82,56 @@ export const BALANCE = {
   staff: {
     ballBoy: { speed: 3.8, carryCap: 6, refillBelow: 0.75 },
   },
+  /** Graduation podium and transfers (M2). Value = base × (OVR / ovrRef)^exp × rarity, rounded to 5. */
+  transfer: {
+    base: 55,
+    ovrRef: 45,
+    exp: 2.2,
+    rarityMult: { common: 1, rare: 1.4, epic: 2, wonderkid: 3.5 } as Record<Rarity, number>,
+    /** Coach stands here to open the podium choice. */
+    zoneRadius: 1.2,
+    /** Sold squad players (released from the squad panel) fetch this share of their value. */
+    releaseShare: 1,
+  },
+  squad: {
+    size: 5,
+    /** Line-up gaps are filled with academy subs of this OVR. */
+    subOvr: 32,
+  },
+  match: {
+    /** Seconds between matches (the first is available as soon as the pitch is built). */
+    interval: 180,
+    chances: [3, 5] as [number, number],
+    powerShotsMax: 2,
+    /** Goal probability = base + (attack − defence) × perOvr, clamped. */
+    goalBase: 0.38,
+    goalPerOvr: 0.012,
+    goalMin: 0.1,
+    goalMax: 0.78,
+    /** Power Shot: probability shifts by (quality − 0.5) × swing. */
+    powerSwing: 0.9,
+    /** Share of chances that are ours: s^k / (s^k + o^k). */
+    shareExp: 2,
+    shareMin: 0.25,
+    shareMax: 0.8,
+    reward: { win: 120, draw: 50, loss: 20 },
+    /** Cash multiplier per division (index 0 = bottom). */
+    divisionMult: [1, 1.6, 2.4, 3.4, 4.8],
+    points: { win: 3, draw: 1, loss: 0 },
+    xp: { win: 20, draw: 10, loss: 5 },
+    mvpStatGain: 1,
+    kickoffRadius: 1.2,
+    /** Power Shot meter: green zone width (0..1 of the bar), needle sweeps per second, seconds before an auto-shot. */
+    powerZone: 0.18,
+    powerSpeed: 1.1,
+    powerTimeout: 3.5,
+  },
   /** Effects of decor objects once built (multipliers, stack multiplicatively). */
   perks: {
     flags: { feeMult: 1.2 },
     water_cooler: { repTimeMult: 0.8 },
-    bench: { gradBonusMult: 2 },
-  } as Record<string, { feeMult?: number; repTimeMult?: number; gradBonusMult?: number }>,
+    bench: { transferMult: 1.25 },
+  } as Record<string, { feeMult?: number; repTimeMult?: number; transferMult?: number }>,
   /** Cumulative XP needed to reach level index+1 (level 1 = 0 XP). */
   levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400],
   xp: { perGraduation: 15, perSign: 2 },

@@ -1,6 +1,7 @@
 import { SAVE_BACKUP_KEY, SAVE_KEY, SAVE_VERSION } from '../data/constants';
 import type { AreaDef } from '../data/types';
 import type { SimState } from '../sim/state';
+import { newLeague } from '../sim/match';
 import { DEFAULT_SETTINGS, type Settings } from '../ui/settings';
 
 export interface SaveStats {
@@ -41,6 +42,8 @@ export const MIGRATIONS: Record<number, Migration> = {
     }
     return { ...raw, v: 2 };
   },
+  // 2 → 3: M2 adds podium queue, squad, league, match timer and records (defaults filled in normalize)
+  2: (raw) => ({ ...raw, v: 3 }),
 };
 
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> {
@@ -83,6 +86,11 @@ export function normalize(blob: SaveBlob, area: AreaDef): SaveBlob {
   const g = blob.game;
   for (const p of area.pads) if (!g.pads[p.id]) g.pads[p.id] = { paid: 0, done: false };
   g.flags = g.flags ?? {};
+  g.podiumQueue = Array.isArray(g.podiumQueue) ? g.podiumQueue : [];
+  g.squad = Array.isArray(g.squad) ? g.squad : [];
+  g.league = g.league && Array.isArray(g.league.table) ? g.league : newLeague(0, 1);
+  g.matchNextAt = typeof g.matchNextAt === 'number' ? g.matchNextAt : 0;
+  g.records = { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0, ...((g.records ?? {}) as Partial<SimState['records']>) };
   g.stats = { signed: 0, reps: 0, graduated: 0, unlocks: 0, ballsDelivered: 0, cashCollected: 0, ...((g.stats ?? {}) as Partial<SimState['stats']>) };
   for (const t of g.trainees) {
     t.path = [];

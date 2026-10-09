@@ -2,10 +2,13 @@ import { BALANCE } from '../../data/balance';
 import { Rng } from '../../core/rng';
 import { dist2 } from '../geom';
 import { Sim, createInitialState } from '../sim';
+import { computeOvr } from '../players';
 
 export interface BotOptions {
   /** 1 = perfect objective follower; 0.7 = distracted player. */
   efficiency: number;
+  /** Power Shot timing quality the bot achieves (0..1). */
+  powerQuality?: number;
   seed: number;
   minutes: number;
 }
@@ -119,6 +122,24 @@ export function runBot(opts: BotOptions): BotReport {
       }
     }
     sim.tick(STEP);
+    // podium / kick-off prompts (the UI panels in the real game)
+    if (sim.prompt === 'podium') {
+      const g = sim.podiumGraduate();
+      const weakest = sim.weakestSquadPlayer();
+      // sell for cash until there is a pitch to play on, then build the squad, then only upgrade it
+      const pitch = !!sim.state.built[sim.area.matchPitch.objectId];
+      const promote =
+        !!g &&
+        pitch &&
+        (sim.state.squad.length < BALANCE.squad.size || (weakest !== undefined && sim.ovr(g) > computeOvr(weakest.position, weakest.stats) + 2));
+      sim.decideGraduate(promote ? 'promote' : 'sell');
+      mark(promote ? 'firstPromotion' : 'firstSale', promote ? 'first graduate promoted' : 'first transfer sale');
+    } else if (sim.prompt === 'kickoff') {
+      const m = sim.startMatch();
+      m.chances.forEach((c, i) => sim.resolveMatchChance(i, c.power ? opts.powerQuality ?? 0.65 : 0.5));
+      const r = sim.finishCurrentMatch();
+      mark('firstMatch', `first match ${r ? `${r.ourGoals}-${r.theirGoals}` : ''}`);
+    }
 
     // affordability tracking
     const pads = sim.visiblePads();

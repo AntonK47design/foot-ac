@@ -62,12 +62,61 @@ test.describe('desktop', () => {
     await page.goto('/');
     await waitForGameplay(page);
     await page.locator('.gear').click();
-    await expect(page.locator('.panel')).toBeVisible();
+    await expect(page.locator('.overlay:not(.hidden) .panel')).toBeVisible();
     const log1 = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
     expect(log1.filter((m) => m === 'gameplayStop').length).toBe(1);
-    await page.locator('.panel .close').click();
+    await page.locator('.overlay:not(.hidden) .panel .close').click();
     const log2 = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
     expect(log2.filter((m) => m === 'gameplayStart').length).toBe(2);
+  });
+
+  test('podium choice, squad and a full match with a Power Shot', async ({ page }) => {
+    test.setTimeout(150_000);
+    const errors = attachConsole(page);
+    await page.goto('/');
+    await waitForGameplay(page);
+    type W = { sim: { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> }; state: Record<string, unknown> & { coach: { x: number; z: number; px: number; pz: number }; squad: unknown[]; cash: number }; spawnTrainee(): { stats: Record<string, number> } | undefined; graduate(t: unknown): void; area: { podium: { coachSpot: { x: number; z: number } }; matchPitch: { kickoff: { x: number; z: number } } } } };
+    await page.evaluate(() => {
+      const sim = (window.__wk as unknown as W).sim;
+      for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
+      const t = sim.spawnTrainee();
+      if (t) sim.graduate(t);
+    });
+    const tp = (x: number, z: number): Promise<void> =>
+      page.evaluate(([x, z]) => {
+        const c = (window.__wk as unknown as W).sim.state.coach;
+        c.x = c.px = x as number;
+        c.z = c.pz = z as number;
+      }, [x, z]);
+    const P = await page.evaluate(() => (window.__wk as unknown as W).sim.area.podium.coachSpot);
+    // wait for the graduate to walk onto the podium, then step up
+    await expect.poll(async () => page.evaluate(() => ((window.__wk as unknown as W).sim.state.podiumQueue as number[]).length), { timeout: 5000 }).toBe(1);
+    await page.waitForTimeout(9000);
+    await tp(P.x, P.z);
+    await expect(page.locator('.podium-panel')).toBeVisible({ timeout: 10_000 });
+    const stops = async (): Promise<number> => page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.filter((e) => e.msg === 'gameplayStop').length);
+    expect(await stops()).toBe(1);
+    await page.locator('.podium-panel .btn-big.promote').click();
+    await expect(page.locator('.podium-panel')).toBeHidden();
+    expect(await page.evaluate(() => (window.__wk as unknown as W).sim.state.squad.length)).toBe(1);
+    await expect(page.locator('.btn-side').first()).toBeVisible();
+    // kick off: the cinematic plays, the Power Shot meter takes Space, results stop gameplay
+    const K = await page.evaluate(() => (window.__wk as unknown as W).sim.area.matchPitch.kickoff);
+    await tp(K.x, K.z);
+    await expect(page.locator('.match-ui')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.m-meter')).toBeVisible({ timeout: 60_000 });
+    await page.keyboard.press('Space');
+    await expect(page.locator('.results-panel')).toBeVisible({ timeout: 90_000 });
+    const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
+    await page.locator('.results-panel .btn-big.promote').click();
+    await expect(page.locator('.results-panel')).toBeHidden();
+    await expect(page.locator('.match-ui')).toBeHidden();
+    const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
+    expect(rows).toBe(6);
+    expect(cash).toBeGreaterThan(0);
+    const log = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
+    expect(log[log.length - 1]).toBe('gameplayStart');
+    expect(errors).toEqual([]);
   });
 
   for (const [w, h] of [

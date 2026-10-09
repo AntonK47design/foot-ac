@@ -28,6 +28,9 @@ export class Hud {
   private readonly hint: HTMLDivElement;
   private readonly toasts: HTMLDivElement;
   readonly edge: HTMLDivElement;
+  /** M2 side buttons (hidden until there is a squad / a match pitch). */
+  readonly squadBtn: HTMLButtonElement;
+  readonly leagueBtn: HTMLButtonElement;
   private shownCash = 0;
   private targetCash = 0;
   private hintMethod: InputMethod | null = null;
@@ -62,6 +65,11 @@ export class Hud {
     this.hint = el('div', 'hint hidden', this.root);
     this.toasts = el('div', 'toasts', this.root);
     this.edge = el('div', 'edge-arrow hidden', this.root, icon('arrow'));
+    const side = el('div', 'hud-side', this.root);
+    this.squadBtn = el('button', 'btn-side hidden', side, `${icon('shirt')}<span>${t('hud.squad')}</span>`);
+    this.leagueBtn = el('button', 'btn-side hidden', side, `${icon('trophy')}<span>${t('hud.league')}</span>`);
+    this.squadBtn.setAttribute('aria-label', t('hud.squad'));
+    this.leagueBtn.setAttribute('aria-label', t('hud.league'));
   }
 
   setCash(v: number, instant = false): void {
@@ -87,6 +95,11 @@ export class Hud {
     this.starFill.style.width = `${Math.min(100, (stars / Math.max(1, total)) * 100)}%`;
     const txt = t('hud.stars', { stars, total });
     if (this.starText.textContent !== txt) this.starText.textContent = txt;
+  }
+
+  setSideButtons(squad: boolean, league: boolean): void {
+    this.squadBtn.classList.toggle('hidden', !squad);
+    this.leagueBtn.classList.toggle('hidden', !league);
   }
 
   bumpStars(): void {

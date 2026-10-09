@@ -24,7 +24,9 @@ import { formatCash, hasKey, t } from '../core/i18n';
 import type { Sim } from '../sim/sim';
 import type { Trainee } from '../sim/state';
 import { lerpAngle } from '../sim/geom';
-import { firstName } from '../sim/players';
+import { computeOvr, firstName } from '../sim/players';
+import type { MatchScript } from '../sim/match';
+import type { MatchUi } from '../ui/match-ui';
 import type { Hud } from '../ui/hud';
 import { icon } from '../ui/icons';
 import { LabelLayer, Popups, Projector, type ScreenPoint } from '../ui/labels';
@@ -45,6 +47,7 @@ import { makePad, type PadMesh } from './pads';
 import { PALETTE } from './palette';
 import { TIERS } from './quality';
 import type { RenderCore } from './renderer';
+import { MatchDirector, type MatchHooks } from './match-view';
 
 const MAX_BALLS = 260;
 const MAX_BILLS = 420;
@@ -52,6 +55,8 @@ const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
 /** Root lift while sitting so the hips rest on the bench seat (bench top 0.53 m, sit-clip hips ≈ 0.05 m). */
 const SIT_LIFT = 0.47;
+/** Top of the podium's 1st-place block. */
+const PODIUM_LIFT = 0.47;
 const ADULT_SCALE = 1.85;
 const HEAD_Y = 1.45;
 const RARITY_CLS: Record<Rarity, string> = { common: 'r-common', rare: 'r-rare', epic: 'r-epic', wonderkid: 'r-wonderkid' };
@@ -150,6 +155,12 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
     case 'cooler':
       k.waterCooler();
       break;
+    case 'pitch':
+      k.place(0, 0, 0.4).goal(1.8, 1.0, 0.7);
+      break;
+    case 'podium':
+      k.podium();
+      break;
     case 'sign':
       k.desk();
       break;
@@ -175,6 +186,10 @@ export class GameView {
   private readonly arrow: Group;
   private readonly bus: Group;
   private readonly deskRing: PadMesh;
+  private readonly podiumRing: PadMesh;
+  private readonly kickoffRing: PadMesh;
+  /** Match cinematic (created on first use). */
+  private director: MatchDirector | null = null;
   private readonly unlocks = new Map<string, UnlockView>();
   private readonly pads = new Map<string, PadView>();
   /** Seconds the coach has stood still (guide arrow hint after the tutorial). */
@@ -266,6 +281,16 @@ export class GameView {
     this.bus = buildBus(core.mat);
     scene.add(this.bus);
 
+    this.podiumRing = makePad(PALETTE.star, 0x1d2433, 1.0, 0.6);
+    const pc = sim.area.podium.coachSpot;
+    this.podiumRing.position.set(pc.x, 0.035, pc.z);
+    scene.add(this.podiumRing);
+    this.kickoffRing = makePad(PALETTE.blue, 0x1d2433, 1.0, 0.6);
+    const ko = sim.area.matchPitch.kickoff;
+    this.kickoffRing.position.set(ko.x, 0.035, ko.z);
+    this.kickoffRing.visible = false;
+    scene.add(this.kickoffRing);
+
     this.deskRing = makePad(PALETTE.blue, 0x1d2433, 1.0, 0.6);
     const ds = sim.area.desk.coachSpot;
     this.deskRing.position.set(ds.x, 0.035, ds.z);
@@ -279,9 +304,10 @@ export class GameView {
     coachIcon.seek(0);
     this.hud.setPortrait(this.icons.render('portrait', coachIcon.root, { yaw: 0.35, pitch: 0.15, zoom: 2.2, focusY: 0.78 }));
     // pre-render the whole icon atlas, then free the offscreen context
-    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler']) this.iconUrl(id);
+    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler', 'pitch', 'podium']) this.iconUrl(id);
     for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) this.iconUrl('lane', st);
     this.icons.dispose();
+    this.iconsDone = true;
   }
 
   /** Icon atlas: objective/pad icons rendered from the real 3D models. */
@@ -297,16 +323,15 @@ export class GameView {
     return url;
   }
 
-  private get iconsDone(): boolean {
-    return this.iconUrls.size >= 17;
-  }
+  /** Set once the atlas is rendered and the offscreen context freed. */
+  private iconsDone = false;
 
   // ───────────────────────────── building / syncing ─────────────────────────────
 
   private unlockKeys(): Array<{ id: string; lanes: number }> {
     const s = this.sim.state;
     const out: Array<{ id: string; lanes: number }> = [];
-    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter']) if (s.built[id]) out.push({ id, lanes: 1 });
+    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'match_pitch']) if (s.built[id]) out.push({ id, lanes: 1 });
     for (const [id, ss] of Object.entries(s.stations)) out.push({ id, lanes: ss.lanes });
     return out;
   }
@@ -428,9 +453,30 @@ export class GameView {
       if (tr) {
         this.fx.burst(tr.x, 1.5, tr.z, 70);
         this.actorFor(tr).c.play('cheer', 0.1);
-        this.hud.toast(t('toast.graduated', { name: firstName(tr), cash: formatCash(e.bonus) }), 'gold');
+        this.hud.toast(t('toast.graduated', { name: firstName(tr) }), 'gold');
       }
     });
+    ev.on('sold', (e) => {
+      this.audio.play('register');
+      this.audio.play('coin', 1.2);
+      this.haptic(25);
+      const P = this.sim.area.podium.top;
+      const c = this.sim.state.coach;
+      for (let i = 0; i < 16; i++) this.fx.coins.spawn(P.x, 1.6, P.z, c.x + (Math.random() - 0.5) * 0.6, 1.4, c.z + (Math.random() - 0.5) * 0.6, 0.45 + i * 0.03);
+      this.fx.burst(P.x, 1.4, P.z, 50, 0.8);
+      if (!e.fromSquad) this.popups.text(P.x, 2.6, P.z, t('podium.sold_stamp'), 'sold');
+      this.hud.toast(t('toast.sold', { name: e.name.split(' ')[0] ?? e.name, club: e.buyer, price: formatCash(e.price) }), 'gold', 3200);
+      this.hud.bumpCash();
+    });
+    ev.on('promoted', (e) => {
+      this.audio.play('cheer');
+      this.audio.play('levelup');
+      const P = this.sim.area.podium.top;
+      this.fx.burst(P.x, 1.6, P.z, 70, 1);
+      const p = this.sim.state.squad.find((q) => q.id === e.id);
+      if (p) this.hud.toast(t('toast.promoted', { name: p.name.split(' ')[0] ?? p.name }), 'good', 3000);
+    });
+    ev.on('graduateWaiting', () => this.audio.play('whistle', 1.3));
     ev.on('busArrived', () => this.audio.play('honk'));
     ev.on('levelUp', (e) => {
       this.audio.play('levelup');
@@ -615,6 +661,26 @@ export class GameView {
       a.seen = frameId;
       ringAt(a.c.root.position.x, a.c.root.position.z, tr.rarity);
     }
+    // ── podium + kick-off spots
+    const grad = sim.podiumGraduate();
+    this.podiumRing.material.uniforms.uTime!.value = this.time;
+    this.podiumRing.material.uniforms.uGlow!.value = grad ? 1 : 0;
+    const pitchBuilt = !!s.built[sim.area.matchPitch.objectId];
+    this.kickoffRing.visible = pitchBuilt && !this.matchActive;
+    if (pitchBuilt && !this.matchActive) {
+      const ready = sim.matchAvailable();
+      this.kickoffRing.material.uniforms.uTime!.value = this.time;
+      this.kickoffRing.material.uniforms.uGlow!.value = ready ? 1 : 0;
+      const ko = sim.area.matchPitch.kickoff;
+      const cd = Math.ceil(sim.matchCountdown());
+      const html = ready
+        ? `<div class="kick-sign ready">${icon('trophy')}<b>${t('match.kickoff')}</b></div>`
+        : `<div class="kick-sign">${icon('trophy')}<span>${t('match.next_in', { time: `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}` })}</span></div>`;
+      this.labels.place('kickoff', ko.x, 1.3, ko.z, '', html);
+      this.drawSquad(dt, frameId, ballAt);
+    }
+    if (this.director?.active) this.director.update(dt, ballAt);
+
     // remove actors of trainees that left
     for (const [k, a] of this.actors) {
       if (a.seen === frameId) continue;
@@ -784,11 +850,15 @@ export class GameView {
       }
     } else if (tr.state === 'seated' || tr.state === 'changing') {
       anim = 'sit';
+    } else if (tr.state === 'atPodium') {
+      // on top: a little celebration every few seconds
+      anim = sim.state.podiumQueue[0] === tr.id && (this.time + tr.id) % 4 < 1.1 ? 'cheer' : 'idle';
     } else if (tr.moving) {
       anim = tr.state === 'leaving' ? 'run' : 'walk';
     }
     a.yaw = lerpAngle(a.yaw, yaw, 1 - Math.exp(-dt * 14));
-    const ly = anim === 'sit' ? SIT_LIFT : 0;
+    const onTop = tr.state === 'atPodium' && sim.state.podiumQueue[0] === tr.id;
+    const ly = anim === 'sit' ? SIT_LIFT : onTop ? PODIUM_LIFT : 0;
     a.y = (a.y ?? ly) + (ly - (a.y ?? ly)) * (1 - Math.exp(-dt * 12));
     a.c.root.position.set(x, a.y, z);
     a.c.root.rotation.y = a.yaw + YAW_OFFSET;
@@ -797,7 +867,17 @@ export class GameView {
     const ovr = sim.ovr(tr);
     const rc = RARITY_CLS[tr.rarity];
     const key = 'tl:' + tr.id;
-    if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
+    if (tr.state === 'atPodium' || tr.state === 'toPodium') {
+      const top = sim.state.podiumQueue[0] === tr.id;
+      this.labels.place(
+        key,
+        x,
+        HEAD_Y + 0.35 + (top ? PODIUM_LIFT : 0),
+        z,
+        '',
+        `<div class="card grad${top ? ' top' : ''}"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span>${top ? `<span class="val">${formatCash(sim.transferValue(tr))}</span>` : ''}</div>`,
+      );
+    } else if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
       this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble need">${icon('ball')}<span class="emo">😟</span></div>`);
@@ -809,6 +889,63 @@ export class GameView {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${rc}">${ovr}</span>`);
     }
     return a;
+  }
+
+  get matchActive(): boolean {
+    return !!this.director?.active;
+  }
+
+  /** Plays the highlight reel on the match pitch (the caller pauses the sim). */
+  startMatch(script: MatchScript, ui: MatchUi, ourName: string, skippable: boolean, hooks: MatchHooks): void {
+    if (!this.director) {
+      const mp = this.sim.area.matchPitch;
+      this.director = new MatchDirector(this.core.scene, this.assets, this.rig, this.fx, this.audio, this.labels, ui, mp.rect, mp.goalW, () => {
+        const u = this.unlocks.get(mp.objectId);
+        if (u) {
+          u.ripple = 1;
+          u.rippleX = 0;
+        }
+      });
+    }
+    // the squad's training figures make way for the match line-ups
+    for (const [k, a] of this.actors) {
+      if (!k.startsWith('sq:')) continue;
+      this.core.scene.remove(a.c.root);
+      this.actors.delete(k);
+    }
+    this.director.start(script, ourName, skippable, hooks);
+  }
+
+  /** Squad members train on the match pitch between matches (keepy-uppies). */
+  private drawSquad(dt: number, frameId: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void): void {
+    const r = this.sim.area.matchPitch.rect;
+    const cx = (r.x0 + r.x1) / 2;
+    const cz = (r.z0 + r.z1) / 2;
+    const spots: Array<[number, number]> = [
+      [cx - 3.5, cz - 1.0],
+      [cx - 1.2, cz + 1.3],
+      [cx + 1.2, cz - 1.2],
+      [cx + 3.5, cz + 1.0],
+      [cx + 5.0, cz - 0.2],
+    ];
+    this.sim.state.squad.forEach((p, i) => {
+      const [x, z] = spots[i % spots.length] as [number, number];
+      const pool = p.female ? KIDS_F : KIDS_M;
+      const model = pool[(p.id * 7 + p.look.hair) % pool.length] as CharacterKey;
+      const a = this.actorNamed('sq:' + p.id, model, KITS.academy, KID_SCALE, x, z);
+      a.seen = frameId;
+      const ph = this.time * 1.6 + i * 1.3;
+      a.c.root.position.set(x, 0, z);
+      a.c.root.rotation.y = Math.sin(ph * 0.3) * 0.6;
+      // juggle: kick every ~0.6 s, ball bobbing in front
+      const k = (ph % 1) as number;
+      if (k < dt * 1.6) a.c.play('kick', 0.06, 1.6);
+      else a.c.play('idle');
+      const fx = Math.sin(a.c.root.rotation.y);
+      const fz = Math.cos(a.c.root.rotation.y);
+      ballAt(x + fx * 0.4, 0.2 + Math.sin(k * Math.PI) * 0.9, z + fz * 0.4, ph * 3, 0.26);
+      this.labels.place('sql:' + p.id, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${RARITY_CLS[p.rarity]}">${computeOvr(p.position, p.stats)}</span>`);
+    });
   }
 
   private updatePads(): void {
@@ -847,7 +984,7 @@ export class GameView {
         this.fx.coins.spawn(s.coach.x, 1.4, s.coach.z, p.pos.x, 0.1, p.pos.z, 0.35);
         this.audio.play('coin', 0.8 + (paid / p.cost) * 0.6);
       }
-      this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford));
+      if (!this.matchActive) this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford));
     }
     for (const [id, pv] of this.pads) {
       if (seen.has(id)) continue;

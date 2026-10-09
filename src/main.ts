@@ -18,6 +18,12 @@ import { autoTier, FpsWatchdog, type Tier } from './view/quality';
 import { RenderCore } from './view/renderer';
 import { loadArea1Assets } from './view/assets';
 import type { Objective } from './sim/objectives';
+import { DIVISIONS } from './data/clubs';
+import { computeOvr } from './sim/players';
+import { opponentsOf, pairings, sortedTable } from './sim/match';
+import { MatchUi } from './ui/match-ui';
+import { LeaguePanel, PodiumPanel, ResultsPanel, SquadPanel, type CardData, type PanelHooks } from './ui/panels';
+import type { Position, Rarity, Stat } from './data/types';
 
 declare global {
   interface Window {
@@ -118,6 +124,7 @@ async function boot(): Promise<void> {
     input.enabled = blockers.size === 0;
     if (blockers.size > 0) input.clear();
     if (started) {
+      // the match cinematic pauses the sim but is still gameplay (Power Shot); panels and ads stop it
       if (blockers.has('panel') || blockers.has('ad')) platform.gameplayStop();
       else platform.gameplayStart();
     }
@@ -170,6 +177,120 @@ async function boot(): Promise<void> {
     platformMuted: () => platform.isMuted(),
   });
   hud.gear.addEventListener('click', () => settingsPanel.open());
+
+  // ── M2: podium, squad, league, matches
+  const panelHooks: PanelHooks = {
+    onOpen: () => {
+      blockers.add('panel');
+      refreshPause();
+    },
+    onClose: () => {
+      blockers.delete('panel');
+      refreshPause();
+    },
+  };
+  const podiumPanel = new PodiumPanel(gameEl, panelHooks);
+  const resultsPanel = new ResultsPanel(gameEl, panelHooks);
+  const squadPanel = new SquadPanel(gameEl, panelHooks);
+  const leaguePanel = new LeaguePanel(gameEl, panelHooks);
+  const matchUi = new MatchUi(gameEl);
+  const card = (p: { name: string; position: Position; age: number; rarity: Rarity; stats: Record<Stat, number> }, hot: Stat | null = null): CardData => ({
+    name: p.name,
+    position: p.position,
+    age: p.age,
+    rarity: p.rarity,
+    ovr: computeOvr(p.position, p.stats),
+    stats: { ...p.stats },
+    hot,
+  });
+  const ourName = (): string => t('team.us');
+  const teamName = (id: string): string => (id === 'us' ? ourName() : (opponentsOf(sim.state.league.division).find((x) => x.id === id)?.name ?? id));
+  const divisionName = (d: number): string => t(DIVISIONS[d]?.nameKey ?? 'league.div.0');
+  const openLeague = (): void => {
+    const L = sim.state.league;
+    const rows = sortedTable(L).map((r) => ({ name: teamName(r.team), us: r.team === 'us', p: r.p, w: r.w, d: r.d, l: r.l, gd: r.gf - r.ga, pts: r.pts }));
+    const nextIdx = pairings(L.round % 5)[0]?.[1] ?? 1;
+    const next = sim.state.built[sim.area.matchPitch.objectId] ? (opponentsOf(L.division)[nextIdx - 1]?.name ?? null) : null;
+    leaguePanel.open(divisionName(L.division), L.season, L.round, rows, next);
+  };
+  const openSquad = (): void => {
+    const sq = sim.state.squad;
+    const rows = sq.map((p) => ({ id: p.id, card: card(p), value: sim.transferValue(p), apps: p.apps, goals: p.goals }));
+    const strength = sq.length ? sq.reduce((a, p) => a + computeOvr(p.position, p.stats), 0) / sq.length : 0;
+    squadPanel.open(rows, BALANCE.squad.size, strength, (id) => {
+      sim.releasePlayer(id);
+      openSquad();
+    });
+  };
+  hud.squadBtn.addEventListener('click', openSquad);
+  hud.leagueBtn.addEventListener('click', openLeague);
+  sim.events.on('podiumOpen', () => {
+    const g = sim.podiumGraduate();
+    if (!g) return;
+    const full = sim.state.squad.length >= BALANCE.squad.size;
+    const w = full ? sim.weakestSquadPlayer() : undefined;
+    podiumPanel.onDismiss = () => sim.dismissPrompt();
+    podiumPanel.open(
+      {
+        card: card(g),
+        price: sim.transferValue(g),
+        buyer: sim.buyerFor(g.id),
+        squadCount: sim.state.squad.length,
+        squadSize: BALANCE.squad.size,
+        replaces: w ? { name: w.name, ovr: computeOvr(w.position, w.stats), price: sim.transferValue(w) } : null,
+      },
+      () => sim.decideGraduate('sell'),
+      () => sim.decideGraduate('promote'),
+    );
+  });
+  sim.events.on('sold', (e) => {
+    analytics.once('first_sale');
+    if (e.record) platform.happytime();
+  });
+  sim.events.on('divisionUp', () => platform.happytime());
+  sim.events.on('kickoffReady', () => {
+    if (view.matchActive) return;
+    blockers.add('match');
+    refreshPause();
+    hud.showHint(null);
+    analytics.once('first_match');
+    const script = sim.startMatch();
+    view.startMatch(script, matchUi, ourName(), !!sim.state.flags.firstMatchPlayed, {
+      resolve: (i, q) => sim.resolveMatchChance(i, q),
+      done: () => {
+        const r = sim.finishCurrentMatch();
+        sim.state.flags.firstMatchPlayed = true;
+        const release = (): void => {
+          blockers.delete('match');
+          refreshPause();
+          updateHint();
+        };
+        if (!r) return release();
+        resultsPanel.open(
+          {
+            ourName: ourName(),
+            theirName: script.opponent.name,
+            ourGoals: r.ourGoals,
+            theirGoals: r.theirGoals,
+            outcome: r.outcome,
+            cash: r.cash,
+            points: r.points,
+            mvp: r.mvp && !r.mvp.sub ? card({ ...(sim.state.squad.find((p) => p.id === r.mvp?.id) ?? { name: r.mvp.name, position: r.mvp.position, age: 16, rarity: 'common', stats: r.mvp.stats }) }, r.mvpStat) : null,
+            rank: r.rank,
+            seasonOver: r.seasonOver,
+            promoted: r.promoted,
+            champion: r.champion,
+            divisionName: divisionName(sim.state.league.division),
+          },
+          release,
+          () => {
+            release();
+            openLeague();
+          },
+        );
+      },
+    });
+  });
 
   // ── hints: shown for the method the player actually uses until they've moved
   let hintDone = sim.state.coach.moved > 2;
@@ -269,6 +390,7 @@ async function boot(): Promise<void> {
       }
       hud.setCash(sim.state.cash);
       hud.setStars(sim.state.stars, sim.world.totalStars);
+      hud.setSideButtons(sim.state.squad.length > 0 || sim.state.records.promoted > 0, !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;
       const hi = BALANCE.levelXp[lv] ?? lo + 1000;

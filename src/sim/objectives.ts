@@ -34,6 +34,13 @@ export function computeObjective(sim: Sim): Objective | null {
     if (p && p.amount > 0) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
+  // 2. a graduate waits on the podium: sell or promote (the big payout moment)
+  const grad = sim.podiumGraduate();
+  if (grad) {
+    const P = area.podium.coachSpot;
+    return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
+  }
+
   const pads = sim.visiblePads();
   let cheapest = null as (typeof pads)[number] | null;
   for (const p of pads) if (!cheapest || sim.padRemaining(p) < sim.padRemaining(cheapest)) cheapest = p;
@@ -86,6 +93,12 @@ export function computeObjective(sim: Sim): Objective | null {
   if (dt && sim.canSign()) {
     const sp = area.desk.coachSpot;
     return { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
+  }
+
+  // 5b. a match is ready on the match pitch
+  if (sim.matchAvailable()) {
+    const K = area.matchPitch.kickoff;
+    return { key: 'obj.kickoff', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
   }
 
   // 6. keep baskets topped up while nobody automates it

@@ -10,6 +10,10 @@ import { computeOvr, createTrainee, firstName } from './players';
 import { makeAgent, type Agent, type SimState, type Staff, type Trainee } from './state';
 import { WorldGeo, type StationGeo } from './world';
 import { computeObjective, type Objective } from './objectives';
+import { BUYERS } from '../data/clubs';
+import { createMatch, finishMatch, newLeague, resolveChance, type MatchResult, type MatchScript } from './match';
+import type { Player } from './state';
+import type { Rarity } from '../data/types';
 
 export interface SimEvents {
   cashCollected: { pileId: string; amount: number; x: number; z: number };
@@ -20,10 +24,19 @@ export interface SimEvents {
   signed: { id: number; fee: number };
   repStart: { traineeId: number; stationId: string };
   rep: { traineeId: number; stationId: string; stat: Stat; gain: number; cash: number };
-  graduated: { id: number; bonus: number };
+  graduated: { id: number };
   busArrived: Record<string, never>;
   busLeft: Record<string, never>;
   levelUp: { level: number };
+  /** The coach stepped up to the podium with a graduate waiting: show the sell / promote choice. */
+  podiumOpen: { id: number };
+  /** The coach is on the kick-off spot and a match is available. */
+  kickoffReady: Record<string, never>;
+  sold: { id: number; name: string; price: number; buyer: string; record: boolean; fromSquad: boolean };
+  promoted: { id: number; replaced: { name: string; price: number } | null };
+  graduateWaiting: { id: number };
+  matchFinished: { result: MatchResult };
+  divisionUp: { division: number };
   staffHired: { id: string };
   objectiveChanged: { objective: Objective | null };
   saveNeeded: { reason: string };
@@ -90,8 +103,15 @@ export function createInitialState(area: AreaDef = AREA1, seed = 12345): SimStat
     rng: seed,
     flags: {},
     stats: { signed: 0, reps: 0, graduated: 0, unlocks: 0, ballsDelivered: 0, cashCollected: 0 },
+    podiumQueue: [],
+    squad: [],
+    league: newLeague(0, 1),
+    matchNextAt: 0,
+    records: { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0 },
   };
 }
+
+export type PromptKind = 'podium' | 'kickoff';
 
 /** The whole game simulation. Pure TS, deterministic for a given seed and input sequence. */
 export class Sim {
@@ -104,6 +124,12 @@ export class Sim {
   /** True while the coach is standing on a pad and cash is draining. */
   paying = false;
   private objT = 0;
+  /** Prompt the UI should show (set when the coach steps into a podium / kick-off zone). */
+  prompt: PromptKind | null = null;
+  /** Zones re-arm only after the coach leaves them (no re-open loop after closing a panel). */
+  private readonly latched: Record<PromptKind, boolean> = { podium: false, kickoff: false };
+  /** The match being played (between startMatch and finishCurrentMatch). */
+  match: MatchScript | null = null;
   private readonly rng: Rng;
   private readonly seatPos: Array<{ x: number; z: number; yaw: number }> = [];
 
@@ -200,6 +226,11 @@ export class Sim {
           break;
         case 'leaving':
           this.setGoal(t, door.x, door.z);
+          break;
+        case 'toPodium':
+        case 'atPodium':
+          p = this.podiumSlot(Math.max(0, s.podiumQueue.indexOf(t.id)));
+          t.state = 'atPodium';
           break;
       }
       t.x = t.px = p.x;
@@ -415,6 +446,8 @@ export class Sim {
     this.updateTrainees(dt);
     this.updateStations();
     this.updateStaff(dt);
+    this.updatePodium(dt);
+    this.updatePrompts();
     s.rng = this.rng.state;
     this.objT -= dt;
     if (this.objT <= 0) {
@@ -552,6 +585,7 @@ export class Sim {
       }
     } else if (u.type === 'object') {
       s.built[u.id] = true;
+      if (u.id === this.area.matchPitch.objectId) s.matchNextAt = s.time;
     } else if (u.type === 'staff') {
       s.built[u.id] = true;
       const f: Staff = { ...makeAgent(p.pos.x, p.pos.z), id: u.id, kind: 'ball_boy', state: 'idle', carry: 0, target: null, timer: 0 };
@@ -855,6 +889,9 @@ export class Sim {
         case 'leaving':
           if (this.moveAgent(t, speed * 1.15, dt)) s.trainees.splice(i, 1);
           break;
+        case 'toPodium':
+        case 'atPodium':
+          break; // updatePodium
       }
     }
   }
@@ -907,7 +944,7 @@ export class Sim {
   }
 
   /** Product of a perk multiplier over every built decor object. */
-  perk(key: 'feeMult' | 'repTimeMult' | 'gradBonusMult'): number {
+  perk(key: 'feeMult' | 'repTimeMult' | 'transferMult'): number {
     let m = 1;
     for (const [id, p] of Object.entries(BALANCE.perks)) if (this.state.built[id]) m *= p[key] ?? 1;
     return m;
@@ -921,17 +958,228 @@ export class Sim {
 
   private graduate(t: Trainee): void {
     const s = this.state;
-    const bonus = Math.round(BALANCE.trainee.graduationBonus * this.perk('gradBonusMult'));
-    const p = this.pile('desk');
-    if (p) p.amount += bonus;
     s.stats.graduated++;
     this.addXp(BALANCE.xp.perGraduation);
+    t.stationId = null;
+    this.events.emit('graduated', { id: t.id });
+    if (s.podiumQueue.length >= 1 + this.area.podium.line.length) {
+      // podium line full: the club's scouts take the graduate at the standard fee (never blocks training)
+      this.sell(t, false);
+    } else {
+      s.podiumQueue.push(t.id);
+      t.state = 'toPodium';
+      t.goal = null;
+      this.events.emit('graduateWaiting', { id: t.id });
+    }
+    this.events.emit('saveNeeded', { reason: 'graduate' });
+  }
+
+  // ───────────────────────────── podium, transfers, squad (M2) ─────────────────────────────
+
+  /** Where the i-th waiting graduate stands (0 = on top of the podium). */
+  podiumSlot(i: number): { x: number; z: number } {
+    const P = this.area.podium;
+    return i === 0 ? P.top : (P.line[i - 1] ?? P.line[P.line.length - 1] ?? P.top);
+  }
+
+  /** The graduate standing on the podium (ready for the coach's decision). */
+  podiumGraduate(): Trainee | undefined {
+    const id = this.state.podiumQueue[0];
+    const t = id !== undefined ? this.trainee(id) : undefined;
+    return t && t.state === 'atPodium' ? t : undefined;
+  }
+
+  /** Transfer value from OVR and rarity (rounded to $5). */
+  transferValue(p: { position: Player['position']; stats: Player['stats']; rarity: Rarity }): number {
+    const T = BALANCE.transfer;
+    const ovr = computeOvr(p.position, p.stats);
+    return Math.max(5, Math.round((T.base * Math.pow(ovr / T.ovrRef, T.exp) * T.rarityMult[p.rarity] * this.perk('transferMult')) / 5) * 5);
+  }
+
+  /** Fictional buying club for a player (stable per id). */
+  buyerFor(id: number): string {
+    return BUYERS[(id * 7 + 3) % BUYERS.length] as string;
+  }
+
+  private updatePodium(dt: number): void {
+    const s = this.state;
+    const speed = BALANCE.trainee.speed;
+    for (let i = 0; i < s.podiumQueue.length; i++) {
+      const t = this.trainee(s.podiumQueue[i] as number);
+      if (!t) {
+        s.podiumQueue.splice(i--, 1);
+        continue;
+      }
+      const slot = this.podiumSlot(i);
+      if (dist2(t.x, t.z, slot.x, slot.z) > 0.0004) {
+        if (!t.goal || Math.abs(t.goal.x - slot.x) > 0.01 || Math.abs(t.goal.z - slot.z) > 0.01) this.setGoal(t, slot.x, slot.z);
+        t.state = 'toPodium';
+        if (this.moveAgent(t, speed, dt)) t.state = 'atPodium';
+      } else {
+        t.goal = null;
+        t.moving = false;
+        t.state = 'atPodium';
+        // face the coach's spot (top) or along the line
+        const c = this.area.podium.coachSpot;
+        t.yaw = yawFor(c.x - t.x, c.z - t.z);
+      }
+    }
+  }
+
+  private updatePrompts(): void {
+    const s = this.state;
+    const c = s.coach;
+    const P = this.area.podium.coachSpot;
+    const pr = BALANCE.transfer.zoneRadius;
+    const inPodium = dist2(c.x, c.z, P.x, P.z) <= pr * pr;
+    if (!inPodium) this.latched.podium = false;
+    const K = this.area.matchPitch.kickoff;
+    const kr = BALANCE.match.kickoffRadius;
+    const inKick = dist2(c.x, c.z, K.x, K.z) <= kr * kr;
+    if (!inKick) this.latched.kickoff = false;
+    if (this.prompt) return;
+    const g = inPodium && !this.latched.podium ? this.podiumGraduate() : undefined;
+    if (g) {
+      this.prompt = 'podium';
+      this.latched.podium = true;
+      this.events.emit('podiumOpen', { id: g.id });
+    } else if (inKick && !this.latched.kickoff && this.matchAvailable()) {
+      this.prompt = 'kickoff';
+      this.latched.kickoff = true;
+      this.events.emit('kickoffReady', EMPTY);
+    }
+  }
+
+  /** The UI closed a prompt without acting; it re-opens once the coach steps out and back in. */
+  dismissPrompt(): void {
+    this.prompt = null;
+  }
+
+  private sell(t: Trainee, fromPodium: boolean): number {
+    const s = this.state;
+    const price = this.transferValue(t);
+    const prev = s.records.bestSale;
+    this.addCash(price);
+    s.records.sold++;
+    s.records.bestSale = Math.max(prev, price);
+    if (fromPodium) s.podiumQueue = s.podiumQueue.filter((id) => id !== t.id);
     t.state = 'leaving';
     t.stationId = null;
     const ex = this.area.gate.exit;
     this.setGoal(t, ex.x, ex.z);
-    this.events.emit('graduated', { id: t.id, bonus });
-    this.events.emit('saveNeeded', { reason: 'graduate' });
+    this.events.emit('sold', { id: t.id, name: t.name, price, buyer: this.buyerFor(t.id), record: prev > 0 && price > prev, fromSquad: false });
+    return price;
+  }
+
+  /** The coach's podium decision for the graduate on top. */
+  decideGraduate(choice: 'sell' | 'promote'): void {
+    const s = this.state;
+    const t = this.podiumGraduate();
+    this.prompt = null;
+    this.latched.podium = false;
+    if (!t) return;
+    if (choice === 'sell') this.sell(t, true);
+    else {
+      let replaced: { name: string; price: number } | null = null;
+      if (s.squad.length >= BALANCE.squad.size) {
+        const weakest = this.weakestSquadPlayer();
+        if (weakest) replaced = { name: weakest.name, price: this.releasePlayer(weakest.id) };
+      }
+      s.squad.push({
+        id: t.id,
+        name: t.name,
+        age: t.age,
+        position: t.position,
+        rarity: t.rarity,
+        female: t.female,
+        look: { ...t.look },
+        stats: { ...t.stats },
+        cap: t.cap,
+        apps: 0,
+        goals: 0,
+      });
+      s.records.promoted++;
+      s.podiumQueue = s.podiumQueue.filter((id) => id !== t.id);
+      s.trainees = s.trainees.filter((o) => o !== t);
+      this.events.emit('promoted', { id: t.id, replaced });
+    }
+    this.events.emit('saveNeeded', { reason: 'podium' });
+    this.refreshObjective();
+  }
+
+  weakestSquadPlayer(): Player | undefined {
+    let w: Player | undefined;
+    for (const p of this.state.squad) if (!w || computeOvr(p.position, p.stats) < computeOvr(w.position, w.stats)) w = p;
+    return w;
+  }
+
+  /** Sells a squad player (squad panel, or to make room for a promotion). */
+  releasePlayer(id: number): number {
+    const s = this.state;
+    const p = s.squad.find((q) => q.id === id);
+    if (!p) return 0;
+    const price = Math.round((this.transferValue(p) * BALANCE.transfer.releaseShare) / 5) * 5;
+    const prev = s.records.bestSale;
+    s.squad = s.squad.filter((q) => q !== p);
+    this.addCash(price);
+    s.records.sold++;
+    s.records.bestSale = Math.max(prev, price);
+    this.events.emit('sold', { id: p.id, name: p.name, price, buyer: this.buyerFor(p.id), record: prev > 0 && price > prev, fromSquad: true });
+    this.events.emit('saveNeeded', { reason: 'release' });
+    return price;
+  }
+
+  // ───────────────────────────── matches (M2) ─────────────────────────────
+
+  matchAvailable(): boolean {
+    const s = this.state;
+    return !!s.built[this.area.matchPitch.objectId] && s.time >= s.matchNextAt && !this.match;
+  }
+
+  /** Seconds until the next match (0 when available; Infinity without a pitch). */
+  matchCountdown(): number {
+    const s = this.state;
+    if (!s.built[this.area.matchPitch.objectId]) return Infinity;
+    return Math.max(0, s.matchNextAt - s.time);
+  }
+
+  /** Creates the highlight script. The caller pauses the sim while the match plays. */
+  startMatch(): MatchScript {
+    this.prompt = null;
+    this.match = createMatch(this.rng, this.state.squad, this.state.league);
+    this.state.rng = this.rng.state;
+    return this.match;
+  }
+
+  resolveMatchChance(i: number, quality = 0.5): boolean {
+    const c = this.match?.chances[i];
+    return c ? resolveChance(c, quality) : false;
+  }
+
+  finishCurrentMatch(): MatchResult | null {
+    const s = this.state;
+    const m = this.match;
+    if (!m) return null;
+    const r = finishMatch(this.rng, m, s.league, s.squad);
+    this.match = null;
+    this.addCash(r.cash);
+    this.addXp(r.xp);
+    s.records.matches++;
+    if (r.outcome === 'win') s.records.wins++;
+    s.records.goals += r.ourGoals;
+    s.matchNextAt = s.time + BALANCE.match.interval;
+    if (r.seasonOver) {
+      if (r.champion) s.records.titles++;
+      const div = r.promoted ? s.league.division + 1 : s.league.division;
+      s.league = newLeague(div, s.league.season + 1);
+      if (r.promoted) this.events.emit('divisionUp', { division: div });
+    }
+    s.rng = this.rng.state;
+    this.latched.kickoff = true;
+    this.events.emit('matchFinished', { result: r });
+    this.events.emit('saveNeeded', { reason: 'match' });
+    this.refreshObjective();
+    return r;
   }
 
   private updateStations(): void {

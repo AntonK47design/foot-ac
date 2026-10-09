@@ -30,6 +30,8 @@ export const ICONS: Record<string, string> = {
   lock: svg('<rect x="5" y="10" width="14" height="11" rx="2.5" fill="#2a2f3a"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="#2a2f3a" stroke-width="2.6"/><circle cx="12" cy="15.5" r="1.8" fill="#FFC83D"/>'),
   close: svg('<path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'),
   arrow: svg('<path d="M4 12h13M12 5l7 7-7 7" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>'),
+  trophy: svg('<path d="M7 3h10v5a5 5 0 01-10 0z" fill="#FFC83D" stroke="#D9930F" stroke-width="1.4"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4" fill="none" stroke="#D9930F" stroke-width="1.6"/><path d="M10 13h4v4h-4z" fill="#D9930F"/><rect x="7" y="17" width="10" height="3.5" rx="1" fill="#2a2f3a"/>'),
+  shirt: svg('<path d="M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.6-2 2.5-4 2.5S8.5 4.6 8 3z" fill="#2F6BFF" stroke="#1d2433" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 9h4" stroke="#FFD23F" stroke-width="2"/>'),
   ticket: svg('<path d="M3 7h18v3a2 2 0 000 4v3H3v-3a2 2 0 000-4z" fill="#A35CFF"/>'),
 };
 

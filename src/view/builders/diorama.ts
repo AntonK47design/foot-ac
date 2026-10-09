@@ -368,15 +368,17 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     [-4.5, -3.0],
     [-4.5, -4.4],
     [-16.0, 7.6],
-    [3.0, 7.2],
   ] as Array<[number, number]>) {
     kit.place(x, z).planter();
     aoBlobs.push({ x, z, r: 0.55 });
   }
-  props.put('bench', 0.6, 7.0, 0, 5);
-  kit.place(-1.6, 7.3).bin();
   kit.place(9.4, 0.6).bin();
-  aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 }, { x: -1.6, z: 7.3, r: 0.35 });
+  aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 });
+  // graduation podium (prebuilt): faces the plaza
+  const pod = AREA1.podium.pos;
+  kit.place(pod.x, pod.z).podium();
+  aoBlobs.push({ x: pod.x, z: pod.z, r: 1.3 });
+  anchors.podium = { x: pod.x, z: pod.z };
   props.put('streetlight', 16.3, L.gate.z + 2.0, -HALF_PI, 4, 0, 0.1);
   props.put('streetlight', -5.6, 7.8, 0, 4, 0, 0.1);
   props.put('firehydrant', 16.35, -1.9, 0, 3.5);
@@ -418,7 +420,7 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   }
   props.put('Box_A', -14.0, 6.6, 0.4, 1.1);
   props.put('Barrel_A', -14.4, 7.4, 0, 0.7);
-  props.put('Pallet_Small_Decorated_A', -5.6, 5.6, 0.2, 0.55);
+  props.put('Pallet_Small_Decorated_A', -5.9, 2.2, 0.2, 0.55);
   kit.place(-15.4, 2.4).planter();
   aoBlobs.push({ x: -15.4, z: 2.4, r: 0.55 });
   kit.place(-15.6, 4.6, Math.PI / 2).bench(2.2);
@@ -474,6 +476,68 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
     case 'bus_shelter':
       kit.place(at.x, at.z).dugout(1.8);
       break;
+    case 'match_pitch': {
+      const mp = AREA1.matchPitch;
+      const r = mp.rect;
+      const turf = floor('turf', r, 0.012, 2);
+      const tt = (turf.material as MeshLambertMaterial).map;
+      if (tt) tt.repeat.set((r.x1 - r.x0) / 3, 1);
+      c.extra.push(turf);
+      const lw = 0.1;
+      const ly = 0.02;
+      const cx = (r.x0 + r.x1) / 2;
+      const cz = (r.z0 + r.z1) / 2;
+      b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z0));
+      b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z1));
+      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x0, ly, cz));
+      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x1, ly, cz));
+      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(cx, ly, cz));
+      const seg = 20;
+      const rad = 1.1;
+      for (let i = 0; i < seg; i++) {
+        const a = ((i + 0.5) / seg) * Math.PI * 2;
+        b.add(flat(lw, (2 * Math.PI * rad) / seg + 0.02), COL.line, trs(cx + Math.cos(a) * rad, ly, cz + Math.sin(a) * rad, -a));
+      }
+      // goal boxes
+      for (const [gx, dir] of [
+        [r.x0, 1],
+        [r.x1, -1],
+      ] as Array<[number, number]>) {
+        b.add(flat(lw, 3.2), COL.line, trs(gx + dir * 1.2, ly, cz));
+        b.add(flat(1.2, lw), COL.line, trs(gx + dir * 0.6, ly, cz - 1.6));
+        b.add(flat(1.2, lw), COL.line, trs(gx + dir * 0.6, ly, cz + 1.6));
+        // goal on the line, net behind (outside the pitch)
+        const gw = mp.goalW;
+        const gh = 1.2;
+        const gd = 0.8;
+        kit.place(gx, cz, dir > 0 ? HALF_PI : -HALF_PI).goal(gw, gh, gd);
+        const nm = netMaterial();
+        const back = new Mesh(new PlaneGeometry(gw, gh, 8, 4), nm);
+        back.position.set(gx - dir * gd, gh / 2, cz);
+        back.rotation.y = HALF_PI;
+        c.nets.push(back);
+        c.extra.push(back);
+        for (const sz of [-1, 1]) {
+          const side = new Mesh(new PlaneGeometry(gd, gh), nm);
+          side.position.set(gx - (dir * gd) / 2, gh / 2, cz + (sz * gw) / 2);
+          c.extra.push(side);
+        }
+        const top = new Mesh(new PlaneGeometry(gd, gw), nm);
+        top.rotation.x = -HALF_PI;
+        top.position.set(gx - (dir * gd) / 2, gh, cz);
+        c.extra.push(top);
+      }
+      for (const [x, z] of [
+        [r.x0, r.z0],
+        [r.x1, r.z0],
+        [r.x0, r.z1],
+        [r.x1, r.z1],
+      ] as Array<[number, number]>)
+        kit.place(0, 0).cornerFlag(x, z);
+      // kick-off spot marker (big centre spot)
+      b.add(flat(0.3, 0.3), COL.line, trs(cx, ly + 0.002, cz, Math.PI / 4));
+      break;
+    }
     case 'shooting_goal': {
       const sl = L.shootingLane;
       const gx0 = (sl.x0 + sl.x1) / 2;
@@ -540,7 +604,7 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
 /** Showcase / capture: the whole academy built (base + every unlockable with all lanes). */
 export function buildFullDiorama(assets: Assets, L: Layout, mat: Material, geos: Record<string, UnlockGeo>): Diorama {
   const base = buildDiorama(assets, L, mat);
-  for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) {
+  for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'match_pitch', 'shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track']) {
     const u = buildUnlockable(id, 2, assets, L, mat, geos[id]);
     base.root.add(u.root);
     base.nets.push(...u.nets);

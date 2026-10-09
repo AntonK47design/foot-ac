@@ -46,6 +46,8 @@ export type TraineeState =
   | 'queued'
   | 'toLane'
   | 'training'
+  | 'toPodium'
+  | 'atPodium'
   | 'leaving';
 
 export interface TraineeLook {
@@ -79,6 +81,52 @@ export interface Trainee extends Agent {
   reps: number;
   totalReps: number;
   waitT: number;
+}
+
+/** A promoted graduate in the Academy Squad (M2). */
+export interface Player {
+  id: number;
+  name: string;
+  age: number;
+  position: Position;
+  rarity: Rarity;
+  female: boolean;
+  look: TraineeLook;
+  stats: Record<Stat, number>;
+  cap: number;
+  apps: number;
+  goals: number;
+}
+
+export interface LeagueRow {
+  /** Team id from data/clubs.ts, or 'us'. */
+  team: string;
+  p: number;
+  w: number;
+  d: number;
+  l: number;
+  gf: number;
+  ga: number;
+  pts: number;
+}
+
+export interface League {
+  /** 0 = bottom division. */
+  division: number;
+  season: number;
+  /** Rounds played this season (a season is one round-robin: 5 rounds). */
+  round: number;
+  table: LeagueRow[];
+}
+
+export interface Records {
+  bestSale: number;
+  sold: number;
+  promoted: number;
+  matches: number;
+  wins: number;
+  goals: number;
+  titles: number;
 }
 
 export type StaffKind = 'ball_boy';
@@ -154,6 +202,13 @@ export interface SimState {
   rng: number;
   flags: Record<string, boolean>;
   stats: SimStats;
+  /** Graduates waiting at the podium, first = on the podium. */
+  podiumQueue: number[];
+  squad: Player[];
+  league: League;
+  /** Sim time when the next match becomes available. */
+  matchNextAt: number;
+  records: Records;
 }
 
 export function makeAgent(x: number, z: number): Agent {

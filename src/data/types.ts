@@ -46,7 +46,7 @@ export interface StationDef {
   footprint: Rect[];
 }
 
-export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter';
+export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter' | 'pitch';
 
 export interface ObjectDef {
   id: string;
@@ -69,7 +69,7 @@ export type Unlock =
   | { type: 'object'; id: string }
   | { type: 'staff'; id: string };
 
-export type IconId = 'ball' | 'goal' | 'cones' | 'wall' | 'track' | 'chair' | 'staff' | 'bench' | 'flag' | 'shelter' | 'cooler' | 'lane';
+export type IconId = 'ball' | 'goal' | 'cones' | 'wall' | 'track' | 'chair' | 'staff' | 'bench' | 'flag' | 'shelter' | 'cooler' | 'lane' | 'pitch' | 'podium';
 
 export interface PadDef {
   id: string;
@@ -109,6 +109,10 @@ export interface AreaDef {
   starterPiles: StarterPile[];
   /** Changing-room bench seats where signed trainees put on the academy kit. */
   lockers: { seats: V2[]; yaw: number };
+  /** Graduation podium: the graduate stands on `top`, others wait on `line`; the coach decides at `coachSpot`. */
+  podium: { pos: V2; top: V2; coachSpot: V2; line: V2[] };
+  /** 5-a-side match pitch (an unlockable object); the coach starts matches at `kickoff`. */
+  matchPitch: { objectId: string; rect: Rect; kickoff: V2; goalW: number };
   /** Static obstacles (walls, fences, fixed furniture) — always present. */
   obstacles: Rect[];
   /** Walkable rects for NPC navigation (plot + street corridor to the bus). */

@@ -18,6 +18,8 @@ export class CameraRig {
   private shakeT = 0;
   private shakeAmp = 0;
   private pan: { x: number; z: number; t: number } | null = null;
+  /** Cinematic hold (matches): fixed focus and visible width (m) until cleared. */
+  private hold: { x: number; z: number; w: number } | null = null;
   aspect = 16 / 9;
 
   constructor() {
@@ -43,7 +45,7 @@ export class CameraRig {
     // zoom out only as the playable area grows (view grows beyond the base)
     const grow = this.view / BALANCE.camera.baseView;
     const { widthPortrait, widthLandscape } = BALANCE.camera;
-    const W = (widthPortrait + (widthLandscape - widthPortrait) * k) * grow;
+    const W = this.hold ? this.hold.w : (widthPortrait + (widthLandscape - widthPortrait) * k) * grow;
     this.dist = W / 2 / (tanH * a);
   }
 
@@ -55,6 +57,20 @@ export class CameraRig {
   /** Pans to a point for ~1 s (skippable by moving). */
   panTo(x: number, z: number): void {
     this.pan = { x, z, t: 1.1 };
+  }
+
+  /** Holds the camera on a point with a given visible width (null releases it). */
+  setHold(h: { x: number; z: number; w: number } | null): void {
+    this.hold = h;
+    this.pan = null;
+    this.updateDistance();
+  }
+
+  /** Moves an active hold's focus (keeps its width). */
+  moveHold(x: number, z: number): void {
+    if (!this.hold) return;
+    this.hold.x = x;
+    this.hold.z = z;
   }
 
   cancelPan(): void {
@@ -74,7 +90,11 @@ export class CameraRig {
     let tx = fx + vx * 0.22;
     let tz = fz + vz * 0.22;
     let k = 1 - Math.exp(-dt * 6);
-    if (this.pan) {
+    if (this.hold) {
+      tx = this.hold.x;
+      tz = this.hold.z;
+      k = 1 - Math.exp(-dt * 3);
+    } else if (this.pan) {
       this.pan.t -= dt;
       tx = this.pan.x;
       tz = this.pan.z;
