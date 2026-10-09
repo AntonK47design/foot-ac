@@ -181,7 +181,7 @@ export const BALANCE = {
       { slots: 16, cash: 10000, tickets: 10 },
     ],
     /** Offline earnings: share of the recent income rate, base cap (s); the Office upgrade adds hours. */
-    offline: { share: 0.1, baseCapSec: 3600, perLevelSec: 3600, minSec: 180 },
+    offline: { share: 0.03, baseCapSec: 3600, perLevelSec: 3600, minSec: 180 },
     /** Income-rate EMA time constant (s) for offline earnings. */
     incomeTau: 60,
     /** Account prompt: share of Area 1 stars and play time before it may show (never forced). */
