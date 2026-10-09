@@ -2,6 +2,8 @@
 
 3D idle-arcade football academy builder for CrazyGames (three.js + TypeScript + Vite).
 
+**▶ Play:** https://antonk47design.github.io/foot-ac/
+
 - Spec: [`docs/GDD.md`](docs/GDD.md) · Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md) · Submission: [`docs/SUBMISSION.md`](docs/SUBMISSION.md)
 
 ```bash
