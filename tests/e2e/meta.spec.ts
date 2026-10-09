@@ -80,4 +80,40 @@ test.describe('M4 meta', () => {
     await expect(page.locator('.overlay:not(.hidden)')).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+
+  test('rewarded ads (VITE_ADS on): daily ×2 doubles the claim; adblock shows a note instead', async ({ page }) => {
+    const errors = attachConsole(page);
+    await page.goto('/');
+    await waitForGameplay(page);
+    await page.evaluate(() => {
+      const wk = window.__wk!;
+      (wk.platform as { enableAdsForTesting(): void }).enableAdsForTesting();
+      const opts = (wk.platform as { adapter: { options: { adsDisabled: boolean; adMs: number } } }).adapter.options;
+      opts.adsDisabled = false;
+      opts.adMs = 300;
+      const sim = wk.sim as { state: { level: number; meta: { daily: { claims: number } } } };
+      sim.state.level = 2;
+      sim.state.meta.daily.claims = 1; // day 2 = 1 ticket
+    });
+    const tickets0 = await page.evaluate(() => (window.__wk!.sim as { state: { tickets: number } }).state.tickets);
+    await page.locator('.btn-side', { hasText: 'Daily' }).click();
+    const panel = page.locator('.overlay:not(.hidden) .daily-panel');
+    await expect(panel.locator('.btn-big.ad')).toBeVisible();
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: 'screenshots/m5-daily-ad.png' });
+    await panel.locator('.btn-big.ad').click();
+    await expect(panel).toBeHidden({ timeout: 5000 });
+    expect(await page.evaluate(() => (window.__wk!.sim as { state: { tickets: number } }).state.tickets)).toBe(tickets0 + 2);
+    // adblock: the Office cash offer becomes an inline note
+    await page.evaluate(() => {
+      const wk = window.__wk!;
+      (wk.ads as { adblock: boolean }).adblock = true;
+      (wk.sim as { state: { cash: number } }).state.cash = 0;
+      (wk.sim as { events: { emit(n: string, e: unknown): void } }).events.emit('podiumOpen', { id: 0 });
+    });
+    const office = page.locator('.overlay:not(.hidden) .office-panel');
+    await expect(office.locator('.ad-note')).toBeVisible();
+    await expect(office.locator('.btn-big.ad')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
 });

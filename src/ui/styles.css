@@ -2157,3 +2157,45 @@ body {
     grid-column: span 2;
   }
 }
+
+/* ── M5 rewarded ads ── */
+.btn-big.ad {
+  background: #ff8a1f;
+  color: #fff;
+}
+.btn-big.ad span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-big.ad svg {
+  width: 24px;
+  height: 24px;
+}
+.ad-note {
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #6b778c;
+  text-align: center;
+}
+.ad-done {
+  margin: 8px 0;
+  font-family: var(--display);
+  font-size: 16px;
+  color: var(--cash-d);
+  text-align: center;
+}
+.claim-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.btn-big.office-ad,
+.results-panel .btn-big.ad {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.scout-active .btn-big.ad {
+  align-self: flex-start;
+}

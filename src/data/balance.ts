@@ -134,6 +134,20 @@ export const BALANCE = {
     powerSpeed: 1.1,
     powerTimeout: 3.5,
   },
+  /** Rewarded / midgame ads (GDD §7). Only active with VITE_ADS=on. */
+  ads: {
+    /** Daily caps per rewarded placement. */
+    caps: { welcome: 3, daily: 1, office: 5, results: 5, scout: 3 } as Record<string, number>,
+    /** Office "Get $X": share of the cheapest item the player can't afford, shrinking per use today. */
+    officeShare: 0.35,
+    officeDecay: 0.15,
+    officeMinMult: 0.5,
+    officeCooldownSec: 180,
+    /** Scout "finish now" only for missions up to this long. */
+    scoutMaxSec: 1800,
+    /** No midgame before this much cumulative play. */
+    midgameMinPlaySec: 300,
+  },
   /** M4 meta / retention systems (GDD §4.8–4.9, §5.3). */
   meta: {
     /** Academy level at which each feature unlocks. */

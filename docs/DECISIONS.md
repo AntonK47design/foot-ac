@@ -109,3 +109,18 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 58. **Quest cash lowered** (playtest: "quests pay too much"). They used to pay ~1 min of income (e.g. $2,400 at Lv 7). Now each quest pays about 15–25 s of income: base $200–300 × (1 + 0.4 × (level − 1)), so ~$500–850 at Lv 7. Scout Tickets are the main prize. The quest pool moved to `balance.ts`.
 59. **Offline earnings lowered** (playtest: "too high"). At the bot's ~40 $/s mid-game income, 50% for up to 2 h paid ~$144k, more than the whole Area 1 economy. Now it pays **10% of the recent income rate, capped at 1 h**, so ~$14k for an hour away (≈ 6 min of active play). Night Shift adds +1 h per level, up to 4 h.
 60. **Offline earnings lowered again** (playtest: "$14k still too much"). Mid-game upgrades cost $600–9,000, so one return could buy several at once. The share is now **3%**: an hour away pays ~$4.3k at mid-game (≈ one upgrade, ~2 min of active play) and ~$1.6k at Lv 4. Active play stays the main source of cash.
+61. **M5 SDK audit.** The container can't fetch the SDK, so `tests/e2e/sdk.spec.ts` checks the real adapter path against a recording stand-in for `window.CrazyGames.SDK`. It covers:
+    - boot order and that `gameplayStart/Stop` are idempotent;
+    - panels stopping and resuming gameplay, and blur/focus doing nothing;
+    - saving through `SDK.data`, monotonic completion %, `muteAudio` override and the auth reload toast;
+    - a rewarded ad stopping gameplay and muting while it plays.
+
+    `docs/SDK_CHECKLIST.md` is the manual pass with the real SDK on localhost.
+62. **Ads (GDD §7, `ui/ads.ts`).**
+    - **Off by default:** everything sits behind `VITE_ADS`, which stays off for Basic Launch, and no offer object exists when it's off.
+    - **Rewarded placements:** Welcome back ×2 (offline cash), Daily ×2 (cash and tickets, not the prospect), Office "Get $X" (35% of the cheapest upgrade the player can't afford, −15% per use that day, at least 50%, 3 min cooldown), Results ×2 prize, and Scout "Finish now" (missions ≤ 30 min).
+    - **Caps and storage:** daily caps are welcome 3, daily 1, office 5, results 5, scout 3. They are stored in the save (`meta.ads`).
+    - **Midgame:** only when closing match results, never after the first match, before 5 min of play, or at a break where a rewarded ad was watched.
+    - **While an ad plays:** the 'ad' blocker pauses the sim, blocks input, stops gameplay and mutes audio.
+    - **Adblock:** an inline note replaces the buttons.
+    - **Dead buttons:** a button that can no longer do anything (Basic Launch error, cap, adblock) removes itself.

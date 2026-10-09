@@ -1,4 +1,5 @@
 import { formatCash, t } from '../core/i18n';
+import { adElement, type AdOffer } from './ads';
 import { STATS, type Position, type Rarity, type Stat } from '../data/types';
 import { icon } from './icons';
 
@@ -163,6 +164,8 @@ export interface ResultInfo {
   divisionName: string;
   /** Daily Cup tie: no points/table; a win pays Scout Tickets. */
   cup?: { tickets: number } | null;
+  /** Rewarded "▶ ×2 prize". */
+  ad?: AdOffer | null;
 }
 
 export class ResultsPanel extends Panel {
@@ -191,6 +194,14 @@ export class ResultsPanel extends Panel {
           : `<span>${icon('star')}<b>${t('results.points', { n: r.points })}</b></span><span>${icon('trophy')}<b>${t('rank.' + Math.min(r.rank, 6))}</b></span>`
       }</div>
       ${r.mvp ? `<div class="mvp"><div class="mvp-tag">${t('results.mvp')}</div>${cardHtml(r.mvp, 'small')}</div>` : ''}`;
+    const adEl = adElement(r.ad, (ok) => {
+      if (!ok || !adEl) return;
+      const done = document.createElement('div');
+      done.className = 'ad-done';
+      done.textContent = t('ads.doubled', { cash: formatCash(r.cash * 2) });
+      adEl.replaceWith(done);
+    });
+    if (adEl) this.body.appendChild(adEl);
     const row = document.createElement('div');
     row.className = 'choice-row';
     row.appendChild(
@@ -309,6 +320,8 @@ export interface OfficeData {
   transfer: PodiumInfo | null;
   waiting: number;
   rows: UpgradeRow[];
+  /** Rewarded "▶ Get $X" when short on cash. */
+  ad?: AdOffer | null;
 }
 
 /** Manager's Office computer: transfer decisions + upgrade tabs (GDD §4.7). */
@@ -377,6 +390,8 @@ export class OfficePanel extends Panel {
       c.appendChild(row);
       return;
     }
+    const adEl = adElement(d.ad, () => this.render(), 'office-ad');
+    if (adEl) c.appendChild(adEl);
     const list = document.createElement('div');
     list.className = 'up-list';
     for (const r of d.rows.filter((x) => x.tab === this.tab)) {

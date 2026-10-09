@@ -273,5 +273,11 @@
   "account.text": "Log in to keep your academy safe across devices.",
   "account.login": "Log in",
   "account.later": "Later",
-  "cup.hint": "Today's Daily Cup tie: board the Team Bus!"
+  "cup.hint": "Today's Daily Cup tie: board the Team Bus!",
+  "ads.x2": "×2 +{cash}",
+  "ads.x2_short": "Claim ×2",
+  "ads.get": "Get {cash}",
+  "ads.finish_now": "Finish now",
+  "ads.blocked": "Ads are blocked, so bonus rewards are unavailable.",
+  "ads.doubled": "Prize doubled: {cash}"
 }

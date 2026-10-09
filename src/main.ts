@@ -27,6 +27,7 @@ import { UPGRADES, type UpgradeDef } from './data/upgrades';
 import type { Position, Rarity, Stat } from './data/types';
 import * as Meta from './sim/meta';
 import type { ScoutTier } from './sim/state';
+import { Ads } from './ui/ads';
 import { AccountPanel, AlbumPanel, DailyPanel, QuestsPanel, ScoutPanel, WelcomePanel, hms, type DailyView, type RewardView } from './ui/meta-panels';
 
 declare global {
@@ -194,6 +195,23 @@ async function boot(): Promise<void> {
       refreshPause();
     },
   };
+  // ── ads (GDD §7): no offers at all with VITE_ADS=off
+  const ads = new Ads(platform, {
+    setBlocked: (on) => {
+      if (on) blockers.add('ad');
+      else blockers.delete('ad');
+      refreshPause();
+    },
+    setMuted: (on) => {
+      audio.adMuted = on;
+      audio.applyVolume();
+    },
+    toast: (s) => hud.toast(s),
+    playSec: () => saves.stats.playSec,
+    usage: () => sim.state.meta.ads,
+    today: () => Meta.dayKey(clock.now(), sim.tz),
+    now: () => clock.now(),
+  });
   const officePanel = new OfficePanel(gameEl, panelHooks);
   const resultsPanel = new ResultsPanel(gameEl, panelHooks);
   const squadPanel = new SquadPanel(gameEl, panelHooks);
@@ -262,6 +280,16 @@ async function boot(): Promise<void> {
     const pad = sim.world.padList.find((p) => p.unlock.type !== 'staff' && p.unlock.type !== 'lane' && 'id' in p.unlock && p.unlock.id === u.requires?.built);
     return t('office.needs_built', { name: pad ? t(pad.nameKey) : '' });
   };
+  /** "▶ Get $X" when the cheapest upgrade is out of reach. */
+  const officeAd = (): OfficeData['ad'] => {
+    const cu = sim.cheapestUpgrade();
+    if (!cu || sim.state.cash + 1e-6 >= cu.cost) return null;
+    const amount = ads.officeAmount(cu.cost);
+    return ads.offer('office', t('ads.get', { cash: formatCash(amount) }), () => {
+      sim.grantBonus(amount, 'ad');
+      hud.setCash(sim.state.cash);
+    });
+  };
   const officeData = (): OfficeData => {
     const g = sim.podiumGraduate();
     const full = sim.state.squad.length >= BALANCE.squad.size;
@@ -281,6 +309,7 @@ async function boot(): Promise<void> {
       cash: sim.state.cash,
       waiting: sim.state.podiumQueue.length,
       rows,
+      ad: officeAd(),
       transfer: g
         ? {
             card: card(g),
@@ -324,14 +353,18 @@ async function boot(): Promise<void> {
     view.startMatch(script, matchUi, ourName(), !!sim.state.flags.firstMatchPlayed, {
       resolve: (i, q) => sim.resolveMatchChance(i, q),
       done: () => {
+        const firstMatch = !sim.state.flags.firstMatchPlayed;
         const r = sim.finishCurrentMatch();
         sim.state.flags.firstMatchPlayed = true;
         if (r && script.cup && r.outcome === 'win') platform.happytime();
+        let rewardedAtBreak = false;
         const release = (): void => {
           view.endTrip();
           blockers.delete('match');
           refreshPause();
           updateHint();
+          // midgame only at this natural break, never after the very first match or when a rewarded ad was watched here
+          if (!firstMatch && !rewardedAtBreak) void ads.midgame();
         };
         if (!r) return release();
         resultsPanel.open(
@@ -350,6 +383,14 @@ async function boot(): Promise<void> {
             champion: r.champion,
             divisionName: divisionName(sim.state.league.division),
             cup: script.cup ? { tickets: r.outcome === 'win' ? BALANCE.meta.cup.tickets : 0 } : null,
+            ad:
+              r.cash > 0
+                ? ads.offer('results', t('ads.x2', { cash: formatCash(r.cash) }), () => {
+                    rewardedAtBreak = true;
+                    sim.grantBonus(r.cash, 'ad');
+                    hud.setCash(sim.state.cash);
+                  })
+                : null,
           },
           release,
           () => {
@@ -390,7 +431,7 @@ async function boot(): Promise<void> {
     available: Meta.dailyAvailable(sim.state, sim.now, sim.tz),
     nextIn: Meta.msToMidnight(sim.now, sim.tz),
   });
-  const openDaily = (): void => dailyPanel.open(dailyView(), () => rewardToast(sim.claimDaily()));
+  const openDaily = (): void => dailyPanel.open(dailyView(), (doubled) => rewardToast(sim.claimDaily(doubled ? 2 : 1)), ads.offer('daily', t('ads.x2_short'), () => undefined));
   const questText = (kind: string, n: number): string => t('quest.' + kind, { n: kind === 'collect' ? formatCash(n) : n });
   const openQuests = (): void => {
     sim.updateMeta();
@@ -411,7 +452,14 @@ async function boot(): Promise<void> {
             const S = BALANCE.meta.scout[tier];
             return { tier, name: t('scout.' + tier), duration: duration(S.sec), cost: Meta.scoutCost(tier), floor: S.floor, canStart: Meta.canScout(sim.state, tier) };
           }),
-          active: sc.tier ? { name: t('scout.' + sc.tier), remaining: Math.max(0, sc.endsAt - sim.now), total: Math.max(1, sc.endsAt - sc.startedAt) } : null,
+          active: sc.tier
+            ? {
+                name: t('scout.' + sc.tier),
+                remaining: Math.max(0, sc.endsAt - sim.now),
+                total: Math.max(1, sc.endsAt - sc.startedAt),
+                ad: sc.endsAt - sc.startedAt <= BALANCE.ads.scoutMaxSec * 1000 ? ads.offer('scout', t('ads.finish_now'), () => sim.finishScoutNow()) : null,
+              }
+            : null,
           waiting: sim.state.prospects.length,
         };
       },
@@ -477,11 +525,13 @@ async function boot(): Promise<void> {
     analytics.track('welcome_back', { awaySec: Math.round(awaySec), cash: off.cash });
     welcomePanel.open(
       { awaySec: awaySec >= BALANCE.meta.offline.minSec ? awaySec : 0, offlineCash: off.cash, capSec: awaySec > off.sec && off.cash > 0 ? off.sec : 0, daily: daily ? dailyView() : null, scoutDone: notes.length ? notes.join('<br>') : null },
-      () => {
-        sim.collectOffline(off.cash);
+      (doubled) => {
+        const cash = off.cash * (doubled ? 2 : 1);
+        sim.collectOffline(cash);
         const d = daily ? sim.claimDaily() : null;
-        rewardToast({ cash: off.cash + (d?.cash ?? 0), tickets: d?.tickets ?? 0, prospect: d?.prospect ?? null });
+        rewardToast({ cash: cash + (d?.cash ?? 0), tickets: d?.tickets ?? 0, prospect: d?.prospect ?? null });
       },
+      off.cash > 0 ? ads.offer('welcome', t('ads.x2', { cash: formatCash(off.cash) }), () => undefined) : null,
     );
     return true;
   };
@@ -678,7 +728,7 @@ async function boot(): Promise<void> {
   });
 
   if (TEST_HOOKS) {
-    window.__wk = { sim, platform, view, saves, clock, settings: () => settings, persist, loop, input, welcomeBack };
+    window.__wk = { sim, platform, view, saves, clock, settings: () => settings, persist, loop, input, welcomeBack, ads, audio };
     const params = new URLSearchParams(location.search);
     if (params.get('debug') === '1') {
       void import('./ui/debug').then((m) => m.mountDebug({ sim, platform, view, clock, core, loop }));

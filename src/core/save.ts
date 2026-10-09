@@ -100,7 +100,7 @@ export function normalize(blob: SaveBlob, area: AreaDef): SaveBlob {
   g.prospects = Array.isArray(g.prospects) ? g.prospects : [];
   const m = newMeta();
   const gm = (g.meta ?? {}) as Partial<SimState['meta']>;
-  g.meta = { ...m, ...gm, daily: { ...m.daily, ...(gm.daily ?? {}) }, quests: { ...m.quests, ...(gm.quests ?? {}) }, scout: { ...m.scout, ...(gm.scout ?? {}) }, album: { ...(gm.album ?? {}) } };
+  g.meta = { ...m, ...gm, daily: { ...m.daily, ...(gm.daily ?? {}) }, quests: { ...m.quests, ...(gm.quests ?? {}) }, scout: { ...m.scout, ...(gm.scout ?? {}) }, album: { ...(gm.album ?? {}) }, ads: { ...m.ads, ...(gm.ads ?? {}), used: { ...(gm.ads?.used ?? {}) } } };
   g.records = { bestSale: 0, sold: 0, promoted: 0, matches: 0, wins: 0, goals: 0, titles: 0, ...((g.records ?? {}) as Partial<SimState['records']>) };
   g.stats = { signed: 0, reps: 0, graduated: 0, unlocks: 0, ballsDelivered: 0, cashCollected: 0, ...((g.stats ?? {}) as Partial<SimState['stats']>) };
   for (const t of g.trainees) {

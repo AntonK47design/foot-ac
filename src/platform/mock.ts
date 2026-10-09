@@ -7,6 +7,8 @@ export interface MockOptions {
   unfilled: boolean;
   adsDisabled: boolean;
   accountAvailable: boolean;
+  /** Simulated ad length (ms). */
+  adMs: number;
 }
 
 /**
@@ -15,7 +17,7 @@ export interface MockOptions {
  */
 export class MockAdapter implements PlatformAdapter {
   readonly kind = 'mock' as const;
-  readonly options: MockOptions = { adblock: false, unfilled: false, adsDisabled: true, accountAvailable: true };
+  readonly options: MockOptions = { adblock: false, unfilled: false, adsDisabled: true, accountAvailable: true, adMs: 1200 };
   private user: PlatformUser | null = null;
   private readonly authListeners: Array<(u: PlatformUser | null) => void> = [];
   private readonly settingsListeners: Array<(m: boolean) => void> = [];
@@ -56,7 +58,7 @@ export class MockAdapter implements PlatformAdapter {
     if (this.options.unfilled) return { ok: false, code: 'unfilled' };
     this.log(`mock ad ${type} playing`);
     onStarted();
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, this.options.adMs));
     return { ok: true };
   }
   async hasAdblock(): Promise<boolean> {

@@ -105,6 +105,11 @@ export class Platform {
     this.adapter.dataRemove(key);
   }
 
+  /** Test builds only (exposed via window.__wk): turn ads on without VITE_ADS. */
+  enableAdsForTesting(): void {
+    this.adsEnabled = true;
+  }
+
   get adsAvailable(): boolean {
     return this.adsEnabled;
   }

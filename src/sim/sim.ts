@@ -1331,16 +1331,30 @@ export class Sim {
     }
   }
 
-  /** Pays what the staff earned while the player was away (computed by the host from the save's lastSeen). */
-  collectOffline(cash: number): void {
+  /** Pays cash from outside the sim loop (offline earnings, rewarded ads); not counted as live income. */
+  grantBonus(cash: number, reason = 'bonus'): void {
     if (cash <= 0) return;
     this.addCash(cash);
-    this.earnedPrev = -1; // not counted as live income
-    this.events.emit('saveNeeded', { reason: 'offline' });
+    this.earnedPrev = -1;
+    this.events.emit('saveNeeded', { reason });
   }
 
-  claimDaily(): Meta.Reward | null {
-    const r = Meta.claimDaily(this.state, this.now, this.rng, this.tz);
+  /** Pays what the staff earned while the player was away (computed by the host from the save's lastSeen). */
+  collectOffline(cash: number): void {
+    this.grantBonus(cash, 'offline');
+  }
+
+  /** Rewarded ad: the running scout mission returns now. */
+  finishScoutNow(): boolean {
+    const sc = this.state.meta.scout;
+    if (!sc.tier) return false;
+    sc.endsAt = Math.min(sc.endsAt, this.now);
+    this.updateMeta();
+    return true;
+  }
+
+  claimDaily(mult = 1): Meta.Reward | null {
+    const r = Meta.claimDaily(this.state, this.now, this.rng, this.tz, mult);
     this.earnedPrev = -1;
     if (r) this.events.emit('saveNeeded', { reason: 'daily' });
     return r;

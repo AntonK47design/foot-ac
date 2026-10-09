@@ -23,6 +23,7 @@ export function newMeta(): MetaState {
     albumClaimed: 0,
     accountPrompted: false,
     incomeRate: 0,
+    ads: { day: '', used: {}, officeAt: 0 },
   };
 }
 
@@ -88,9 +89,12 @@ export function dailyIndex(state: SimState): number {
   return state.meta.daily.claims % 7;
 }
 
-export function claimDaily(state: SimState, now: number, rng: Rng, tz?: number): Reward | null {
+/** `mult` 2 = doubled by a rewarded ad (cash and tickets; the prospect stays single). */
+export function claimDaily(state: SimState, now: number, rng: Rng, tz?: number, mult = 1): Reward | null {
   if (!dailyAvailable(state, now, tz)) return null;
   const r = dailyReward(state, dailyIndex(state), rng);
+  r.cash *= mult;
+  r.tickets *= mult;
   grant(state, r);
   state.meta.daily.claims++;
   state.meta.daily.lastDay = dayKey(now, tz);

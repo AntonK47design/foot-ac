@@ -2,6 +2,7 @@ import { formatCash, t } from '../core/i18n';
 import type { Position, Rarity } from '../data/types';
 import { icon } from './icons';
 import { Panel, type PanelHooks } from './panels';
+import { adElement, type AdOffer } from './ads';
 
 /** Reward as shown in the UI. */
 export interface RewardView {
@@ -25,6 +26,19 @@ function btn(label: string, cls: string, onClick: () => void, disabled = false):
   b.disabled = disabled;
   b.addEventListener('click', onClick);
   return b;
+}
+
+/** "Claim" next to an equally sized rewarded "▶ ×2" (GDD §7), or the claim button alone. */
+function claimRow(label: string, ad: AdOffer | null | undefined, onClaim: (doubled: boolean) => void): HTMLElement {
+  const main = btn(label, ad && !ad.blocked ? 'neutral' : 'sell', () => onClaim(false));
+  const adEl = adElement(ad, (ok) => {
+    if (ok) onClaim(true);
+  });
+  if (!adEl) return main;
+  const row = document.createElement('div');
+  row.className = adEl.tagName === 'BUTTON' ? 'choice-row' : 'claim-col';
+  row.append(main, adEl);
+  return row;
 }
 
 export function hms(ms: number): string {
@@ -61,13 +75,13 @@ export class DailyPanel extends Panel {
     super(parent, hooks, 'daily-panel');
   }
 
-  open(d: DailyView, onClaim: () => void): void {
+  open(d: DailyView, onClaim: (doubled: boolean) => void, ad?: AdOffer | null): void {
     this.title.textContent = t('daily.title');
     this.body.innerHTML = calendarHtml(d);
     if (d.available) {
       this.body.appendChild(
-        btn(t('daily.claim'), 'sell', () => {
-          onClaim();
+        claimRow(t('daily.claim'), ad, (doubled) => {
+          onClaim(doubled);
           this.close();
         }),
       );
@@ -98,7 +112,7 @@ export class WelcomePanel extends Panel {
     super(parent, hooks, 'welcome-panel', false);
   }
 
-  open(w: WelcomeView, onCollect: () => void): void {
+  open(w: WelcomeView, onCollect: (doubled: boolean) => void, ad?: AdOffer | null): void {
     this.title.textContent = t('welcome.title');
     const h = Math.floor(w.awaySec / 3600);
     const m = Math.floor((w.awaySec % 3600) / 60);
@@ -111,8 +125,8 @@ export class WelcomePanel extends Panel {
     if (w.daily) html += `<div class="wb-daily"><b>${t('daily.title')}</b>${calendarHtml(w.daily)}</div>`;
     this.body.innerHTML = html;
     this.body.appendChild(
-      btn(w.daily?.available ? t('welcome.collect_all') : t('welcome.collect'), 'sell', () => {
-        onCollect();
+      claimRow(w.daily?.available ? t('welcome.collect_all') : t('welcome.collect'), ad, (doubled) => {
+        onCollect(doubled);
         this.close();
       }),
     );
@@ -179,7 +193,7 @@ export interface ScoutTierView {
 
 export interface ScoutView {
   tiers: ScoutTierView[];
-  active: { name: string; remaining: number; total: number } | null;
+  active: { name: string; remaining: number; total: number; ad: AdOffer | null } | null;
   waiting: number;
 }
 
@@ -198,6 +212,8 @@ export class ScoutPanel extends Panel {
         a.className = 'scout-active';
         const pct = 100 - Math.min(100, (v.active.remaining / v.active.total) * 100);
         a.innerHTML = `<b>${t('scout.active', { name: v.active.name })}</b><i class="q-bar"><b style="width:${pct}%"></b></i><small>${t('scout.back_in', { time: hms(v.active.remaining) })}</small>`;
+        const adEl = adElement(v.active.ad, (ok) => ok && render(), 'small');
+        if (adEl) a.appendChild(adEl);
         this.body.appendChild(a);
       }
       if (v.waiting > 0) {
