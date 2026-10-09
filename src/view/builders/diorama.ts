@@ -14,6 +14,7 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Rect } from '../../data/types';
 import type { Layout } from '../../data/areas/area1-layout';
+import { AREA1 } from '../../data/areas/area1';
 import { Batch, trs } from '../batch';
 import { G } from '../geo';
 import type { Assets } from '../assets';
@@ -301,8 +302,8 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   b.add(flat(lw, 1.7), COL.line, trs(gx0 - 2.9, ly, goalZ + 0.85));
   b.add(flat(lw, 1.7), COL.line, trs(gx0 + 2.9, ly, goalZ + 0.85));
   kit.place((pitch.x0 + pitch.x1) / 2 + 1.6, P.z0 + 0.05).scoreboard();
-  kit.place(-0.45, -0.9, 0.25).tacticsBoard();
-  aoBlobs.push({ x: -0.45, z: -0.9, r: 0.7 });
+  kit.place(-6.2, -0.8, 0.25).tacticsBoard();
+  aoBlobs.push({ x: -6.2, z: -0.8, r: 0.7 });
 
   // ── clubhouse walls (cutaway): full back/side walls, front stubs with doorways
   for (const room of L.rooms) {
@@ -364,29 +365,29 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     for (let j = 0; j < 2; j++) b.add(flat(0.13, (tr.z1 - tr.z0) / 8), (i + j) % 2 ? 0x1d2433 : 0xffffff, trs(tr.x0 + 0.5 + j * 0.13, 0.023, tr.z0 + ((i + 0.5) * (tr.z1 - tr.z0)) / 8));
   anchors.trackStart = { x: tr.x1 - 1.0, z: tr.z0 + laneW / 2 };
   for (const [x, z] of [
-    [-1.8, -1.7],
-    [-12.8, 6.0],
-    [2.5, 6.0],
+    [-4.5, -3.0],
+    [-4.5, -4.4],
+    [-16.0, 7.6],
+    [3.0, 7.2],
   ] as Array<[number, number]>) {
     kit.place(x, z).planter();
     aoBlobs.push({ x, z, r: 0.55 });
   }
-  props.put('bench', 0.6, 5.7, 0, 5);
-  kit.place(-1.6, 6.0).bin();
-  kit.place(7.4, 1.0).bin();
-  aoBlobs.push({ x: 7.4, z: 1.0, r: 0.35 }, { x: -1.6, z: 6.0, r: 0.35 });
-  props.put('streetlight', 12.9, 1.6 + 2.6, -HALF_PI, 4, 0, 0.1);
-  props.put('streetlight', -6.2, 6.4, 0, 4, 0, 0.1);
-  props.put('firehydrant', 12.8, -1.6, 0, 3.5);
-  props.put('bush', -12.9, 8.9, 0, 5);
-  props.put('bush', 13.0, 8.9, 0, 5);
-  props.put('bush', 12.9, -9.2, 0, 5);
-  kit.place(0, 0).coneStack(-2.2, 0.3);
-  kit.place(0, 0).coneStack(-2.55, 0.6);
-  kit.place(-10.6, -1.5, 0).bench(2.2);
-  anchors.outsideBench = { x: -10.6, z: -1.5, ry: 0 };
-  kit.place(-12.5, -1.6).bin();
-  aoBlobs.push({ x: -12.5, z: -1.6, r: 0.35 });
+  props.put('bench', 0.6, 7.0, 0, 5);
+  kit.place(-1.6, 7.3).bin();
+  kit.place(9.4, 0.6).bin();
+  aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 }, { x: -1.6, z: 7.3, r: 0.35 });
+  props.put('streetlight', 16.3, L.gate.z + 2.0, -HALF_PI, 4, 0, 0.1);
+  props.put('streetlight', -5.6, 7.8, 0, 4, 0, 0.1);
+  props.put('firehydrant', 16.35, -1.9, 0, 3.5);
+  props.put('bush', -16.3, 11.3, 0, 5);
+  props.put('bush', 16.3, 11.3, 0, 5);
+  kit.place(0, 0).coneStack(7.0, 0.2);
+  kit.place(0, 0).coneStack(7.3, 0.5);
+  kit.place(-14.0, -2.0, 0).bench(2.2);
+  anchors.outsideBench = { x: -14.0, z: -2.0, ry: 0 };
+  kit.place(-16.0, -2.0).bin();
+  aoBlobs.push({ x: -16.0, z: -2.0, r: 0.35 });
 
   // ── locked expansions: blueprint ghosts behind construction fences
   const ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.32, depthWrite: false, side: DoubleSide });
@@ -415,14 +416,14 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     anchors['ghost:' + gh.id] = { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 };
     anchors['ghostSign:' + gh.id] = { x: r.x1 - 0.6, z: r.z1 + 0.5 };
   }
-  props.put('Box_A', -9.4, 5.3, 0.4, 1.1);
-  props.put('Barrel_A', -9.6, 4.4, 0, 0.7);
-  props.put('Pallet_Small_Decorated_A', -2.6, 4.9, 0.2, 0.55);
-  kit.place(-11.4, 3.0).planter();
-  aoBlobs.push({ x: -11.4, z: 3.0, r: 0.55 });
-  kit.place(-11.6, 4.6, Math.PI / 2).bench(2.2);
-  anchors.ambientBench = { x: -11.6, z: 4.6, ry: Math.PI / 2 };
-  props.put('Pallet_Small_Decorated_A', 12.2, 3.0, 0.3, 0.55);
+  props.put('Box_A', -14.0, 6.6, 0.4, 1.1);
+  props.put('Barrel_A', -14.4, 7.4, 0, 0.7);
+  props.put('Pallet_Small_Decorated_A', -5.6, 5.6, 0.2, 0.55);
+  kit.place(-15.4, 2.4).planter();
+  aoBlobs.push({ x: -15.4, z: 2.4, r: 0.55 });
+  kit.place(-15.6, 4.6, Math.PI / 2).bench(2.2);
+  anchors.ambientBench = { x: -15.6, z: 4.6, ry: Math.PI / 2 };
+  props.put('Pallet_Small_Decorated_A', 9.6, 2.4, 0.3, 0.55);
   // anchors needed by the showcase / view
   anchors.goal = { x: gx0, z: goalZ };
   anchors.shootSpot = { x: gx0 - 0.4, z: goalZ + 3.4 };
@@ -446,31 +447,32 @@ export interface UnlockGeo {
 export function buildUnlockable(id: string, lanes: number, assets: Assets, L: Layout, mat: Material, geo?: UnlockGeo): Diorama {
   const c = newCtx(assets, L);
   const { kit, props, aoBlobs, b } = c;
+  const at = AREA1.objects.find((o) => o.id === id)?.pos ?? { x: 0, z: 0 };
   switch (id) {
     case 'ball_crate': {
-      const cx = -1.0;
-      const cz = 0.9;
+      const cx = at.x;
+      const cz = at.z;
       props.put('crate', cx, cz, 0.15, 0.45);
       kit.place(0, 0);
       for (let i = 0; i < 6; i++) kit.ball(cx - 0.26 + (i % 3) * 0.26, 0.47 + Math.floor(i / 3) * 0.12, cz - 0.1 + Math.floor(i / 3) * 0.17, 0.26);
       break;
     }
     case 'chairs_2':
-      kit.place(-11.0, -3.25, 0).bench(2.2, false);
+      kit.place(at.x, at.z, 0).bench(2.2, false);
       break;
     case 'bench':
-      kit.place(4.4, -0.9, Math.PI).dugout(3.2);
-      aoBlobs.push({ x: 4.4, z: -0.9, r: 1.6 });
+      kit.place(at.x, at.z, Math.PI).dugout(3.2);
+      aoBlobs.push({ x: at.x, z: at.z, r: 1.6 });
       break;
     case 'flags':
-      [4.4, 5.9, 7.4].forEach((x, i) => kit.place(x, 9.0).flagpole(i % 2 ? 0xffd23f : 0x2f6bff));
+      [-1.5, 0, 1.5].forEach((dx, i) => kit.place(at.x + dx, at.z).flagpole(i % 2 ? 0xffd23f : 0x2f6bff));
       break;
     case 'water_cooler':
-      kit.place(-3.0, -2.0).waterCooler();
-      aoBlobs.push({ x: -3.0, z: -2.0, r: 0.5 });
+      kit.place(at.x, at.z).waterCooler();
+      aoBlobs.push({ x: at.x, z: at.z, r: 0.5 });
       break;
     case 'bus_shelter':
-      kit.place(12.3, -0.4).dugout(1.8);
+      kit.place(at.x, at.z).dugout(1.8);
       break;
     case 'shooting_goal': {
       const sl = L.shootingLane;
@@ -496,7 +498,7 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       kit.place(bk.x, bk.z, 0.3).ballCart();
       aoBlobs.push({ x: bk.x, z: bk.z, r: 0.8 });
       for (const l of (geo?.lanes ?? []).slice(0, lanes)) b.add(flat(0.36, 0.36), COL.line, trs(l.spot.x, 0.021, l.spot.z, Math.PI / 4));
-      if (lanes > 1) kit.place(sl.x1 - 0.6, sl.z1 - 0.9, -0.5).popUpGoal();
+      if (lanes > 1) kit.place(sl.x1 - 0.5, (sl.z0 + sl.z1) / 2, -0.5).popUpGoal();
       break;
     }
     case 'dribble_cones': {
@@ -528,7 +530,7 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       const ls = (geo?.lanes ?? []).slice(0, lanes);
       for (const l of ls) for (let k = 0; k < 3; k++) kit.place(0, 0).hurdle(l.target.x + 3.2 + k * 3.2, l.spot.z, HALF_PI);
       const tr = L.sprintTrack;
-      kit.place(tr.x1 + 0.4, tr.z0 - 0.35).stopwatchStand();
+      kit.place(tr.x0 + 1.2, tr.z0 - 0.4).stopwatchStand();
       break;
     }
   }

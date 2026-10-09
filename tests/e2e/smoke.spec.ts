@@ -50,7 +50,8 @@ test.describe('desktop', () => {
     const before = await coach(page);
     await page.mouse.move(1100, 360);
     await page.mouse.down();
-    await page.waitForTimeout(600);
+    // hold until the coach has moved (software GL in CI can run at a few FPS), up to 3 s
+    for (let i = 0; i < 30 && (await coach(page)).x <= before.x + 1; i++) await page.waitForTimeout(100);
     await page.mouse.up();
     const after = await coach(page);
     expect(after.x).toBeGreaterThan(before.x + 1);

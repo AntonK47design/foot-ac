@@ -31,26 +31,26 @@ export interface Layout {
 }
 
 export const AREA1_LAYOUT: Layout = {
-  plot: { x0: -13.6, z0: -9.8, x1: 13.6, z1: 9.6 },
+  plot: { x0: -17, z0: -12, x1: 17, z1: 12 },
   rooms: [
-    { id: 'reception', rect: { x0: -13, z0: -9.2, x1: -7, z1: -2.6 }, floor: 'tilesTeal', door: [-9.9, -8.1], eastDoor: [-6.4, -5.0] },
-    { id: 'changing', rect: { x0: -7, z0: -9.2, x1: -1.8, z1: -2.6 }, floor: 'rubberBlue', door: [-5.2, -3.6] },
+    { id: 'reception', rect: { x0: -16.4, z0: -11.4, x1: -10.4, z1: -4.8 }, floor: 'tilesTeal', door: [-13.3, -11.5], eastDoor: [-8.6, -7.2] },
+    { id: 'changing', rect: { x0: -10.4, z0: -11.4, x1: -5.2, z1: -4.8 }, floor: 'rubberBlue', door: [-8.6, -7.0] },
   ],
-  pitch: { x0: -0.8, z0: -9.2, x1: 13, z1: -2.2 },
+  pitch: { x0: -3.8, z0: -11.4, x1: 16.4, z1: -2.4 },
   pitchGates: [
-    [1.0, 2.6],
+    [-1.0, 0.6],
     [6.2, 7.8],
-    [9.8, 11.4],
+    [12.2, 13.8],
   ],
-  shootingLane: { x0: -0.4, z0: -8.9, x1: 4.2, z1: -2.6 },
-  dribbleStrip: { x0: 5.0, z0: -8.6, x1: 7.6, z1: -2.8 },
-  passDeck: { x0: 9.0, z0: -8.8, x1: 12.6, z1: -2.8 },
-  sprintTrack: { x0: -12.6, z0: 6.8, x1: 1.6, z1: 8.9 },
+  shootingLane: { x0: -3.2, z0: -11.1, x1: 2.8, z1: -2.8 },
+  dribbleStrip: { x0: 4.6, z0: -10.8, x1: 8.4, z1: -3.0 },
+  passDeck: { x0: 10.4, z0: -11.0, x1: 15.6, z1: -3.0 },
+  sprintTrack: { x0: -16.2, z0: 9.4, x1: 2.4, z1: 11.5 },
   ghosts: [
-    { id: 'office', rect: { x0: -8.8, z0: 1.7, x1: -3.4, z1: 5.6 }, label: 'Office', price: 600 },
-    { id: 'gym', rect: { x0: 8.4, z0: 3.6, x1: 12.9, z1: 8.6 }, label: 'Gym', price: 900 },
+    { id: 'office', rect: { x0: -13.0, z0: 1.2, x1: -6.6, z1: 6.4 }, label: 'Office', price: 600 },
+    { id: 'gym', rect: { x0: 10.4, z0: 2.6, x1: 16.2, z1: 8.2 }, label: 'Gym', price: 900 },
   ],
-  busStop: { x: 15.4, z: 1.6 },
-  gate: { x: 13.6, z: 1.6 },
-  coachSpawn: { x: -5.2, z: -1.4 },
+  busStop: { x: 18.8, z: 0.4 },
+  gate: { x: 17, z: 0.4 },
+  coachSpawn: { x: -6.8, z: -1.6 },
 };

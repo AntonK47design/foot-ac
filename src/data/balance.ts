@@ -3,7 +3,7 @@ import type { Position, Rarity, StationKind, Stat } from './types';
 /** All gameplay tunables. Systems must not contain magic numbers. */
 export const BALANCE = {
   coach: {
-    speed: 6.0,
+    speed: 6.8,
     accel: 50,
     radius: 0.35,
     carryCap: 5,
@@ -40,7 +40,7 @@ export const BALANCE = {
     shelterIntervalMult: 0.7,
   },
   trainee: {
-    speed: 3.5,
+    speed: 4.0,
     radius: 0.3,
     repsPerVisit: 3,
     /** OVR points gained before graduating (area 1). */
@@ -81,7 +81,7 @@ export const BALANCE = {
     sprint: { repTime: 3.2, cashPerRep: 9, statGain: 1, ballsPerRep: 0, basketCap: 0 },
   } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number }>,
   staff: {
-    ballBoy: { speed: 3.3, carryCap: 6, refillBelow: 0.75 },
+    ballBoy: { speed: 3.8, carryCap: 6, refillBelow: 0.75 },
   },
   /** Effects of decor objects once built (multipliers, stack multiplicatively). */
   perks: {
@@ -103,6 +103,9 @@ export const BALANCE = {
     hintIdleSec: 5,
   },
   camera: {
+    /** Visible world width (m) at the focus point at the base view: portrait → landscape. */
+    widthPortrait: 11,
+    widthLandscape: 21,
     /** Half-extent (m) of the ground area kept visible around the coach, at start. */
     baseView: 10.5,
     /** Extra view per star collected (zoom out as the academy grows). */

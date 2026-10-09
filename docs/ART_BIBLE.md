@@ -35,7 +35,7 @@ Reference frames: `docs/art/reference/` (principles only — never copy assets, 
 
 No mid-value green-on-green: green surfaces are always framed by a light curb, fence or line.
 
-## 3. Area 1 layout — "Sunday Park" diorama (~26 × 18 m)
+## 3. Area 1 layout — "Sunday Park" diorama (~34 × 24 m)
 
 ```
  north (top of screen)
@@ -86,8 +86,8 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
 |---|---|
 | FOV | 48° (vertical) |
 | Pitch | 52° |
-| Landscape | ~17 m world width visible |
-| Portrait | ~10.5 m world width visible |
+| Landscape | ~21 m world width visible (`BALANCE.camera.widthLandscape`) |
+| Portrait | ~11 m world width visible (`BALANCE.camera.widthPortrait`) |
 | Follow | smooth, slight look-ahead; zoom out only when the playable area grows |
 
 ## 6. Materials & lighting

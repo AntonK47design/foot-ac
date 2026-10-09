@@ -51,7 +51,7 @@ describe('sim basics', () => {
     walkTo(sim, pad.pos.x, pad.pos.z);
     wait(sim, 1.6);
     expect(sim.state.pads.p_crate?.done).toBe(true);
-    expect(sim.state.cash).toBeCloseTo(5, 5);
+    expect(sim.state.cash).toBeCloseTo(sim.state.stats.cashCollected - 10, 5);
     expect(sim.state.stars).toBe(1);
   });
 

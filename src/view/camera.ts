@@ -4,9 +4,6 @@ import { BALANCE } from '../data/balance';
 /** ART_BIBLE §5 */
 const FOV = 48;
 const PITCH = (52 * Math.PI) / 180;
-/** Visible world width (m) at the focus point: portrait → landscape. */
-const WIDTH_PORTRAIT = 9.5;
-const WIDTH_LANDSCAPE = 17;
 
 /**
  * Fixed 3/4 follow camera. Distance is derived from the aspect ratio so roughly the same
@@ -45,7 +42,8 @@ export class CameraRig {
     const k = Math.min(1, Math.max(0, (a - 0.46) / (1.78 - 0.46)));
     // zoom out only as the playable area grows (view grows beyond the base)
     const grow = this.view / BALANCE.camera.baseView;
-    const W = (WIDTH_PORTRAIT + (WIDTH_LANDSCAPE - WIDTH_PORTRAIT) * k) * grow;
+    const { widthPortrait, widthLandscape } = BALANCE.camera;
+    const W = (widthPortrait + (widthLandscape - widthPortrait) * k) * grow;
     this.dist = W / 2 / (tanH * a);
   }
 
