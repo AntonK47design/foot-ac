@@ -151,7 +151,7 @@ describe('M4: offline earnings and chests', () => {
     const capped = Meta.offlineEarnings(sim.state, 48 * 3600);
     expect(capped.sec).toBe(BALANCE.meta.offline.baseCapSec);
     sim.state.upgrades.academy_offline = 3;
-    expect(Meta.offlineEarnings(sim.state, 48 * 3600).sec).toBe(8 * 3600);
+    expect(Meta.offlineEarnings(sim.state, 48 * 3600).sec).toBe(4 * 3600);
   });
 
   it('every level-up opens a chest', () => {

@@ -221,7 +221,7 @@ export function claimAlbum(state: SimState): Reward | null {
 /** Offline earnings cap (s): base + Office upgrade. */
 export function offlineCapSec(state: SimState): number {
   const lv = state.upgrades.academy_offline ?? 0;
-  return BALANCE.meta.offline.baseCapSec + lv * 7200;
+  return BALANCE.meta.offline.baseCapSec + lv * BALANCE.meta.offline.perLevelSec;
 }
 
 /** Cash earned while away: automated academy (ball boy hired) at a share of the recent income rate, capped. */

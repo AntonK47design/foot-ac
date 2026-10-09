@@ -42,7 +42,7 @@ test.describe('M4 meta', () => {
     await expect(panel).toBeHidden();
     const after = await page.evaluate(() => (window.__wk!.sim as { state: { cash: number; tickets: number } }).state);
     expect(after.tickets).toBe(tickets0 + 1); // day 2 = 1 Scout Ticket
-    expect(after.cash).toBeGreaterThan(cash0 + 1000); // 2/s × 50% × 2 h cap
+    expect(after.cash).toBeGreaterThan(cash0 + 500); // 2/s × 10% × 1 h cap = $720 (+ day-2 reward is tickets)
     // HUD: daily button shows, claimed for today
     await expect(page.locator('.btn-side', { hasText: 'Daily' })).toBeVisible();
     expect(errors).toEqual([]);
