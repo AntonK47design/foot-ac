@@ -692,7 +692,7 @@ export class GameView {
     if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
       this.labels.place(key, x, headY + 0.1, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="chip ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
-      this.labels.place(key, x, headY + 0.2, z, '', `<div class="bubble">${icon('ball')}</div>`);
+      this.labels.place(key, x, headY + 0.2, z, '', `<div class="bubble need">${icon('ball')}</div>`);
     } else if (tr.state === 'seated' && tr.waitT > BALANCE.trainee.moodWaitSec) {
       this.labels.place(key, x, headY - 0.2, z, '', `<div class="bubble">😴</div>`);
     } else {

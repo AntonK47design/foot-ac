@@ -272,7 +272,8 @@ body {
   width: calc(var(--fs) * 1.9);
   height: calc(var(--fs) * 1.9);
   border-radius: 50%;
-  background: var(--blue);
+  background: #e6edff;
+  border: 2px solid #c9d6f5;
   display: grid;
   place-items: center;
 }
@@ -519,7 +520,7 @@ body {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--blue);
+  background: #e6edff;
   display: grid;
   place-items: center;
 }
@@ -602,6 +603,25 @@ body {
   box-shadow: var(--shadow);
   font-size: 18px;
   animation: wobble 1s infinite ease-in-out;
+}
+.bubble.need {
+  position: relative;
+  border: 3px solid #ff5a4f;
+}
+.bubble.need::after {
+  content: '!';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff5a4f;
+  color: #fff;
+  font-family: var(--display);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
 }
 .bubble svg {
   width: 24px;
