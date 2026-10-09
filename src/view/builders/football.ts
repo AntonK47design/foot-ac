@@ -379,6 +379,151 @@ export class PropKit {
     this.add(G.rbox(0.3), C.dark, 0, 0.8, 0, 0, 0.18, 0.04, 0.06);
   }
 
+  // ───────────────────────────── Training Ground (Area 2) ─────────────────────────────
+
+  /** Water bottle: blue-tinted body, white cap, academy label. */
+  bottle(x: number, y: number, z: number, s = 1): void {
+    this.add(G.cyl(10), 0x8fd3ff, x, y + 0.12 * s, z, 0, 0.13 * s, 0.24 * s, 0.13 * s);
+    this.add(G.cyl(10), C.blue, x, y + 0.12 * s, z, 0, 0.135 * s, 0.07 * s, 0.135 * s);
+    this.add(G.cyl(8), C.white, x, y + 0.27 * s, z, 0, 0.07 * s, 0.06 * s, 0.07 * s);
+  }
+
+  /** Plastic crate (water bottles go in here at each Training Ground drill). Local: front faces +z. */
+  bottleCrate(n = 6): void {
+    this.add(G.rbox(0.12), C.blue, 0, 0.2, 0, 0, 0.9, 0.4, 0.6);
+    this.add(G.rbox(0.12), C.blueDark, 0, 0.38, 0, 0, 0.94, 0.05, 0.64);
+    for (const sx of [-0.25, 0.25]) this.add(G.box(), C.yellow, sx, 0.22, 0.305, 0, 0.18, 0.08, 0.01);
+    for (let i = 0; i < n; i++) this.bottle(-0.3 + (i % 3) * 0.3, 0.32, -0.12 + Math.floor(i / 3) * 0.24, 1);
+  }
+
+  /** Hydration Point: counter with two big dispensers, stacked bottle crates and a sign. Local: front faces +z. */
+  waterStation(): void {
+    this.add(G.rbox(0.06), C.white, 0, 0.88, 0, 0, 1.6, 0.08, 0.7);
+    this.add(G.rbox(0.08), C.blue, 0, 0.44, 0.05, 0, 1.6, 0.86, 0.62);
+    this.add(G.rbox(0.08), C.yellow, 0, 0.62, 0.37, 0, 1.4, 0.1, 0.02);
+    for (const sx of [-0.45, 0.45]) {
+      this.add(G.cyl(14), 0x8fd3ff, sx, 1.22, -0.08, 0, 0.42, 0.56, 0.42);
+      this.add(G.cyl(14), 0x5ec0f0, sx, 1.53, -0.08, 0, 0.18, 0.08, 0.18);
+      this.add(G.rbox(0.2), C.dark, sx, 0.98, 0.18, 0, 0.12, 0.1, 0.12);
+    }
+    for (let i = 0; i < 4; i++) this.bottle(-0.15 + (i % 2) * 0.3, 0.92, 0.12 + Math.floor(i / 2) * 0.0, 0.9);
+    // spare crates beside the counter
+    this.add(G.rbox(0.12), C.blueDark, 1.15, 0.2, -0.05, 0.1, 0.6, 0.4, 0.5);
+    this.add(G.rbox(0.12), C.blue, 1.15, 0.6, -0.05, -0.08, 0.6, 0.4, 0.5);
+    for (let i = 0; i < 3; i++) this.bottle(1.0 + i * 0.15, 0.78, -0.05, 0.9);
+    this.add(G.cyl(8), C.steel, -1.0, 1.0, -0.25, 0, 0.06, 2.0, 0.06);
+    this.add(G.rbox(0.1), C.blue, -1.0, 2.0, -0.2, 0, 0.7, 0.42, 0.06);
+    this.add(G.cyl(14), 0x8fd3ff, -1.0, 2.0, -0.16, 0, 0.22, 0.02, 0.22, Math.PI / 2);
+  }
+
+  /** Flat-bench press: padded bench, uprights, loaded barbell. Local: bench along z, lifter's head at -z. */
+  weightBench(): void {
+    this.add(G.rbox(0.2), C.dark, 0, 0.42, 0.1, 0, 0.36, 0.12, 1.2);
+    this.add(G.rbox(0.25), C.blue, 0, 0.5, 0.1, 0, 0.34, 0.06, 1.16);
+    for (const sz of [-0.35, 0.55]) this.add(G.rbox(0.1), C.steelDark, 0, 0.2, sz, 0, 0.3, 0.4, 0.08);
+    for (const sx of [-0.45, 0.45]) {
+      this.add(G.rbox(0.1), C.steelDark, sx, 0.02, -0.4, 0, 0.12, 0.04, 0.5);
+      this.add(G.cyl(8), C.steel, sx, 0.55, -0.45, 0, 0.06, 1.1, 0.06);
+    }
+    this.barbell(0, 1.05, -0.45, 1.6);
+  }
+
+  /** Squat rack with a racked barbell and a rubber platform. Local: lifter faces +z. */
+  squatRack(): void {
+    this.add(G.rbox(0.1), 0x3a3f4f, 0, 0.02, 0, 0, 1.6, 0.04, 1.4);
+    this.add(G.rbox(0.1), C.woodDark, 0, 0.03, 0, 0, 0.7, 0.04, 1.3);
+    for (const sx of [-0.6, 0.6])
+      for (const sz of [-0.45, 0.25]) this.add(G.rbox(0.1), C.dark, sx, 1.05, sz, 0, 0.09, 2.1, 0.09);
+    for (const sx of [-0.6, 0.6]) this.add(G.rbox(0.1), C.dark, sx, 2.08, -0.1, 0, 0.09, 0.09, 0.8);
+    this.add(G.rbox(0.1), C.dark, 0, 2.08, -0.45, 0, 1.3, 0.09, 0.09);
+    for (const sx of [-0.6, 0.6]) this.add(G.rbox(0.2), C.yellow, sx, 1.3, 0.3, 0, 0.12, 0.06, 0.14);
+    this.barbell(0, 1.35, 0.25, 1.7);
+  }
+
+  private barbell(x: number, y: number, z: number, len: number): void {
+    this.add(G.cyl(8), C.steel, x, y, z, 0, 0.04, len, 0.04, 0, Math.PI / 2);
+    for (const sx of [-1, 1]) {
+      this.add(G.cyl(16), C.red, x + sx * (len / 2 - 0.18), y, z, 0, 0.42, 0.07, 0.42, 0, Math.PI / 2);
+      this.add(G.cyl(16), C.dark, x + sx * (len / 2 - 0.1), y, z, 0, 0.32, 0.06, 0.32, 0, Math.PI / 2);
+    }
+  }
+
+  /** Two-tier dumbbell rack. Local: front faces +z. */
+  dumbbellRack(n = 5): void {
+    for (const sx of [-0.8, 0.8]) this.add(G.rbox(0.1), C.dark, sx, 0.35, 0, 0, 0.08, 0.7, 0.5);
+    this.add(G.rbox(0.1), C.steelDark, 0, 0.3, 0.08, 0, 1.6, 0.05, 0.3, -0.25);
+    this.add(G.rbox(0.1), C.steelDark, 0, 0.62, -0.08, 0, 1.6, 0.05, 0.3, -0.25);
+    const cols = [C.blue, C.yellow, C.red, C.green, C.orange];
+    for (let row = 0; row < 2; row++)
+      for (let i = 0; i < n; i++) {
+        const x = -0.6 + i * 0.3;
+        const y = 0.38 + row * 0.32;
+        const zz = 0.08 - row * 0.16;
+        const col = cols[(i + row) % cols.length] as number;
+        this.add(G.cyl(8), C.steel, x, y, zz, 0, 0.04, 0.22, 0.04, 0, Math.PI / 2);
+        for (const e of [-0.1, 0.1]) this.add(G.cyl(10), col, x + e, y, zz, 0, 0.11, 0.06, 0.11, 0, Math.PI / 2);
+      }
+  }
+
+  kettlebell(x: number, z: number, color = C.dark): void {
+    this.add(G.sphere(10, 8), color, x, 0.12, z, 0, 0.24, 0.22, 0.24);
+    this.add(G.cyl(8), color, x, 0.27, z, 0, 0.16, 0.04, 0.04, 0, Math.PI / 2);
+  }
+
+  /** Medicine ball. */
+  medBall(x: number, z: number, color = C.red): void {
+    this.add(G.sphere(12, 8), color, x, 0.15, z, 0, 0.3, 0.3, 0.3);
+    this.add(G.cyl(12), C.dark, x, 0.15, z, 0, 0.31, 0.04, 0.31);
+  }
+
+  /** Angled rebounder (net trampoline). Local: net faces +z. */
+  rebounder(w = 1.4): void {
+    for (const sx of [-1, 1]) {
+      this.add(G.cyl(8), C.steelDark, (sx * w) / 2, 0.42, -0.1, 0, 0.06, 0.9, 0.06, -0.35);
+      this.add(G.cyl(8), C.steelDark, (sx * w) / 2, 0.28, -0.32, 0, 0.05, 0.6, 0.05, 0.6);
+    }
+    this.add(G.rbox(0.08), C.orange, 0, 0.45, -0.1, 0, w + 0.12, 0.92, 0.06, -0.35);
+    this.add(G.rbox(0.06), C.dark, 0, 0.45, -0.07, 0, w - 0.1, 0.78, 0.04, -0.35);
+    this.add(G.cyl(16), C.white, 0, 0.45, -0.04, 0, 0.3, 0.02, 0.3, Math.PI / 2 - 0.35);
+  }
+
+  /** Padded treatment bed with pillow and towel. Local: bed along x. */
+  treatmentBed(): void {
+    this.add(G.rbox(0.2), C.blue, 0, 0.72, 0, 0, 1.9, 0.14, 0.7);
+    this.add(G.rbox(0.25), C.white, -0.68, 0.84, 0, 0, 0.4, 0.1, 0.5);
+    this.add(G.rbox(0.2), C.yellow, 0.35, 0.8, 0, 0, 0.5, 0.03, 0.68);
+    for (const sx of [-0.8, 0.8]) for (const sz of [-0.28, 0.28]) this.add(G.cyl(8), C.steel, sx, 0.33, sz, 0, 0.06, 0.66, 0.06);
+    this.add(G.rbox(0.1), C.steelDark, 0, 0.22, 0, 0, 1.6, 0.04, 0.5);
+  }
+
+  /** Training Ground entrance arch: two academy pillars and a banner beam. Local: walk-through along z. */
+  archGate(w = 4.0): void {
+    for (const sx of [-1, 1]) {
+      this.add(G.rbox(0.15), C.blue, (sx * w) / 2, 1.4, 0, 0, 0.42, 2.8, 0.42);
+      this.add(G.rbox(0.15), C.yellow, (sx * w) / 2, 2.84, 0, 0, 0.5, 0.12, 0.5);
+      this.add(G.rbox(0.15), C.dark, (sx * w) / 2, 0.08, 0, 0, 0.52, 0.16, 0.52);
+    }
+    this.add(G.rbox(0.1), C.blue, 0, 2.55, 0, 0, w + 0.3, 0.5, 0.18);
+    this.add(G.rbox(0.1), C.yellow, 0, 2.55, 0.095, 0, w - 0.2, 0.32, 0.02);
+    this.add(G.rbox(0.1), C.yellow, 0, 2.55, -0.095, 0, w - 0.2, 0.32, 0.02);
+    this.add(G.sphere(10, 8), C.gold, 0, 2.95, 0, 0, 0.26, 0.26, 0.26);
+  }
+
+  /** Low rope-and-post railing (zone edge). */
+  railing(x0: number, z0: number, x1: number, z1: number): void {
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const len = Math.hypot(dx, dz);
+    const ry = Math.atan2(-dz, dx);
+    const n = Math.max(1, Math.round(len / 1.6));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      this.add(G.cyl(8), C.white, x0 + dx * t, 0.3, z0 + dz * t, 0, 0.07, 0.6, 0.07);
+      this.add(G.cyl(8), C.blue, x0 + dx * t, 0.62, z0 + dz * t, 0, 0.1, 0.06, 0.1);
+    }
+    this.add(G.cyl(6), C.yellow, (x0 + x1) / 2, 0.5, (z0 + z1) / 2, ry, 0.035, len, 0.035, 0, Math.PI / 2);
+  }
+
   stopwatchStand(): void {
     this.add(G.rbox(0.2), C.dark, 0, 0.04, 0, 0, 0.4, 0.08, 0.4);
     this.add(G.cyl(8), C.steel, 0, 0.6, 0, 0, 0.05, 1.1, 0.05);

@@ -112,7 +112,7 @@ export class MatchDirector {
     this.theirGoals = 0;
     const oppKit: Kit = { shirt: script.opponent.shirt, shorts: script.opponent.shorts, socks: script.opponent.shirt, trim: 0xffffff };
     this.ours = script.lineup.map((p, i) => this.body(p, KITS.academy, i));
-    this.theirs = [0, 1, 2, 3, 4].map((i) => this.body(null, oppKit, i + 31 * (script.opponent.id.length + 1)));
+    this.theirs = script.lineup.map((_, i) => this.body(null, oppKit, i + 31 * (script.opponent.id.length + 1)));
     for (const b of [...this.ours, ...this.theirs]) b.c.root.visible = false;
     this.portrait = this.rig.aspect < 1;
     this.ui.show(skippable);
@@ -155,6 +155,9 @@ export class MatchDirector {
       [cx - 3.6 * sx, cz + 1.6 * sz],
       [cx - 1.2 * sx, cz - 1.5 * sz],
       [cx - 1.2 * sx, cz + 1.5 * sz],
+      // 7-a-side: a holding midfielder and a striker
+      [cx - 2.4 * sx, cz],
+      [cx - 0.5 * sx, cz],
     ];
     ours.forEach(([x, z], i) => this.target(this.ours[i], x, z));
     ours.forEach(([x, z], i) => this.target(this.theirs[i], 2 * cx - x, z));

@@ -1,4 +1,4 @@
-import type { Position, Rarity, StationKind, Stat } from './types';
+import type { Position, Rarity, StationKind, Stat, Supply } from './types';
 
 /** All gameplay tunables. Systems must not contain magic numbers. */
 export const BALANCE = {
@@ -45,6 +45,10 @@ export const BALANCE = {
     repsPerVisit: 3,
     /** OVR points gained before graduating (area 1). */
     gradOvrGain: 4,
+    /** …once the Training Ground is open (more drills → longer, richer careers). */
+    gradOvrGainArea2: 7,
+    /** Station choice: extra score per metre of walking (keeps trainees near their drills). */
+    distWeight: 0.12,
     maxQueue: 1,
     moodWaitSec: 18,
     /** Seconds without progress before the stuck watchdog teleports an NPC. */
@@ -73,14 +77,21 @@ export const BALANCE = {
     FW: { PAC: 0.25, SHO: 0.4, PAS: 0.1, DRI: 0.25 },
   } as Record<Position, Record<Stat, number>>,
   positionWeights: { GK: 10, DF: 30, MF: 30, FW: 30 } as Record<Position, number>,
+  /** `ballsPerRep` / `basketCap` count the station's supply (balls in Sunday Park, water bottles in the Training Ground). */
   stations: {
-    shoot: { repTime: 2.4, cashPerRep: 6, statGain: 1, ballsPerRep: 1, basketCap: 8 },
-    dribble: { repTime: 3.0, cashPerRep: 7, statGain: 1, ballsPerRep: 1, basketCap: 8 },
-    pass: { repTime: 2.6, cashPerRep: 8, statGain: 1, ballsPerRep: 1, basketCap: 8 },
-    sprint: { repTime: 3.2, cashPerRep: 9, statGain: 1, ballsPerRep: 0, basketCap: 0 },
-  } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number }>,
+    shoot: { repTime: 2.4, cashPerRep: 6, statGain: 1, ballsPerRep: 1, basketCap: 8, supply: 'ball' },
+    dribble: { repTime: 3.0, cashPerRep: 7, statGain: 1, ballsPerRep: 1, basketCap: 8, supply: 'ball' },
+    pass: { repTime: 2.6, cashPerRep: 8, statGain: 1, ballsPerRep: 1, basketCap: 8, supply: 'ball' },
+    sprint: { repTime: 3.2, cashPerRep: 9, statGain: 1, ballsPerRep: 0, basketCap: 0, supply: null },
+    gym: { repTime: 3.0, cashPerRep: 18, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+    rondo: { repTime: 2.8, cashPerRep: 20, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+    freekick: { repTime: 2.6, cashPerRep: 22, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+    agility: { repTime: 3.4, cashPerRep: 25, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+    skills: { repTime: 3.0, cashPerRep: 27, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+  } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number; supply: Supply | null }>,
   staff: {
     ballBoy: { speed: 3.8, carryCap: 6, refillBelow: 0.75 },
+    /** Water Carriers work like ball boys (same speed/carry upgrades) between the Hydration Point and the drills. */
     /** Receptionist signs on their own at this multiple of the coach's sign time. */
     receptionist: { signTimeMult: 1.6 },
     /** An Assistant Coach at a drill: rep time multiplier. */
@@ -103,6 +114,9 @@ export const BALANCE = {
   },
   squad: {
     size: 5,
+    /** With the Training Ground's 7-a-side pitch: squad size and match cash multiplier. */
+    sizeSeven: 7,
+    sevenCashMult: 1.5,
     /** Line-up gaps are filled with academy subs of this OVR. */
     subOvr: 32,
   },
@@ -206,9 +220,10 @@ export const BALANCE = {
     flags: { feeMult: 1.2 },
     water_cooler: { repTimeMult: 0.8 },
     bench: { transferMult: 1.25 },
+    physio: { repTimeMult: 0.85 },
   } as Record<string, { feeMult?: number; repTimeMult?: number; transferMult?: number }>,
   /** Cumulative XP needed to reach level index+1 (level 1 = 0 XP). */
-  levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400],
+  levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400, 4500, 5800, 7300, 9000, 11000, 13300, 16000, 19000, 22500],
   xp: { perGraduation: 15, perSign: 2, perUpgrade: 6 },
   objectives: {
     /** Re-evaluate objective this often (s). */
@@ -217,6 +232,8 @@ export const BALANCE = {
     minPileWorth: 8,
     /** Point at an office upgrade only if it costs at most this share of the next pad. */
     upgradeShare: 0.5,
+    /** …or this share when the next pad is an area gate (a long save: upgrades fill the wait). */
+    upgradeShareGate: 0.6,
     /** The 3D guide arrow always shows until this many unlocks (tutorial)... */
     guideUnlocks: 3,
     /** ...after that only when the coach has stood still this long (s). */

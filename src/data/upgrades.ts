@@ -18,6 +18,11 @@ export type UpgradeId =
   | 'st:dribble_cones'
   | 'st:passing_wall'
   | 'st:sprint_track'
+  | 'st:gym'
+  | 'st:rondo'
+  | 'st:freekick'
+  | 'st:agility'
+  | 'st:skills'
   | 'academy_matchday'
   | 'academy_bus'
   | 'academy_offline';
@@ -65,6 +70,12 @@ export const UPGRADES: UpgradeDef[] = [
   up('st:dribble_cones', 'stations', 'cones', 4, 950, 1.6, 0.12, { built: 'dribble_cones' }),
   up('st:passing_wall', 'stations', 'wall', 4, 1200, 1.6, 0.12, { built: 'passing_wall' }),
   up('st:sprint_track', 'stations', 'track', 4, 1600, 1.6, 0.12, { built: 'sprint_track' }),
+  // Training Ground drills
+  up('st:gym', 'stations', 'gym', 4, 3000, 1.6, 0.12, { built: 'gym' }),
+  up('st:rondo', 'stations', 'rondo', 4, 3600, 1.6, 0.12, { built: 'rondo' }),
+  up('st:freekick', 'stations', 'freekick', 4, 4300, 1.6, 0.12, { built: 'freekick' }),
+  up('st:agility', 'stations', 'agility', 4, 5200, 1.6, 0.12, { built: 'agility' }),
+  up('st:skills', 'stations', 'skills', 4, 6200, 1.6, 0.12, { built: 'skills' }),
   // Academy
   up('academy_matchday', 'academy', 'trophy', 4, 1300, 1.65, 0.25, { built: 'match_pitch' }),
   up('academy_bus', 'academy', 'shelter', 4, 1000, 1.65, 0.1),

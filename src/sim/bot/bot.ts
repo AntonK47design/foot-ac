@@ -26,6 +26,8 @@ export interface BotReport {
   matchTimes: number[];
   /** Longest stretch between 3:00 and 20:00 without a pad, an upgrade or a match (§5.2 "never dead air"). */
   midGameGap: { from: number; to: number; gap: number };
+  /** Same, 20:00 → 40:00 (Training Ground). */
+  lateGameGap: { from: number; to: number; gap: number };
   longestPurchaseGap: { from: number; to: number; gap: number };
   longestUnaffordable: { from: number; gap: number };
   finalCash: number;
@@ -135,7 +137,7 @@ export function runBot(opts: BotOptions): BotReport {
       const weakest = sim.weakestSquadPlayer();
       const pitch = !!sim.state.built[sim.area.matchPitch.objectId];
       const promote =
-        pitch && (sim.state.squad.length < BALANCE.squad.size || (weakest !== undefined && sim.ovr(g) > computeOvr(weakest.position, weakest.stats) + 2));
+        pitch && (sim.state.squad.length < sim.squadSize() || (weakest !== undefined && sim.ovr(g) > computeOvr(weakest.position, weakest.stats) + 2));
       sim.decideGraduate(promote ? 'promote' : 'sell');
       sim.prompt = 'podium';
       mark(promote ? 'firstPromotion' : 'firstSale', promote ? 'first graduate promoted' : 'first transfer sale');
@@ -144,10 +146,7 @@ export function runBot(opts: BotOptions): BotReport {
       // office upgrades: cheapest first, without stalling the next pad
       for (let n = 0; n < 6; n++) {
         const up = sim.cheapestUpgrade();
-        const pads = sim.visiblePads();
-        let next = Infinity;
-        for (const p of pads) next = Math.min(next, sim.padRemaining(p));
-        if (!up || sim.state.cash < up.cost || (pads.length > 0 && up.cost > next * BALANCE.objectives.upgradeShare)) break;
+        if (!up || sim.state.cash < up.cost || !sim.upgradeFitsBudget(up.cost)) break;
         sim.buyUpgrade(up.id);
         upgradeTimes.push(sim.state.time);
         mark('firstUpgrade', `first upgrade (${up.id})`);
@@ -166,12 +165,13 @@ export function runBot(opts: BotOptions): BotReport {
     if (pads.length === 0) {
       if (contentDoneAt === null) {
         contentDoneAt = sim.state.time;
-        timeline.push({ t: sim.state.time, what: 'all M1 pads unlocked' });
+        timeline.push({ t: sim.state.time, what: 'all pads unlocked (Sunday Park + Training Ground)' });
       }
     } else {
       let piles = 0;
       for (const p of sim.state.piles) piles += Math.floor(p.amount);
-      const cheapest = Math.min(...pads.map((p) => sim.padRemaining(p)));
+      // an Office upgrade counts as an affordable purchase too (GDD §4.9 never-dead-air)
+      const cheapest = Math.min(...pads.map((p) => sim.padRemaining(p)), sim.cheapestUpgrade()?.cost ?? Infinity);
       const affordable = sim.state.cash + piles >= cheapest;
       if (!affordable) {
         if (unaffordableSince === null) unaffordableSince = sim.state.time;
@@ -201,6 +201,14 @@ export function runBot(opts: BotOptions): BotReport {
     if (t - p0 > midGameGap.gap) midGameGap = { from: p0, to: t, gap: t - p0 };
     p0 = t;
   }
+  const late = [...unlockTimes, ...upgradeTimes, ...matchTimes].filter((t) => t >= 1200 && t <= Math.min(2400, total)).sort((a, b) => a - b);
+  let lateGameGap = { from: 1200, to: 1200, gap: 0 };
+  let q0 = 1200;
+  if (total > 1200)
+    for (const t of [...late, Math.min(2400, total)]) {
+      if (t - q0 > lateGameGap.gap) lateGameGap = { from: q0, to: t, gap: t - q0 };
+      q0 = t;
+    }
   void BALANCE;
   return {
     timeline,
@@ -209,6 +217,7 @@ export function runBot(opts: BotOptions): BotReport {
     upgradeTimes,
     matchTimes,
     midGameGap,
+    lateGameGap,
     longestPurchaseGap,
     longestUnaffordable,
     finalCash: sim.state.cash,

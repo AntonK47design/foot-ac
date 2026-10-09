@@ -124,3 +124,23 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **While an ad plays:** the 'ad' blocker pauses the sim, blocks input, stops gameplay and mutes audio.
     - **Adblock:** an inline note replaces the buttons.
     - **Dead buttons:** a button that can no longer do anything (Basic Launch error, cap, adblock) removes itself.
+63. **Area 2 "Training Ground" (M6).** A second plot directly south of Sunday Park, x −17…17, z 12…40, in the same `AreaDef` so the sim, nav grid and save stay one world.
+    - **Before it opens:** it is visible but fenced off. Barriers sit in the gate gap, a blueprint tint covers the plot, and a padlock sign reads "Complete Sunday Park · ★n/30".
+    - **Gate pad:** a $1,900 pad that needs every Sunday Park pad. Buying it builds an entrance arch, removes the barrier obstacle and widens the coach's bounds to both plots.
+    - **Star bar:** shows the current area's stars, so Area 2 starts at 3/33.
+    - **Size:** 21 pads, not the GDD's ~35. Each one does something; no filler.
+64. **The Training Ground chore is water.** The Hydration Point is a second source next to the ball crate, and all five Area 2 drills use bottle crates instead of ball baskets.
+    - **One stack kind at a time:** stepping into the other source swaps the stack (the balls go back), so the coach is never stuck holding the wrong supply.
+    - **Water Carrier hires:** two of them automate it, just as ball boys do for balls. The ball-boy speed/carry upgrades apply to both.
+    - **Laundry deferred:** GDD §4.4's second chore is left for later, to keep one new mechanic per area.
+65. **Training Ground drills.**
+    - **The five drills:** Gym (trains the weakest stat each rep), Rondo Ring (PAS), Free-Kick Wall (SHO), Agility Course (PAC) and Skills Square (DRI). Each has 2 lanes and an assistant coach, and pays 18–27 per rep.
+    - **Supporting unlocks:** Physio Room (−15% rep time, like the water cooler perk) and the 7-a-side Pitch (squad 5 → 7, match cash ×1.5, the squad trains there).
+    - **Office upgrades:** five more drill upgrades.
+    - **Trainee routing:** once the gate is open, new trainees aim for +7 OVR instead of +4, and station choice adds a walking-distance cost so they don't commute across both plots.
+    - **Character art:** no new character assets. All Area 2 props are coded kit pieces (squat rack, bench press, dumbbell rack, bottle crates, water station, rebounder, treatment bed, arch) plus existing KayKit props.
+66. **Balance for M6 (bot, 40 min).** Sunday Park is finished by ~6 min, the gate opens at 7–11 min, and the Training Ground is complete at 33–36 min. There are never more than 90 s (focused) or 120 s (distracted) without a pad, upgrade or match between 20:00 and 40:00.
+    - **Gate saving:** while the player saves for the gate, upgrades up to 60% of its price are recommended (50% for normal pads). Otherwise the wait for the gate was dead air.
+    - **"Unaffordable" metric:** it now counts an affordable Office upgrade as a purchase (GDD §4.9 points at upgrades when no pad is affordable).
+    - **Prices:** Area 2 pads cost $600–6,400.
+    - **Level table:** extended to level 20.

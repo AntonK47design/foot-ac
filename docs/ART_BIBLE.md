@@ -71,6 +71,21 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
 | Sprint track | tartan lanes, start/finish lines, hurdles, stopwatch stand |
 | Plaza / edges | floodlights, academy flags & banners, dugout bench, scoreboard, tactics board, bins, plants, benches, bus stop, fence |
 
+## 3b. Area 2 layout: "Training Ground" (south of Sunday Park, ~34 × 28 m)
+
+```
+ Sunday Park ── hedge border ──[ gate arch ]── hedge ──
+ ┌ GYM (blue rubber) ┐ ( RONDO ring ) [ FREE-KICK turf ] │ path │ Hydration Point
+ │ rack · bench · DB │   mannequins     goal + wall       │      │ water carriers
+ └───────────────────┘                                   │      │
+ [ AGILITY astro: hurdles + ladder ]  [ SKILLS deck ]    │      │ PHYSIO (cutaway, tiles)
+ ┌──────────── 7-a-side pitch (fenced, floodlights, dugouts) ────────────┐
+ └────────────────────────────────────────────────────────────────────────┘
+```
+
+- Locked: blueprint tint over the whole plot, barriers in the gate gap, padlock sign with the star requirement.
+- Supply chips and bubbles show a water bottle for Training Ground drills; the coach and water carriers carry stacks of bottles.
+
 ## 4. Characters
 
 - **Source**: rigged CC0 chibi characters (Kenney Mini Characters preferred) with shared AnimationClips; `SkeletonUtils.clone` per instance.

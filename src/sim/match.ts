@@ -88,8 +88,7 @@ export function pairings(round: number): Array<[number, number]> {
   return pairs;
 }
 
-function lineupFrom(squad: Player[], rng: Rng): MatchPlayer[] {
-  const size = BALANCE.squad.size;
+function lineupFrom(squad: Player[], rng: Rng, size: number): MatchPlayer[] {
   const ps: MatchPlayer[] = squad.map((p) => ({ id: p.id, name: p.name, position: p.position, female: p.female, ovr: computeOvr(p.position, p.stats), stats: { ...p.stats }, sub: false }));
   ps.sort((a, b) => b.ovr - a.ovr);
   const lineup = ps.slice(0, size);
@@ -112,12 +111,12 @@ function lineupFrom(squad: Player[], rng: Rng): MatchPlayer[] {
 }
 
 /** Builds the scripted highlight reel: 3–5 chances, outcomes pre-rolled except for Power Shots. */
-export function createMatch(rng: Rng, squad: Player[], league: League, cupOpponent?: TeamDef): MatchScript {
+export function createMatch(rng: Rng, squad: Player[], league: League, cupOpponent?: TeamDef, size: number = BALANCE.squad.size): MatchScript {
   const M = BALANCE.match;
   const opps = opponentsOf(league.division);
   const pair = pairings(league.round % 5)[0] as [number, number];
   const opponent = cupOpponent ?? opps[pair[1] - 1] ?? (opps[0] as TeamDef);
-  const lineup = lineupFrom(squad, rng);
+  const lineup = lineupFrom(squad, rng, size);
   const ourStrength = lineup.reduce((a, p) => a + p.ovr, 0) / lineup.length;
   const opp = opponent.strength;
   const share = clamp(ourStrength ** M.shareExp / (ourStrength ** M.shareExp + opp ** M.shareExp), M.shareMin, M.shareMax);

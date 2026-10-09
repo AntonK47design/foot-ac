@@ -1,6 +1,8 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  CircleGeometry,
+  RingGeometry,
   DoubleSide,
   Group,
   Mesh,
@@ -237,18 +239,20 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   const pcz = (P.z0 + P.z1) / 2;
   b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
   const curbW = 0.38;
+  // the south curb leaves a gap for the Training Ground gate
+  const [ga, gb] = L.area2.gateGap;
   for (const [x, z, w, d] of [
     [pcx, P.z0 + curbW / 2, pw, curbW],
-    [pcx, P.z1 - curbW / 2, pw, curbW],
+    [(P.x0 + ga) / 2, P.z1 - curbW / 2, ga - P.x0, curbW],
+    [(gb + P.x1) / 2, P.z1 - curbW / 2, P.x1 - gb, curbW],
     [P.x0 + curbW / 2, pcz, curbW, pd],
     [P.x1 - curbW / 2, pcz, curbW, pd],
   ] as Array<[number, number, number, number]>) {
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
   }
-  b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
 
-  // ── street east (lower level) with the bus stop
-  const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.8, z1: P.z1 };
+  // ── street east (lower level) with the bus stop; it runs on past the Training Ground
+  const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.8, z1: L.area2.plot.z1 };
   root.add(floor('asphalt', street, -0.3, 2));
   // base block top sits 4 cm under the asphalt (coplanar faces z-fight and flicker)
   b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.79, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
@@ -452,6 +456,124 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   return finalize(c, mat);
 }
 
+/**
+ * Area 2 "Training Ground" ground: plot, curb, paving, zone floors and edges. Always visible (the locked
+ * look is a separate overlay, see buildArea2Lock).
+ */
+export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { b, kit, props, root, aoBlobs, decals } = c;
+  const A = L.area2;
+  const P = A.plot;
+  const pw = P.x1 - P.x0;
+  const pd = P.z1 - P.z0;
+  const pcx = (P.x0 + P.x1) / 2;
+  const pcz = (P.z0 + P.z1) / 2;
+  b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
+  const curbW = 0.38;
+  for (const [x, z, w, d] of [
+    [pcx, P.z1 - curbW / 2, pw, curbW],
+    [P.x0 + curbW / 2, pcz, curbW, pd],
+    [P.x1 - curbW / 2, pcz, curbW, pd],
+  ] as Array<[number, number, number, number]>) {
+    b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
+  }
+  b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
+  // border hedge between the two plots (gate gap stays open)
+  const [ga, gb] = A.gateGap;
+  for (const [x0, x1] of [
+    [P.x0 + 0.4, ga - 0.2],
+    [gb + 0.2, P.x1 - 0.4],
+  ] as Array<[number, number]>) {
+    for (let x = x0 + 0.6; x < x1 - 0.3; x += 1.25) {
+      b.at(G.ico(1), (Math.round(x * 3) % 2 ? 0x3fae4f : 0x4cb85a), x, 0.42, P.z0 + 0.05, x, 1.15, 0.8, 0.7);
+    }
+    b.at(G.rbox(0.1), COL.curbSide, (x0 + x1) / 2, 0.08, P.z0 + 0.05, 0, x1 - x0, 0.16, 0.5);
+  }
+  root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
+  // zone floors: gym rubber, rondo turf disc, free-kick turf, agility astro, skills deck, walkway
+  root.add(floor('rubberBlue', A.gym, 0.012, 1));
+  kit.place(0, 0).railing(A.gym.x0, A.gym.z0 + 0.15, A.gym.x1, A.gym.z0 + 0.15);
+  kit.place(0, 0).railing(A.gym.x1 - 0.1, A.gym.z0 + 0.15, A.gym.x1 - 0.1, A.gym.z1 - 2.4);
+  decals.add('banner', 1.0, 1.0, trs((A.gym.x0 + A.gym.x1) / 2, 0.62, A.gym.z0 + 0.22));
+  const ro = A.rondo;
+  const disc = new Mesh(new CircleGeometry(ro.r, 40).rotateX(-HALF_PI), new MeshLambertMaterial({ map: pattern('turf') }));
+  disc.position.set(ro.x, 0.012, ro.z);
+  disc.receiveShadow = true;
+  root.add(disc);
+  const ring = new Mesh(new RingGeometry(ro.r - 0.12, ro.r, 48).rotateX(-HALF_PI), new MeshBasicMaterial({ color: COL.line }));
+  ring.position.set(ro.x, 0.02, ro.z);
+  root.add(ring);
+  const ring2 = new Mesh(new RingGeometry(ro.r * 0.5 - 0.05, ro.r * 0.5 + 0.03, 40).rotateX(-HALF_PI), new MeshBasicMaterial({ color: COL.line }));
+  ring2.position.set(ro.x, 0.02, ro.z);
+  root.add(ring2);
+  const fk = A.freekick;
+  const fkTurf = floor('turf', fk, 0.012, 2);
+  root.add(fkTurf);
+  const lw = 0.1;
+  b.add(flat(fk.x1 - fk.x0 - 0.6, lw), COL.line, trs((fk.x0 + fk.x1) / 2, 0.02, fk.z0 + 0.6));
+  b.add(flat(lw, 2.0), COL.line, trs(fk.x0 + 0.9, 0.02, fk.z0 + 1.6));
+  b.add(flat(lw, 2.0), COL.line, trs(fk.x1 - 0.9, 0.02, fk.z0 + 1.6));
+  b.add(flat(fk.x1 - fk.x0 - 1.8, lw), COL.line, trs((fk.x0 + fk.x1) / 2, 0.02, fk.z0 + 2.6));
+  kit.place(0, 0).railing(fk.x0 + 0.1, fk.z0 + 0.15, fk.x0 + 0.1, fk.z1 - 0.2);
+  root.add(floor('astro', A.agility, 0.012, 1));
+  const ag = A.agility;
+  b.add(flat(ag.x1 - ag.x0, 0.08), COL.line, trs((ag.x0 + ag.x1) / 2, 0.022, (ag.z0 + ag.z1) / 2));
+  root.add(floor('deck', A.skills, 0.012, 2));
+  b.at(G.rbox(0.03), 0x9a6435, (A.skills.x0 + A.skills.x1) / 2, 0.01, (A.skills.z0 + A.skills.z1) / 2, 0, A.skills.x1 - A.skills.x0 + 0.12, 0.03, A.skills.z1 - A.skills.z0 + 0.12);
+  root.add(floor('curb', A.path, 0.008, 1));
+  // edge decor: trees, benches, bins, lights, academy flags
+  for (const [x, z] of [
+    [-16.0, 20.3],
+    [-16.0, 27.6],
+    [16.0, 28.8],
+    [-16.0, 38.8],
+    [16.0, 38.8],
+    [7.8, 19.9],
+  ] as Array<[number, number]>) {
+    kit.place(x, z).planter();
+    aoBlobs.push({ x, z, r: 0.55 });
+  }
+  props.put('bush', -13.6, 27.4, 0, 5);
+  props.put('bush', 14.6, 39.0, 0, 5);
+  props.put('bush', -14.6, 39.0, 0, 5);
+  props.put('streetlight', 8.2, 13.2, 0, 4, 0, 0.1);
+  props.put('streetlight', 8.2, 27.0, 0, 4, 0, 0.1);
+  kit.place(7.6, 24.2, HALF_PI).bench(2.2);
+  kit.place(7.7, 26.2).bin();
+  aoBlobs.push({ x: 7.7, z: 26.2, r: 0.35 });
+  for (const [x, z, col] of [
+    [-16.2, 13.0, 0x2f6bff],
+    [16.2, 13.0, 0xffd23f],
+  ] as Array<[number, number, number]>)
+    kit.place(x, z).flagpole(col);
+  anchors(c, A);
+  return finalize(c, mat);
+}
+
+function anchors(c: Ctx, A: Layout['area2']): void {
+  c.anchors.area2Gate = { x: (A.gateGap[0] + A.gateGap[1]) / 2, z: A.plot.z0 };
+}
+
+/** Construction look over the closed Training Ground: barriers along the border, blueprint tint, padlock sign. */
+export function buildArea2Lock(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { kit, root, extra } = c;
+  const A = L.area2;
+  const P = A.plot;
+  const fl = floor('blueprint', { x0: P.x0 + 0.4, z0: P.z0 + 0.4, x1: P.x1 - 0.4, z1: P.z1 - 0.4 }, 0.03, 1);
+  const fm = fl.material as MeshLambertMaterial;
+  fm.transparent = true;
+  fm.opacity = 0.55;
+  fm.depthWrite = false;
+  extra.push(fl);
+  const [ga, gb] = A.gateGap;
+  for (let x = ga + 0.8; x < gb; x += 1.55) kit.place(0, 0).barrier(x, P.z0 - 0.1);
+  kit.place(gb + 0.6, P.z0 - 0.5).padlockSign();
+  void root;
+  return finalize(c, mat);
+}
+
 /** World-space position helper for station local coords (rot 0 layouts). */
 export interface UnlockGeo {
   center: { x: number; z: number };
@@ -465,7 +587,7 @@ export interface UnlockGeo {
  */
 export function buildUnlockable(id: string, lanes: number, assets: Assets, L: Layout, mat: Material, geo?: UnlockGeo): Diorama {
   const c = newCtx(assets, L);
-  const { kit, props, aoBlobs, b } = c;
+  const { kit, props, aoBlobs, b, decals } = c;
   const at = AREA1.objects.find((o) => o.id === id)?.pos ?? { x: 0, z: 0 };
   switch (id) {
     case 'ball_crate': {
@@ -567,8 +689,153 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       kit.place(tr.x0 + 1.2, tr.z0 - 0.4).stopwatchStand();
       break;
     }
+    // ── Area 2 "Training Ground"
+    case 'area2_gate':
+      kit.place(at.x, at.z, 0).archGate(L.area2.gateGap[1] - L.area2.gateGap[0] - 0.4);
+      break;
+    case 'hydration':
+      kit.place(at.x, at.z, 0).waterStation();
+      aoBlobs.push({ x: at.x, z: at.z, r: 1.3 });
+      break;
+    case 'gym': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      ls.forEach((l, i) => {
+        if (i === 0) kit.place(l.spot.x, l.spot.z - 1.3, Math.PI).squatRack();
+        else kit.place(l.spot.x, l.spot.z - 1.1, 0).weightBench();
+        aoBlobs.push({ x: l.spot.x, z: l.spot.z - 1.2, r: 1.0 });
+      });
+      const g = L.area2.gym;
+      kit.place(g.x0 + 1.4, g.z1 - 0.5, 0).dumbbellRack(5);
+      kit.place(0, 0).kettlebell(g.x0 + 2.8, g.z1 - 0.5, 0x2b2f3d);
+      kit.place(0, 0).kettlebell(g.x0 + 3.2, g.z1 - 0.4, 0xffd23f);
+      if (lanes > 1) {
+        kit.place(0, 0).medBall(g.x1 - 1.2, g.z0 + 0.8);
+        kit.place(0, 0).medBall(g.x1 - 0.8, g.z0 + 1.1, 0x2f6bff);
+        props.put('Dummy_Base', g.x0 + 0.7, g.z0 + 0.9, 0.4, 0.9);
+      }
+      waterCrate(c, geo);
+      break;
+    }
+    case 'rondo': {
+      const st = AREA1.stations.find((s) => s.id === 'rondo');
+      if (st) for (const f of st.footprint) {
+        const mx = st.center.x + (f.x0 + f.x1) / 2;
+        const mz = st.center.z + (f.z0 + f.z1) / 2;
+        kit.place(0, 0).mannequin(mx, mz, Math.atan2(st.center.x - mx, st.center.z - mz));
+      }
+      if (lanes > 1) for (const [x, z] of [
+        [-1.8, 1.9],
+        [1.8, 1.9],
+      ] as Array<[number, number]>) kit.place(0, 0).cone((st?.center.x ?? 0) + x, (st?.center.z ?? 0) + z, 0.9, 0xffd23f);
+      waterCrate(c, geo);
+      break;
+    }
+    case 'freekick': {
+      const fk = L.area2.freekick;
+      const gx = (fk.x0 + fk.x1) / 2 - 0.1;
+      const gz = fk.z0 + 0.6;
+      kit.place(gx, gz).goal(3.8, 1.8, 1.0);
+      const nm = netMaterial();
+      const back = new Mesh(new PlaneGeometry(3.8, 1.8, 12, 6), nm);
+      back.position.set(gx, 0.9, gz - 1.0);
+      c.nets.push(back);
+      c.extra.push(back);
+      const top = new Mesh(new PlaneGeometry(3.8, 1.0), nm);
+      top.rotation.x = -HALF_PI;
+      top.position.set(gx, 1.8, gz - 0.5);
+      c.extra.push(top);
+      for (let i = 0; i < 3; i++) kit.place(0, 0).mannequin(gx - 1.0 + i * 0.55 + 0.15, gz + 2.0, 0);
+      for (const l of (geo?.lanes ?? []).slice(0, lanes)) b.add(flat(0.3, 0.3), COL.line, trs(l.spot.x, 0.021, l.spot.z - 0.35, Math.PI / 4));
+      waterCrate(c, geo);
+      break;
+    }
+    case 'agility': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) {
+        for (let k = 0; k < 2; k++) kit.place(0, 0).hurdle(l.target.x + 2.2 + k * 2.0, l.spot.z, HALF_PI);
+        kit.place(l.target.x + 6.6, l.spot.z).agilityLadder(2.6, HALF_PI);
+        kit.place(0, 0).pole(l.target.x + 0.4, l.spot.z);
+      }
+      kit.place(L.area2.agility.x0 + 0.8, L.area2.agility.z0 - 0.45).stopwatchStand();
+      waterCrate(c, geo);
+      break;
+    }
+    case 'skills': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) {
+        kit.place(l.target.x, l.target.z - 0.6, 0).rebounder(1.3);
+        kit.place(0, 0).cone(l.spot.x - 0.6, l.spot.z - 0.4, 0.7, 0xffd23f);
+        kit.place(0, 0).cone(l.spot.x + 0.6, l.spot.z - 0.4, 0.7, 0xffd23f);
+      }
+      // skills grid markers, a juggling ball cart and the coach's board
+      const sq = L.area2.skills;
+      for (const [x, z] of [
+        [sq.x0 + 0.5, sq.z1 - 0.5],
+        [sq.x1 - 0.5, sq.z1 - 0.5],
+        [sq.x0 + 0.5, sq.z0 + 3.2],
+        [sq.x1 - 0.5, sq.z0 + 3.2],
+      ] as Array<[number, number]>)
+        kit.place(0, 0).cone(x, z, 0.8);
+      kit.place(sq.x0 + 1.0, sq.z1 - 1.3, 0.4).ballCart();
+      aoBlobs.push({ x: sq.x0 + 1.0, z: sq.z1 - 1.3, r: 0.7 });
+      if (lanes > 1) kit.place(sq.x1 - 1.2, sq.z1 - 1.0, -0.3).tacticsBoard();
+      waterCrate(c, geo);
+      break;
+    }
+    case 'physio': {
+      const r = L.area2.physio;
+      const H = 1.3;
+      c.extra.push(floor('tilesTeal', r, 0.014, 1));
+      wall(b, r.x0, r.z0, r.x1, r.z0, H, 1);
+      wall(b, r.x0, r.z0, r.x0, r.z1, H, -1);
+      wall(b, r.x1, r.z0, r.x1, r.z1, H, 1);
+      const door: [number, number] = [12.2, 13.8];
+      wall(b, r.x0, r.z1, door[0], r.z1, STUB_H, 1);
+      wall(b, door[1], r.z1, r.x1, r.z1, STUB_H, 1);
+      c.aoStrips.push({ x0: r.x0, z0: r.z0 + WALL_T / 2, x1: r.x1, z1: r.z0 + WALL_T / 2, w: 0.7 });
+      for (const dx of [-1.6, 1.6]) {
+        kit.place(at.x + dx, at.z - 1.9, HALF_PI).treatmentBed();
+        aoBlobs.push({ x: at.x + dx, z: at.z - 1.9, r: 1.1 });
+      }
+      props.put('towelrail', r.x1 - 0.5, at.z + 0.6, -HALF_PI, 0.8);
+      props.put('cabinet_small_decorated', r.x0 + 0.6, at.z + 1.0, HALF_PI, 0.7);
+      props.put('cactus_medium_A', r.x1 - 0.5, r.z1 - 0.7, 0, 0.85);
+      props.put('rug_oval_A', at.x, at.z + 0.9, 0, 0.9, 0.015, 0);
+      kit.place(0, 0).medBall(r.x0 + 0.6, r.z1 - 0.8, 0x2f6bff);
+      decals.add('posterD', 0.6, 0.6, trs(at.x, 0.8, r.z0 + WALL_T / 2 + 0.02));
+      break;
+    }
+    case 'seven_pitch': {
+      const r = L.area2.seven;
+      c.extra.push(floor('curb', { x0: r.x0 - 0.5, z0: r.z0 - 0.5, x1: r.x1 + 0.5, z1: r.z1 + 0.5 }, 0.008, 1));
+      pitchMarkings(c, r, 3.0);
+      const f = { x0: r.x0 - 0.35, z0: r.z0 - 0.35, x1: r.x1 + 0.35, z1: r.z1 + 0.35 };
+      kit.place(0, 0).fence(f.x0, f.z0, -1.0, f.z0);
+      kit.place(0, 0).fence(1.0, f.z0, f.x1, f.z0);
+      kit.place(0, 0).fence(f.x0, f.z0, f.x0, f.z1);
+      kit.place(0, 0).fence(f.x1, f.z0, f.x1, f.z1);
+      kit.place(0, 0).fence(f.x0, f.z1, f.x1, f.z1);
+      for (const [x, z] of [
+        [f.x0 - 0.5, f.z0],
+        [f.x1 + 0.5, f.z0],
+      ] as Array<[number, number]>) {
+        kit.place(x, z, 0).floodlight();
+        aoBlobs.push({ x, z, r: 0.7 });
+      }
+      kit.place(r.x0 + 4.0, f.z0 - 0.75, 0).dugout(3.0);
+      kit.place(r.x1 - 4.0, f.z0 - 0.75, 0).dugout(3.0);
+      break;
+    }
   }
   return finalize(c, mat);
+}
+
+/** Bottle crate at a Training Ground drill's basket spot (bottles themselves are instanced by the view). */
+function waterCrate(c: Ctx, geo?: UnlockGeo): void {
+  const bk = geo?.basket;
+  if (!bk) return;
+  c.kit.place(bk.x, bk.z, 0).bottleCrate(0);
+  c.aoBlobs.push({ x: bk.x, z: bk.z, r: 0.6 });
 }
 
 /** Pitch surface, lines, goals with nets and corner flags (stadium). */

@@ -48,6 +48,17 @@ function checksFor(r: BotReport, strict: boolean): Check[] {
   const avg610 = 240 / Math.max(1, n610);
   out.push({ name: 'avg purchase gap 6–10 min ≥ 18s', ok: avg610 >= 18, detail: `${avg610.toFixed(1)}s` });
   out.push({ name: '≥ 15 unlocks by 10:00 (pads + upgrades)', ok: [...r.unlockTimes, ...r.upgradeTimes].filter((t) => t <= 600).length >= 15, detail: String([...r.unlockTimes, ...r.upgradeTimes].filter((t) => t <= 600).length) });
+  // M6: the Training Ground opens around minute 12 and carries the session to ~minute 35
+  const gate = r.marks['unlock:p2_gate'];
+  const [g0, g1] = strict ? [420, 960] : [420, 1080];
+  out.push({ name: `Training Ground opens ${fmt(g0)}–${fmt(g1)}`, ok: gate !== undefined && gate >= g0 && gate <= g1, detail: gate === undefined ? 'never' : fmt(gate) });
+  if (r.sim.state.time >= 2400) {
+    const done = r.contentDoneAt;
+    out.push({ name: 'Training Ground complete 30:00–40:00', ok: done !== null && done >= 1800 && done <= 2400, detail: done === null ? 'not yet' : fmt(done) });
+    const lg = r.lateGameGap;
+    const lgLim = strict ? 90 : 120;
+    out.push({ name: `20:00–40:00 never > ${lgLim}s without a purchase or match`, ok: lg.gap <= lgLim, detail: `${lg.gap.toFixed(1)}s (${fmt(lg.from)}→${fmt(lg.to)})` });
+  }
   const lim = strict ? 60 : 85;
   out.push({ name: `never > ${lim}s unaffordable (content horizon)`, ok: r.longestUnaffordable.gap <= lim, detail: `${r.longestUnaffordable.gap.toFixed(1)}s from ${fmt(r.longestUnaffordable.from)}` });
   return out;
@@ -68,7 +79,7 @@ function report(label: string, r: BotReport, strict: boolean, quiet: boolean): b
 
 const args = process.argv.slice(2);
 const quiet = args.includes('--quiet');
-const minutes = Number(args.find((a) => a.startsWith('--minutes='))?.split('=')[1] ?? 20);
+const minutes = Number(args.find((a) => a.startsWith('--minutes='))?.split('=')[1] ?? 40);
 const seeds = [12345, 777, 4242];
 let allOk = true;
 for (const seed of seeds) {

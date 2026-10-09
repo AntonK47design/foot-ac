@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import type { AreaDef, ObjectDef, PadDef, Rect, StationDef, StationKind, Stat, V2 } from '../data/types';
+import type { AreaDef, ObjectDef, PadDef, Rect, StationDef, StationKind, Stat, Supply, V2 } from '../data/types';
 import { rectToWorld, toWorld } from './geom';
 
 export interface LaneGeo {
@@ -12,7 +12,10 @@ export interface StationGeo {
   def: StationDef;
   id: string;
   kind: StationKind;
-  stat: Stat;
+  stat: Stat | 'ALL';
+  /** What the basket holds (null: no supply needed). */
+  supply: Supply | null;
+  area: number;
   basket: V2 | null;
   pile: V2;
   lanes: LaneGeo[];
@@ -33,7 +36,9 @@ export class WorldGeo {
   readonly objects = new Map<string, ObjectGeo>();
   readonly pads = new Map<string, PadDef>();
   readonly padList: PadDef[];
+  /** All stars in the game, and per area (index = area id). */
   readonly totalStars: number;
+  readonly areaStars: number[] = [];
 
   constructor(readonly area: AreaDef) {
     for (const s of area.stations) {
@@ -42,6 +47,8 @@ export class WorldGeo {
         id: s.id,
         kind: s.kind,
         stat: s.stat,
+        supply: BALANCE.stations[s.kind].supply,
+        area: s.area,
         basket: s.basket ? toWorld(s.center, s.rot, s.basket) : null,
         pile: toWorld(s.center, s.rot, s.pile),
         lanes: s.lanes.map((l) => ({
@@ -64,6 +71,7 @@ export class WorldGeo {
     for (const p of area.pads) this.pads.set(p.id, p);
     this.padList = area.pads;
     this.totalStars = area.pads.reduce((a, p) => a + p.stars, 0);
+    for (const p of area.pads) this.areaStars[p.area] = (this.areaStars[p.area] ?? 0) + p.stars;
   }
 
   queueSlot(st: StationGeo, i: number): V2 {

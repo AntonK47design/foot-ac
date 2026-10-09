@@ -1,4 +1,4 @@
-import type { Position, Rarity, Stat } from '../data/types';
+import type { Position, Rarity, Stat, Supply } from '../data/types';
 
 export interface Pile {
   id: string;
@@ -167,7 +167,7 @@ export interface MetaState {
   ads: { day: string; used: Record<string, number>; officeAt: number };
 }
 
-export type StaffKind = 'ball_boy' | 'receptionist' | 'assistant' | 'accountant';
+export type StaffKind = 'ball_boy' | 'water_carrier' | 'receptionist' | 'assistant' | 'accountant';
 export type StaffState = 'idle' | 'toCrate' | 'loading' | 'toBasket' | 'unloading';
 
 export interface Staff extends Agent {
@@ -188,6 +188,8 @@ export interface Coach {
   vz: number;
   yaw: number;
   carry: number;
+  /** What the carry stack is (balls or water bottles); absent in old saves = balls. */
+  carryKind?: Supply;
   pickT: number;
   dropT: number;
   padId: string | null;

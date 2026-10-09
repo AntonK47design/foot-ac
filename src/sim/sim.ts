@@ -1,7 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { AREA1, PREBUILT_OBJECTS } from '../data/areas/area1';
 import { SAVE_VERSION } from '../data/constants';
-import type { AreaDef, PadDef, Rect, Stat } from '../data/types';
+import { STATS, type AreaDef, type PadDef, type Rect, type Stat, type Supply } from '../data/types';
 import { Emitter } from '../core/events';
 import { Rng } from '../core/rng';
 import { dist2, pushOutOfRect, yawFor } from './geom';
@@ -22,7 +22,7 @@ import { UPGRADES, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades';
 export interface SimEvents {
   cashCollected: { pileId: string; amount: number; x: number; z: number };
   unlocked: { padId: string; x: number; z: number; stars: number; major: boolean };
-  ballPicked: { carry: number; byStaff: boolean };
+  ballPicked: { carry: number; byStaff: boolean; kind?: Supply };
   ballDropped: { stationId: string; byStaff: boolean };
   traineeArrived: { id: number };
   signed: { id: number; fee: number };
@@ -62,6 +62,15 @@ export interface SimInput {
 }
 
 const EMPTY = {} as Record<string, never>;
+
+const SUPPLIES: readonly Supply[] = ['ball', 'water'];
+
+/** Lowest stat (the gym trains it). */
+function weakest(stats: Record<Stat, number>): { k: Stat; v: number } {
+  let k: Stat = 'PAC';
+  for (const s of STATS) if (stats[s] < stats[k]) k = s;
+  return { k, v: stats[k] };
+}
 
 export function levelForXp(xp: number): number {
   const t = BALANCE.levelXp;
@@ -266,7 +275,7 @@ export class Sim {
     }
     for (const f of s.staff) {
       const spot = this.area.staffSpots[f.id];
-      const h = f.kind === 'ball_boy' ? this.staffHome(this.ballBoyIndex(f)) : (spot ?? this.staffHome(0));
+      const h = f.kind === 'ball_boy' || f.kind === 'water_carrier' ? this.staffHome(this.ballBoyIndex(f), f.kind) : (spot ?? this.staffHome(0));
       f.x = f.px = h.x;
       f.z = f.pz = h.z;
       f.goal = null;
@@ -281,6 +290,7 @@ export class Sim {
   rebuildWorld(): void {
     const s = this.state;
     const obs: Rect[] = [...this.area.obstacles];
+    if (!this.area2Open()) obs.push(...this.area.expansion.lockedObstacles);
     for (const [id, o] of this.world.objects) if (s.built[id]) obs.push(...o.footprint);
     for (const [id, st] of this.world.stations) {
       const ss = s.stations[id];
@@ -335,6 +345,29 @@ export class Sim {
 
   hasStaff(kind: Staff['kind']): boolean {
     return this.state.staff.some((f) => f.kind === kind);
+  }
+
+  /** The Training Ground gate has been bought. */
+  area2Open(): boolean {
+    return !!this.state.built[this.area.expansion.gateObjectId];
+  }
+
+  /** Area the star bar tracks: the newest open one. */
+  currentArea(): number {
+    return this.area2Open() ? 2 : 1;
+  }
+
+  /** Stars earned / available in the current area (HUD star bar). */
+  areaStars(): { have: number; total: number } {
+    const a = this.currentArea();
+    let have = 0;
+    for (const p of this.world.padList) if (p.area === a && this.state.pads[p.id]?.done) have += p.stars;
+    return { have, total: this.world.areaStars[a] ?? 0 };
+  }
+
+  /** Squad size: 5-a-side, 7 with the Training Ground pitch. */
+  squadSize(): number {
+    return this.state.built.seven_pitch ? BALANCE.squad.sizeSeven : BALANCE.squad.size;
   }
 
   activeTrainees(): number {
@@ -531,7 +564,7 @@ export class Sim {
     c.x += c.vx * dt;
     c.z += c.vz * dt;
     for (const r of this.obstacles) pushOutOfRect(c, B.radius, r);
-    const b = this.area.bounds;
+    const b = this.area2Open() ? this.area.expansion.bounds : this.area.bounds;
     c.x = Math.max(b.x0 + B.radius, Math.min(b.x1 - B.radius, c.x));
     c.z = Math.max(b.z0 + B.radius, Math.min(b.z1 - B.radius, c.z));
     const sp = Math.hypot(c.vx, c.vz);
@@ -629,7 +662,13 @@ export class Sim {
       if (u.id === this.area.matchPitch.objectId) s.matchNextAt = s.time;
     } else if (u.type === 'staff') {
       s.built[u.id] = true;
-      const kind: Staff['kind'] = u.id.startsWith('assistant:') ? 'assistant' : u.id === 'receptionist' || u.id === 'accountant' ? u.id : 'ball_boy';
+      const kind: Staff['kind'] = u.id.startsWith('assistant:')
+        ? 'assistant'
+        : u.id === 'receptionist' || u.id === 'accountant'
+          ? u.id
+          : u.id.startsWith('water_carrier')
+            ? 'water_carrier'
+            : 'ball_boy';
       const spot = this.area.staffSpots[u.id];
       const f: Staff = { ...makeAgent(spot?.x ?? p.pos.x, spot?.z ?? p.pos.z), id: u.id, kind, state: 'idle', carry: 0, target: null, timer: 0 };
       if (spot) f.yaw = spot.yaw;
@@ -675,6 +714,18 @@ export class Sim {
     if (r?.built && !this.state.built[r.built] && !this.state.stations[r.built]) return false;
     if (r?.staff && !this.state.staff.some((f) => f.id === r.staff)) return false;
     return true;
+  }
+
+  /**
+   * An upgrade of `cost` doesn't stall the next pad: it costs at most a share of the cheapest visible pad
+   * (a larger share while saving for an area gate). True when no pad is left.
+   */
+  upgradeFitsBudget(cost: number): boolean {
+    let next: PadDef | null = null;
+    for (const p of this.visiblePads()) if (!next || this.padRemaining(p) < this.padRemaining(next)) next = p;
+    if (!next) return true;
+    const gate = next.unlock.type === 'object' && next.unlock.id === this.area.expansion.gateObjectId;
+    return cost <= this.padRemaining(next) * (gate ? BALANCE.objectives.upgradeShareGate : BALANCE.objectives.upgradeShare);
   }
 
   /** Cheapest upgrade the player could buy right now (ignores cash), or null. */
@@ -731,11 +782,12 @@ export class Sim {
     return m;
   }
 
+  /** Index among runners of the same kind (ball boys / water carriers) for their idle spots. */
   private ballBoyIndex(f: Staff): number {
     let i = 0;
     for (const o of this.state.staff) {
       if (o === f) return i;
-      if (o.kind === 'ball_boy') i++;
+      if (o.kind === f.kind) i++;
     }
     return i;
   }
@@ -756,38 +808,57 @@ export class Sim {
     }
   }
 
-  private staffHome(i = 0): { x: number; z: number } {
-    const sp = this.area.crate.spot;
+  private staffHome(i = 0, kind: Staff['kind'] = 'ball_boy'): { x: number; z: number } {
+    const sp = kind === 'water_carrier' ? this.area.water.spot : this.area.crate.spot;
     return { x: sp.x - 1.8 + i * 3.6, z: sp.z + 0.6 };
+  }
+
+  /** Where `supply` is picked up, if that source is built. */
+  supplySource(supply: Supply): { x: number; z: number } | null {
+    if (supply === 'water') return this.state.built[this.area.water.objectId] ? this.area.water.spot : null;
+    return this.state.built.ball_crate ? this.area.crate.spot : null;
+  }
+
+  /** What the coach's stack holds (an empty stack can take either). */
+  coachCarryKind(): Supply {
+    return this.state.coach.carryKind ?? 'ball';
   }
 
   private updateCrateAndBaskets(dt: number): void {
     const s = this.state;
     const c = s.coach;
     const B = BALANCE.coach;
-    // crate → carry stack
-    const crate = this.area.crate.spot;
+    // ball crate / hydration point → carry stack (one kind at a time)
     const zr = BALANCE.crate.zoneRadius;
     const cap = this.carryCap();
-    if (s.built.ball_crate && dist2(c.x, c.z, crate.x, crate.z) <= zr * zr && c.carry < cap) {
+    let picking = false;
+    for (const kind of SUPPLIES) {
+      const src = this.supplySource(kind);
+      if (!src || dist2(c.x, c.z, src.x, src.z) > zr * zr) continue;
+      // stepping into the other source swaps the stack (balls go back in the crate, never a dead end)
+      if (c.carry > 0 && this.coachCarryKind() !== kind) c.carry = 0;
+      if (c.carry >= cap) break;
+      picking = true;
       c.pickT += dt;
       while (c.pickT >= B.pickupInterval && c.carry < cap) {
         c.pickT -= B.pickupInterval;
         c.carry++;
+        c.carryKind = kind;
         s.flags.firstPickup = true;
-        this.events.emit('ballPicked', { carry: c.carry, byStaff: false });
+        this.events.emit('ballPicked', { carry: c.carry, byStaff: false, kind });
       }
-    } else {
-      c.pickT = B.pickupInterval; // first ball is instant next time
+      break;
     }
-    // carry stack → baskets
+    if (!picking) c.pickT = B.pickupInterval; // first item is instant next time
+    // carry stack → baskets that take it
     let dropping = false;
     if (c.carry > 0) {
       const br = BALANCE.basket.zoneRadius;
+      const kind = this.coachCarryKind();
       for (const id of Object.keys(s.stations)) {
         const st = this.station(id);
         const ss = s.stations[id];
-        if (!st.basket || !ss) continue;
+        if (!st.basket || !ss || st.supply !== kind) continue;
         if (ss.balls >= st.cfg.basketCap) continue;
         if (dist2(c.x, c.z, st.basket.x, st.basket.z) > br * br) continue;
         dropping = true;
@@ -873,7 +944,9 @@ export class Sim {
       for (const o of ss.occupants) if (o) occ++;
       const load = occ + ss.queue.length;
       if (load >= ss.lanes + BALANCE.trainee.maxQueue) continue;
-      const score = (load / ss.lanes) * 10 + t.stats[st.stat] / 10 + (id === t.lastStationId ? 3 : 0);
+      const sv = st.stat === 'ALL' ? weakest(t.stats).v : t.stats[st.stat];
+      const walk = Math.hypot(st.queueStart.x - t.x, st.queueStart.z - t.z);
+      const score = (load / ss.lanes) * 10 + sv / 10 + (id === t.lastStationId ? 3 : 0) + walk * BALANCE.trainee.distWeight;
       if (score < bestScore) {
         bestScore = score;
         best = id;
@@ -965,6 +1038,8 @@ export class Sim {
       first ? { name: BALANCE.tutorial.firstTraineeName, rarity: 'rare', position: 'FW', female: false } : pro ? { rarity: pro.rarity, position: pro.position } : {},
     );
     if (pro) t.scouted = true;
+    // with the Training Ground open, careers run longer (more drills to visit)
+    if (this.area2Open()) t.gradOvr = Math.min(t.cap, t.startOvr + BALANCE.trainee.gradOvrGainArea2);
     s.flags.firstTraineeSpawned = true;
     t.seat = seat;
     t.arrivalOrder = ++s.arrivalCounter;
@@ -1092,9 +1167,11 @@ export class Sim {
     t.repT = 0;
     t.repActive = false;
     t.waitT = 0;
-    const before = t.stats[st.stat];
-    t.stats[st.stat] = Math.min(t.cap, before + cfg.statGain);
-    const gain = t.stats[st.stat] - before;
+    // the gym works on the weakest stat
+    const stat: Stat = st.stat === 'ALL' ? weakest(t.stats).k : st.stat;
+    const before = t.stats[stat];
+    t.stats[stat] = Math.min(t.cap, before + cfg.statGain);
+    const gain = t.stats[stat] - before;
     const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult') * this.upMult('st:' + t.stationId, 1));
     const p = this.pile('st:' + t.stationId);
     if (p) p.amount += cash;
@@ -1103,7 +1180,7 @@ export class Sim {
     s.stats.reps++;
     s.flags.firstRep = true;
     Meta.questProgress(s, 'reps');
-    this.events.emit('rep', { traineeId: t.id, stationId: t.stationId, stat: st.stat, gain, cash });
+    this.events.emit('rep', { traineeId: t.id, stationId: t.stationId, stat, gain, cash });
     if (t.reps < BALANCE.trainee.repsPerVisit) return;
     // visit finished: free the lane
     ss.occupants[t.lane] = 0;
@@ -1126,7 +1203,10 @@ export class Sim {
 
   /** A trainee whose trainable stats are all capped can't reach the target; let them graduate. */
   private ovrStalled(t: Trainee): boolean {
-    for (const id of Object.keys(this.state.stations)) if (t.stats[this.station(id).stat] < t.cap) return false;
+    for (const id of Object.keys(this.state.stations)) {
+      const stat = this.station(id).stat;
+      if ((stat === 'ALL' ? weakest(t.stats).v : t.stats[stat]) < t.cap) return false;
+    }
     return true;
   }
 
@@ -1260,7 +1340,7 @@ export class Sim {
     if (choice === 'sell') this.sell(t, true);
     else {
       let replaced: { name: string; price: number } | null = null;
-      if (s.squad.length >= BALANCE.squad.size) {
+      if (s.squad.length >= this.squadSize()) {
         const weakest = this.weakestSquadPlayer();
         if (weakest) replaced = { name: weakest.name, price: this.releasePlayer(weakest.id) };
       }
@@ -1405,7 +1485,7 @@ export class Sim {
   /** Creates the highlight script. The caller pauses the sim while the match plays. */
   startMatch(): MatchScript {
     this.prompt = null;
-    this.match = createMatch(this.rng, this.state.squad, this.state.league, this.cupAvailable() ? this.cupOpponent() : undefined);
+    this.match = createMatch(this.rng, this.state.squad, this.state.league, this.cupAvailable() ? this.cupOpponent() : undefined, this.squadSize());
     this.state.rng = this.rng.state;
     return this.match;
   }
@@ -1420,7 +1500,7 @@ export class Sim {
     const m = this.match;
     if (!m) return null;
     const r = finishMatch(this.rng, m, s.league, s.squad);
-    r.cash = Math.round(r.cash * this.upMult('academy_matchday', 1));
+    r.cash = Math.round(r.cash * this.upMult('academy_matchday', 1) * (s.built.seven_pitch ? BALANCE.squad.sevenCashMult : 1));
     this.match = null;
     this.addCash(r.cash);
     this.addXp(r.xp);
@@ -1473,14 +1553,14 @@ export class Sim {
 
   /** Station most in need of balls (or null). */
   /** Emptiest basket below `threshold` (fill ratio). With `self`, baskets another ball boy is already serving are skipped. */
-  neediestStation(threshold: number, self?: Staff): string | null {
+  neediestStation(threshold: number, self?: Staff, supply: Supply = 'ball'): string | null {
     const s = this.state;
     let best: string | null = null;
     let bestR = threshold;
     for (const id of Object.keys(s.stations)) {
       const ss = s.stations[id];
       const st = this.station(id);
-      if (!ss || !st.basket || st.cfg.basketCap <= 0) continue;
+      if (!ss || !st.basket || st.cfg.basketCap <= 0 || st.supply !== supply) continue;
       if (self && s.staff.some((o) => o !== self && o.target === id)) continue;
       const r = ss.balls / st.cfg.basketCap;
       if (r < bestR) {
@@ -1494,13 +1574,15 @@ export class Sim {
   private updateStaff(dt: number): void {
     const s = this.state;
     const B = BALANCE.staff.ballBoy;
-    const crate = this.area.crate.spot;
     for (const f of s.staff) {
-      if (f.kind !== 'ball_boy') continue;
+      if (f.kind !== 'ball_boy' && f.kind !== 'water_carrier') continue;
+      // ball boys run crate → ball baskets; water carriers run Hydration Point → water baskets
+      const supply: Supply = f.kind === 'water_carrier' ? 'water' : 'ball';
+      const crate = this.supplySource(supply);
       switch (f.state) {
         case 'idle': {
-          const need = this.neediestStation(B.refillBelow, f);
-          if (need && s.built.ball_crate) {
+          const need = this.neediestStation(B.refillBelow, f, supply);
+          if (need && crate) {
             if (f.carry > 0) {
               f.target = need;
               f.state = 'toBasket';
@@ -1511,7 +1593,7 @@ export class Sim {
               this.setGoal(f, crate.x - 0.6, crate.z + 0.3);
             }
           } else {
-            const h = this.staffHome(this.ballBoyIndex(f));
+            const h = this.staffHome(this.ballBoyIndex(f), f.kind);
             if (!f.goal && dist2(f.x, f.z, h.x, h.z) > 0.25) this.setGoal(f, h.x, h.z);
             this.moveAgent(f, this.ballBoySpeed(), dt);
           }
@@ -1528,10 +1610,10 @@ export class Sim {
           while (f.timer >= BALANCE.coach.pickupInterval * 1.5 && f.carry < this.ballBoyCarry()) {
             f.timer -= BALANCE.coach.pickupInterval * 1.5;
             f.carry++;
-            this.events.emit('ballPicked', { carry: f.carry, byStaff: true });
+            this.events.emit('ballPicked', { carry: f.carry, byStaff: true, kind: supply });
           }
           if (f.carry >= this.ballBoyCarry()) {
-            const need = this.neediestStation(1, f) ?? this.neediestStation(1);
+            const need = this.neediestStation(1, f, supply) ?? this.neediestStation(1, undefined, supply);
             if (need) {
               f.target = need;
               f.state = 'toBasket';
@@ -1562,7 +1644,7 @@ export class Sim {
           if (!ss || !st || f.carry === 0 || ss.balls >= st.cfg.basketCap) {
             f.target = null;
             if (f.carry > 0) {
-              const need = this.neediestStation(1, f) ?? this.neediestStation(1);
+              const need = this.neediestStation(1, f, supply) ?? this.neediestStation(1, undefined, supply);
               if (need) {
                 f.target = need;
                 f.state = 'toBasket';

@@ -11,10 +11,12 @@ export const AREA1: AreaDef = {
   id: 1,
   nameKey: 'area.1',
   bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
-  navBounds: { x0: -17.0, z0: -12.0, x1: 20.0, z1: 12.0 },
+  navBounds: { x0: -17.0, z0: -12.0, x1: 20.0, z1: 40.0 },
   walkable: [
     { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
     { x0: 16.0, z0: -0.6, x1: 20.0, z1: 1.4 },
+    // Area 2 "Training Ground" (south); the gate and the plot border are obstacles
+    { x0: -16.6, z0: 11.6, x1: 16.6, z1: 39.6 },
   ],
   spawn: { x: -6.8, z: -1.6 },
   gate: {
@@ -29,6 +31,14 @@ export const AREA1: AreaDef = {
     pile: { x: -11.4, z: -9.0 },
   },
   crate: { spot: { x: 5.5, z: 1.65 } },
+  water: { objectId: 'hydration', spot: { x: 13.8, z: 16.1 } },
+  expansion: {
+    gateObjectId: 'area2_gate',
+    plot: { x0: -17, z0: 12, x1: 17, z1: 40 },
+    bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 39.6 },
+    // construction fence across the gate until the Training Ground opens
+    lockedObstacles: [{ x0: 8.5, z0: 11.6, x1: 12.5, z1: 12.4 }],
+  },
   stations: [
     {
       id: 'shooting_goal',
@@ -97,6 +107,101 @@ export const AREA1: AreaDef = {
       queueStep: { x: 1, z: 0 },
       footprint: [],
     },
+    // ── Area 2 "Training Ground": drills fed with water bottles from the Hydration Point
+    {
+      id: 'gym',
+      kind: 'gym',
+      stat: 'ALL',
+      area: 2,
+      center: { x: -12.8, z: 16.0 },
+      rot: 0,
+      lanes: [
+        { spot: { x: -1.6, z: 0.6 }, target: { x: -1.6, z: -1.2 }, footprint: [{ x0: -2.4, z0: -1.7, x1: -0.8, z1: -0.7 }] },
+        { spot: { x: 1.4, z: 0.6 }, target: { x: 1.4, z: -1.2 }, footprint: [{ x0: 0.6, z0: -1.7, x1: 2.2, z1: -0.7 }] },
+      ],
+      basket: { x: 3.0, z: 2.0 },
+      pile: { x: -2.4, z: 2.6 },
+      queueStart: { x: 0, z: 3.0 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [],
+    },
+    {
+      id: 'rondo',
+      kind: 'rondo',
+      stat: 'PAS',
+      area: 2,
+      center: { x: -4.4, z: 16.0 },
+      rot: 0,
+      lanes: [
+        { spot: { x: -0.8, z: 0.4 }, target: { x: -2.2, z: -0.8 } },
+        { spot: { x: 0.8, z: 0.4 }, target: { x: 2.2, z: -0.8 } },
+      ],
+      basket: { x: 2.6, z: 2.2 },
+      pile: { x: -2.6, z: 2.4 },
+      queueStart: { x: 0, z: 3.4 },
+      queueStep: { x: 0, z: 1 },
+      // ring of passing mannequins (open to the south)
+      footprint: [
+        { x0: -2.6, z0: -0.9, x1: -2.1, z1: -0.4 },
+        { x0: -1.5, z0: -2.4, x1: -1.0, z1: -1.9 },
+        { x0: 1.0, z0: -2.4, x1: 1.5, z1: -1.9 },
+        { x0: 2.1, z0: -0.9, x1: 2.6, z1: -0.4 },
+      ],
+    },
+    {
+      id: 'freekick',
+      kind: 'freekick',
+      stat: 'SHO',
+      area: 2,
+      center: { x: 3.8, z: 16.0 },
+      rot: 0,
+      lanes: [
+        { spot: { x: -1.0, z: 1.4 }, target: { x: -0.8, z: -2.9 } },
+        { spot: { x: 1.0, z: 1.4 }, target: { x: 0.8, z: -2.9 } },
+      ],
+      basket: { x: 2.6, z: 2.4 },
+      pile: { x: -2.4, z: 2.6 },
+      queueStart: { x: 0, z: 3.6 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [
+        { x0: -2.0, z0: -3.6, x1: 2.0, z1: -2.7 },
+        { x0: -1.2, z0: -1.3, x1: 0.4, z1: -0.8 },
+      ],
+    },
+    {
+      id: 'agility',
+      kind: 'agility',
+      stat: 'PAC',
+      area: 2,
+      center: { x: -10.4, z: 23.2 },
+      rot: 0,
+      lanes: [
+        { spot: { x: 5.2, z: -0.55 }, target: { x: -5.0, z: -0.55 } },
+        { spot: { x: 5.2, z: 0.6 }, target: { x: -5.0, z: 0.6 } },
+      ],
+      basket: { x: 6.4, z: 1.8 },
+      pile: { x: 6.6, z: -1.8 },
+      queueStart: { x: 6.8, z: 0.0 },
+      queueStep: { x: 1, z: 0 },
+      footprint: [],
+    },
+    {
+      id: 'skills',
+      kind: 'skills',
+      stat: 'DRI',
+      area: 2,
+      center: { x: 1.6, z: 24.4 },
+      rot: 0,
+      lanes: [
+        { spot: { x: -1.2, z: 0.8 }, target: { x: -1.2, z: -1.6 } },
+        { spot: { x: 1.2, z: 0.8 }, target: { x: 1.2, z: -1.6 } },
+      ],
+      basket: { x: 3.0, z: 1.0 },
+      pile: { x: -2.8, z: 1.6 },
+      queueStart: { x: 0, z: 3.4 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [{ x0: -2.2, z0: -2.6, x1: 2.2, z1: -2.0 }],
+    },
   ],
   objects: [
     { id: 'ball_crate', kind: 'crate', area: 1, pos: { x: 5.5, z: 0.6 }, rot: 0, footprint: [{ x0: -0.5, z0: -0.5, x1: 0.5, z1: 0.5 }] },
@@ -134,6 +239,41 @@ export const AREA1: AreaDef = {
     // the Team Bus stop (matches are played away at the stadium)
     { id: 'match_pitch', kind: 'pitch', area: 1, pos: { x: 13.6, z: 1.9 }, rot: 0, footprint: [] },
     { id: 'bus_shelter', kind: 'shelter', area: 1, pos: { x: 15.0, z: -1.4 }, rot: 0, footprint: [{ x0: -0.9, z0: -0.4, x1: 0.9, z1: 0.4 }] },
+    // ── Area 2
+    { id: 'area2_gate', kind: 'gate', area: 2, pos: { x: 10.5, z: 12.0 }, rot: 0, footprint: [] },
+    { id: 'hydration', kind: 'water', area: 2, pos: { x: 13.8, z: 15.0 }, rot: 0, footprint: [{ x0: -0.75, z0: -0.45, x1: 0.75, z1: 0.4 }] },
+    {
+      id: 'physio',
+      kind: 'room',
+      area: 2,
+      pos: { x: 13.0, z: 23.6 },
+      rot: 0,
+      // room rect x 9.6…16.4, z 20.6…26.6: back wall, west wall, front stubs (door x 12.2…13.8), treatment beds
+      footprint: [
+        { x0: -3.4, z0: -3.15, x1: 3.4, z1: -2.85 },
+        { x0: -3.55, z0: -3.15, x1: -3.25, z1: 3.15 },
+        { x0: -3.55, z0: 2.85, x1: -0.8, z1: 3.15 },
+        { x0: 0.8, z0: 2.85, x1: 3.4, z1: 3.15 },
+        { x0: -2.6, z0: -2.4, x1: -0.6, z1: -1.4 },
+        { x0: 0.6, z0: -2.4, x1: 2.6, z1: -1.4 },
+      ],
+    },
+    {
+      id: 'seven_pitch',
+      kind: 'decor',
+      variant: 'seven',
+      area: 2,
+      pos: { x: 0, z: 34.2 },
+      rot: 0,
+      // fence around x −12…12, z 29…39.4 with a gate in the north side (x −1…1)
+      footprint: [
+        { x0: -12.15, z0: -5.35, x1: -1.0, z1: -5.05 },
+        { x0: 1.0, z0: -5.35, x1: 12.15, z1: -5.05 },
+        { x0: -12.15, z0: -5.35, x1: -11.85, z1: 5.35 },
+        { x0: 11.85, z0: -5.35, x1: 12.15, z1: 5.35 },
+        { x0: -12.15, z0: 5.05, x1: 12.15, z1: 5.35 },
+      ],
+    },
   ],
   pads: [
     { id: 'p_crate', area: 1, pos: { x: 5.5, z: 1.65 }, cost: 10, stars: 1, xp: 8, requires: [], unlock: { type: 'object', id: 'ball_crate' }, icon: 'ball', nameKey: 'obj.ball_crate', major: true },
@@ -160,6 +300,28 @@ export const AREA1: AreaDef = {
     { id: 'p_shelter', area: 1, pos: { x: 15.0, z: -0.4 }, cost: 220, stars: 1, xp: 10, requires: ['p_chairs2', 'p_wall'], unlock: { type: 'object', id: 'bus_shelter' }, icon: 'shelter', nameKey: 'obj.bus_shelter' },
     { id: 'p_cooler', area: 1, pos: { x: -10.4, z: -3.5 }, cost: 50, stars: 1, xp: 8, requires: ['p_flags'], unlock: { type: 'object', id: 'water_cooler' }, icon: 'cooler', nameKey: 'obj.water_cooler' },
     { id: 'p_track_l2', area: 1, pos: { x: -4.5, z: 8.9 }, cost: 320, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'lane', station: 'sprint_track' }, icon: 'lane', nameKey: 'lane.sprint_track' },
+    // ── Area 2 "Training Ground" (the gate needs every Area 1 pad; filled in below)
+    { id: 'p2_gate', area: 2, pos: { x: 10.5, z: 10.5 }, cost: 1900, stars: 3, xp: 40, requires: [], unlock: { type: 'object', id: 'area2_gate' }, icon: 'gate', nameKey: 'obj.area2_gate', major: true },
+    { id: 'p2_water', area: 2, pos: { x: 13.8, z: 16.1 }, cost: 600, stars: 2, xp: 14, requires: ['p2_gate'], unlock: { type: 'object', id: 'hydration' }, icon: 'water', nameKey: 'obj.hydration', major: true },
+    { id: 'p2_gym', area: 2, pos: { x: -9.8, z: 18.0 }, cost: 900, stars: 2, xp: 14, requires: ['p2_water'], unlock: { type: 'station', id: 'gym' }, icon: 'gym', nameKey: 'station.gym', major: true },
+    { id: 'p2_rondo', area: 2, pos: { x: -1.8, z: 18.2 }, cost: 1200, stars: 2, xp: 14, requires: ['p2_gym'], unlock: { type: 'station', id: 'rondo' }, icon: 'rondo', nameKey: 'station.rondo', major: true },
+    { id: 'p2_gym_l2', area: 2, pos: { x: -11.4, z: 18.2 }, cost: 1400, stars: 1, xp: 10, requires: ['p2_rondo'], unlock: { type: 'lane', station: 'gym' }, icon: 'lane', nameKey: 'lane.gym' },
+    { id: 'p2_carrier', area: 2, pos: { x: 12.0, z: 17.4 }, cost: 1800, stars: 2, xp: 16, requires: ['p2_rondo'], unlock: { type: 'staff', id: 'water_carrier' }, icon: 'staff', nameKey: 'staff.water_carrier', major: true },
+    { id: 'p2_fk', area: 2, pos: { x: 6.4, z: 18.4 }, cost: 2200, stars: 2, xp: 14, requires: ['p2_carrier'], unlock: { type: 'station', id: 'freekick' }, icon: 'freekick', nameKey: 'station.freekick', major: true },
+    { id: 'p2_rondo_l2', area: 2, pos: { x: -5.6, z: 18.8 }, cost: 2000, stars: 1, xp: 10, requires: ['p2_fk'], unlock: { type: 'lane', station: 'rondo' }, icon: 'lane', nameKey: 'lane.rondo' },
+    { id: 'p2_agility', area: 2, pos: { x: -4.0, z: 25.0 }, cost: 2800, stars: 2, xp: 14, requires: ['p2_fk'], unlock: { type: 'station', id: 'agility' }, icon: 'agility', nameKey: 'station.agility', major: true },
+    { id: 'p2_fk_l2', area: 2, pos: { x: 2.6, z: 18.9 }, cost: 2600, stars: 1, xp: 10, requires: ['p2_agility'], unlock: { type: 'lane', station: 'freekick' }, icon: 'lane', nameKey: 'lane.freekick' },
+    { id: 'p2_skills', area: 2, pos: { x: 4.6, z: 25.4 }, cost: 3400, stars: 2, xp: 14, requires: ['p2_agility'], unlock: { type: 'station', id: 'skills' }, icon: 'skills', nameKey: 'station.skills', major: true },
+    { id: 'p2_agility_l2', area: 2, pos: { x: -8.0, z: 25.6 }, cost: 3200, stars: 1, xp: 10, requires: ['p2_skills'], unlock: { type: 'lane', station: 'agility' }, icon: 'lane', nameKey: 'lane.agility' },
+    { id: 'p2_skills_l2', area: 2, pos: { x: 3.0, z: 27.6 }, cost: 3800, stars: 1, xp: 10, requires: ['p2_skills'], unlock: { type: 'lane', station: 'skills' }, icon: 'lane', nameKey: 'lane.skills' },
+    { id: 'p2_carrier2', area: 2, pos: { x: 15.6, z: 17.4 }, cost: 3000, stars: 1, xp: 12, requires: ['p2_skills'], unlock: { type: 'staff', id: 'water_carrier_2' }, icon: 'staff', nameKey: 'staff.water_carrier_2' },
+    { id: 'p2_physio', area: 2, pos: { x: 13.0, z: 27.6 }, cost: 4400, stars: 2, xp: 16, requires: ['p2_skills'], unlock: { type: 'object', id: 'physio' }, icon: 'physio', nameKey: 'obj.physio', major: true },
+    { id: 'p2_seven', area: 2, pos: { x: 0, z: 28.2 }, cost: 6000, stars: 3, xp: 24, requires: ['p2_physio'], unlock: { type: 'object', id: 'seven_pitch' }, icon: 'pitch', nameKey: 'obj.seven_pitch', major: true },
+    { id: 'p2_asst_gym', area: 2, pos: { x: -9.4, z: 14.4 }, cost: 4000, stars: 1, xp: 12, requires: ['p2_gym_l2', 'p2_physio'], unlock: { type: 'staff', id: 'assistant:gym' }, icon: 'whistle', nameKey: 'staff.assistant_gym' },
+    { id: 'p2_asst_rondo', area: 2, pos: { x: -7.4, z: 14.2 }, cost: 4600, stars: 1, xp: 12, requires: ['p2_rondo_l2', 'p2_asst_gym'], unlock: { type: 'staff', id: 'assistant:rondo' }, icon: 'whistle', nameKey: 'staff.assistant_rondo' },
+    { id: 'p2_asst_fk', area: 2, pos: { x: 7.0, z: 14.2 }, cost: 5200, stars: 1, xp: 12, requires: ['p2_fk_l2', 'p2_asst_rondo'], unlock: { type: 'staff', id: 'assistant:freekick' }, icon: 'whistle', nameKey: 'staff.assistant_fk' },
+    { id: 'p2_asst_agility', area: 2, pos: { x: -4.0, z: 21.4 }, cost: 5800, stars: 1, xp: 12, requires: ['p2_agility_l2', 'p2_asst_fk'], unlock: { type: 'staff', id: 'assistant:agility' }, icon: 'whistle', nameKey: 'staff.assistant_agility' },
+    { id: 'p2_asst_skills', area: 2, pos: { x: 5.6, z: 22.0 }, cost: 6400, stars: 1, xp: 12, requires: ['p2_skills_l2', 'p2_asst_agility'], unlock: { type: 'staff', id: 'assistant:skills' }, icon: 'whistle', nameKey: 'staff.assistant_skills' },
   ],
   starterPiles: [
     { id: 'starter_a', pos: { x: -4.8, z: -1.6 }, amount: 15 },
@@ -191,6 +353,11 @@ export const AREA1: AreaDef = {
     'assistant:passing_wall': { x: 15.9, z: -7.0, yaw: HALF_PI },
     'assistant:sprint_track': { x: -13.6, z: 8.8, yaw: Math.PI },
     accountant: { x: -9.0, z: 5.7, yaw: -HALF_PI },
+    'assistant:gym': { x: -9.4, z: 14.4, yaw: -HALF_PI },
+    'assistant:rondo': { x: -7.4, z: 14.2, yaw: -HALF_PI },
+    'assistant:freekick': { x: 7.0, z: 14.2, yaw: HALF_PI },
+    'assistant:agility': { x: -4.0, z: 21.4, yaw: Math.PI },
+    'assistant:skills': { x: 5.6, z: 22.0, yaw: HALF_PI },
   },
   safe: { x: -7.9, z: 5.6 },
   lockers: {
@@ -245,10 +412,15 @@ export const AREA1: AreaDef = {
     { x0: -9.2, z0: 6.45, x1: -6.85, z1: 6.75 },
     { x0: -11.25, z0: 2.6, x1: -8.75, z1: 3.5 },
     { x0: -12.85, z0: 2.7, x1: -12.2, z1: 6.4 },
-    // construction site (gym) behind fences
-    { x0: 10.4, z0: 2.6, x1: 16.2, z1: 8.55 },
+    // border between Sunday Park and the Training Ground (gate gap x 8.5…12.5; locked separately)
+    { x0: -17.0, z0: 11.6, x1: 8.5, z1: 12.4 },
+    { x0: 12.5, z0: 11.6, x1: 17.0, z1: 12.4 },
   ],
 };
+
+// The Training Ground gate opens once every Sunday Park pad is done.
+const gate = AREA1.pads.find((p) => p.id === 'p2_gate');
+if (gate) gate.requires = AREA1.pads.filter((p) => p.area === 1).map((p) => p.id);
 
 /** Prebuilt objects present from the start. */
 export const PREBUILT_OBJECTS = ['desk', 'chairs_1'];

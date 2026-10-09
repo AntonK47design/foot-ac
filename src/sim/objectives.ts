@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import type { IconId } from '../data/types';
+import type { IconId, Supply } from '../data/types';
 import { dist2 } from './geom';
 import { firstName } from './players';
 import type { Sim } from './sim';
@@ -80,11 +80,11 @@ export function computeObjective(sim: Sim): Objective | null {
     if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
-  // 3. a trainee is blocked by an empty basket and nobody else will refill it
-  const ballBoy = sim.hasStaff('ball_boy');
-  if (!ballBoy && s.built.ball_crate) {
+  // 3. a trainee is blocked by an empty basket and nobody else will refill it (balls, then water)
+  for (const supply of SUPPLIES) {
+    if (!needsCoach(sim, supply)) continue;
     let starving: string | null = null;
-    for (const t of s.trainees) if (sim.isWaitingForBalls(t) && t.stationId) starving = t.stationId;
+    for (const t of s.trainees) if (sim.isWaitingForBalls(t) && t.stationId && sim.station(t.stationId).supply === supply) starving = t.stationId;
     if (starving) return ballObjective(sim, starving);
   }
 
@@ -102,22 +102,22 @@ export function computeObjective(sim: Sim): Objective | null {
   }
 
   // 6. keep baskets topped up while nobody automates it
-  if (!ballBoy && s.built.ball_crate) {
-    const need = sim.neediestStation(0.4);
-    if (need) {
-      const ss = s.stations[need];
-      let demand = 0;
-      if (ss) {
-        for (const o of ss.occupants) if (o) demand++;
-        demand += ss.queue.length;
-      }
-      if (demand > 0 || c.carry > 0) return ballObjective(sim, need);
+  for (const supply of SUPPLIES) {
+    if (!needsCoach(sim, supply)) continue;
+    const need = sim.neediestStation(0.4, undefined, supply);
+    if (!need) continue;
+    const ss = s.stations[need];
+    let demand = 0;
+    if (ss) {
+      for (const o of ss.occupants) if (o) demand++;
+      demand += ss.queue.length;
     }
+    if (demand > 0 || (c.carry > 0 && sim.coachCarryKind() === supply)) return ballObjective(sim, need);
   }
 
   // 6b. an upgrade at the office computer (only when it doesn't stall saving up for the next pad)
   const up = sim.cheapestUpgrade();
-  if (up && s.cash + 1e-6 >= up.cost && (!cheapest || up.cost <= sim.padRemaining(cheapest) * BALANCE.objectives.upgradeShare)) {
+  if (up && s.cash + 1e-6 >= up.cost && sim.upgradeFitsBudget(up.cost)) {
     const P = area.office.computer;
     return { key: 'obj.upgrade', icon: 'podium', x: P.x, z: P.z, targetId: 'office', radius: BALANCE.transfer.zoneRadius };
   }
@@ -143,16 +143,27 @@ export function computeObjective(sim: Sim): Objective | null {
   return null;
 }
 
+const SUPPLIES: readonly Supply[] = ['ball', 'water'];
+
+/** The coach has to run this supply: its source is built and no runner (ball boy / water carrier) does it. */
+function needsCoach(sim: Sim, supply: Supply): boolean {
+  if (!sim.supplySource(supply)) return false;
+  return !sim.hasStaff(supply === 'water' ? 'water_carrier' : 'ball_boy');
+}
+
 function ballObjective(sim: Sim, stationId: string): Objective {
   const c = sim.state.coach;
-  const crate = sim.area.crate.spot;
+  const st = sim.station(stationId);
+  const supply: Supply = st.supply ?? 'ball';
+  const water = supply === 'water';
+  const src = sim.supplySource(supply) ?? sim.area.crate.spot;
   const cap = sim.carryCap();
   const zr = BALANCE.crate.zoneRadius;
-  const nearCrate = dist2(c.x, c.z, crate.x, crate.z) <= zr * zr;
-  if (c.carry >= cap || (c.carry > 0 && !nearCrate)) {
-    const st = sim.station(stationId);
+  const nearSrc = dist2(c.x, c.z, src.x, src.z) <= zr * zr;
+  const holding = c.carry > 0 && sim.coachCarryKind() === supply;
+  if ((holding && c.carry >= cap) || (holding && !nearSrc)) {
     const b = st.basket ?? st.pile;
-    return { key: 'obj.bring_balls', icon: 'ball', x: b.x, z: b.z, targetId: 'basket:' + stationId, radius: BALANCE.basket.zoneRadius };
+    return { key: water ? 'obj.bring_water' : 'obj.bring_balls', icon: water ? 'water' : 'ball', x: b.x, z: b.z, targetId: 'basket:' + stationId, radius: BALANCE.basket.zoneRadius };
   }
-  return { key: 'obj.grab_balls', icon: 'ball', x: crate.x, z: crate.z, targetId: 'crate', radius: BALANCE.crate.zoneRadius };
+  return { key: water ? 'obj.grab_water' : 'obj.grab_balls', icon: water ? 'water' : 'ball', x: src.x, z: src.z, targetId: water ? 'water' : 'crate', radius: BALANCE.crate.zoneRadius };
 }

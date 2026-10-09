@@ -20,7 +20,9 @@ export type Position = 'GK' | 'DF' | 'MF' | 'FW';
 export type Rarity = 'common' | 'rare' | 'epic' | 'wonderkid';
 export const RARITIES: readonly Rarity[] = ['common', 'rare', 'epic', 'wonderkid'];
 
-export type StationKind = 'shoot' | 'dribble' | 'pass' | 'sprint';
+export type StationKind = 'shoot' | 'dribble' | 'pass' | 'sprint' | 'gym' | 'rondo' | 'freekick' | 'agility' | 'skills';
+/** What a station's basket holds (Area 1 drills: balls; Training Ground drills: water bottles). */
+export type Supply = 'ball' | 'water';
 
 export interface LaneDef {
   /** Where the trainee stands to start a rep (local). */
@@ -34,7 +36,8 @@ export interface LaneDef {
 export interface StationDef {
   id: string;
   kind: StationKind;
-  stat: Stat;
+  /** Trained stat; 'ALL' (gym) raises the trainee's weakest stat each rep. */
+  stat: Stat | 'ALL';
   area: number;
   center: V2;
   rot: Rot;
@@ -46,7 +49,7 @@ export interface StationDef {
   footprint: Rect[];
 }
 
-export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter' | 'pitch';
+export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter' | 'pitch' | 'gate' | 'water' | 'room';
 
 export interface ObjectDef {
   id: string;
@@ -69,7 +72,32 @@ export type Unlock =
   | { type: 'object'; id: string }
   | { type: 'staff'; id: string };
 
-export type IconId = 'ball' | 'goal' | 'cones' | 'wall' | 'track' | 'chair' | 'staff' | 'bench' | 'flag' | 'shelter' | 'cooler' | 'lane' | 'pitch' | 'podium' | 'whistle' | 'sign' | 'cash';
+export type IconId =
+  | 'ball'
+  | 'goal'
+  | 'cones'
+  | 'wall'
+  | 'track'
+  | 'chair'
+  | 'staff'
+  | 'bench'
+  | 'flag'
+  | 'shelter'
+  | 'cooler'
+  | 'lane'
+  | 'pitch'
+  | 'podium'
+  | 'whistle'
+  | 'sign'
+  | 'cash'
+  | 'gate'
+  | 'water'
+  | 'gym'
+  | 'rondo'
+  | 'freekick'
+  | 'agility'
+  | 'skills'
+  | 'physio';
 
 export interface PadDef {
   id: string;
@@ -103,6 +131,13 @@ export interface AreaDef {
   gate: { busStop: V2; door: V2; inside: V2; exit: V2 };
   desk: { coachSpot: V2; traineeSpot: V2; pile: V2 };
   crate: { spot: V2 };
+  /** Training Ground Hydration Point: where water bottles are picked up. */
+  water: { objectId: string; spot: V2 };
+  /**
+   * Area 2 "Training Ground": a second plot south of Area 1, opened by the gate pad. Until then `lockedObstacles`
+   * (construction fence) keep everyone out; afterwards the coach may roam `bounds` (both plots).
+   */
+  expansion: { gateObjectId: string; plot: Rect; bounds: Rect; lockedObstacles: Rect[] };
   stations: StationDef[];
   objects: ObjectDef[];
   pads: PadDef[];

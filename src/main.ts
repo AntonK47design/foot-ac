@@ -240,7 +240,7 @@ async function boot(): Promise<void> {
     const sq = sim.state.squad;
     const rows = sq.map((p) => ({ id: p.id, card: card(p), value: sim.transferValue(p), apps: p.apps, goals: p.goals }));
     const strength = sq.length ? sq.reduce((a, p) => a + computeOvr(p.position, p.stats), 0) / sq.length : 0;
-    squadPanel.open(rows, BALANCE.squad.size, strength, (id) => {
+    squadPanel.open(rows, sim.squadSize(), strength, (id) => {
       sim.releasePlayer(id);
       openSquad();
     });
@@ -292,7 +292,7 @@ async function boot(): Promise<void> {
   };
   const officeData = (): OfficeData => {
     const g = sim.podiumGraduate();
-    const full = sim.state.squad.length >= BALANCE.squad.size;
+    const full = sim.state.squad.length >= sim.squadSize();
     const w = full ? sim.weakestSquadPlayer() : undefined;
     const rows: UpgradeRow[] = UPGRADES.map((u) => ({
       id: u.id,
@@ -316,7 +316,7 @@ async function boot(): Promise<void> {
             price: sim.transferValue(g),
             buyer: sim.buyerFor(g.id),
             squadCount: sim.state.squad.length,
-            squadSize: BALANCE.squad.size,
+            squadSize: sim.squadSize(),
             replaces: w ? { name: w.name, ovr: computeOvr(w.position, w.stats), price: sim.transferValue(w) } : null,
           }
         : null,
@@ -560,7 +560,7 @@ async function boot(): Promise<void> {
         !st.meta.accountPrompted &&
         blockers.size === 0 &&
         saves.stats.playSec >= BALANCE.meta.accountPrompt.minPlaySec &&
-        st.stars >= sim.world.totalStars * BALANCE.meta.accountPrompt.starShare &&
+        st.stars >= (sim.world.areaStars[1] ?? 0) * BALANCE.meta.accountPrompt.starShare &&
         platform.isAccountAvailable()
       ) {
         st.meta.accountPrompted = true;
@@ -666,7 +666,8 @@ async function boot(): Promise<void> {
         platform.record('fps cap 30');
       }
       hud.setCash(sim.state.cash);
-      hud.setStars(sim.state.stars, sim.world.totalStars);
+      const as = sim.areaStars();
+      hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
       hud.setSideButtons(sim.state.squad.length > 0 || sim.state.records.promoted > 0, !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
