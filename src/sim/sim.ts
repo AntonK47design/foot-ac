@@ -205,8 +205,8 @@ export class Sim {
       t.x = t.px = p.x;
       t.z = t.pz = p.z;
     }
-    const h = this.staffHome();
     for (const f of s.staff) {
+      const h = this.staffHome(s.staff.indexOf(f));
       f.x = f.px = h.x;
       f.z = f.pz = h.z;
       f.goal = null;
@@ -565,9 +565,9 @@ export class Sim {
     this.refreshObjective();
   }
 
-  private staffHome(): { x: number; z: number } {
+  private staffHome(i = 0): { x: number; z: number } {
     const sp = this.area.crate.spot;
-    return { x: sp.x - 1.8, z: sp.z + 0.6 };
+    return { x: sp.x - 1.8 + i * 3.6, z: sp.z + 0.6 };
   }
 
   private updateCrateAndBaskets(dt: number): void {
@@ -957,7 +957,8 @@ export class Sim {
   // ───────────────────────────── staff ─────────────────────────────
 
   /** Station most in need of balls (or null). */
-  neediestStation(threshold: number): string | null {
+  /** Emptiest basket below `threshold` (fill ratio). With `self`, baskets another ball boy is already serving are skipped. */
+  neediestStation(threshold: number, self?: Staff): string | null {
     const s = this.state;
     let best: string | null = null;
     let bestR = threshold;
@@ -965,6 +966,7 @@ export class Sim {
       const ss = s.stations[id];
       const st = this.station(id);
       if (!ss || !st.basket || st.cfg.basketCap <= 0) continue;
+      if (self && s.staff.some((o) => o !== self && o.target === id)) continue;
       const r = ss.balls / st.cfg.basketCap;
       if (r < bestR) {
         bestR = r;
@@ -982,7 +984,7 @@ export class Sim {
       if (f.kind !== 'ball_boy') continue;
       switch (f.state) {
         case 'idle': {
-          const need = this.neediestStation(B.refillBelow);
+          const need = this.neediestStation(B.refillBelow, f);
           if (need && s.built.ball_crate) {
             if (f.carry > 0) {
               f.target = need;
@@ -994,7 +996,7 @@ export class Sim {
               this.setGoal(f, crate.x - 0.6, crate.z + 0.3);
             }
           } else {
-            const h = this.staffHome();
+            const h = this.staffHome(s.staff.indexOf(f));
             if (!f.goal && dist2(f.x, f.z, h.x, h.z) > 0.25) this.setGoal(f, h.x, h.z);
             this.moveAgent(f, B.speed, dt);
           }
@@ -1014,7 +1016,7 @@ export class Sim {
             this.events.emit('ballPicked', { carry: f.carry, byStaff: true });
           }
           if (f.carry >= B.carryCap) {
-            const need = this.neediestStation(1) ?? null;
+            const need = this.neediestStation(1, f) ?? this.neediestStation(1);
             if (need) {
               f.target = need;
               f.state = 'toBasket';
@@ -1045,7 +1047,7 @@ export class Sim {
           if (!ss || !st || f.carry === 0 || ss.balls >= st.cfg.basketCap) {
             f.target = null;
             if (f.carry > 0) {
-              const need = this.neediestStation(1);
+              const need = this.neediestStation(1, f) ?? this.neediestStation(1);
               if (need) {
                 f.target = need;
                 f.state = 'toBasket';

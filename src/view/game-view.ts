@@ -586,7 +586,7 @@ export class GameView {
     for (const f of s.staff) {
       const fx = f.px + (f.x - f.px) * alpha;
       const fz = f.pz + (f.z - f.pz) * alpha;
-      const a = this.actorNamed('staff:' + f.id, 'male-b', KITS.staff, ADULT_SCALE, fx, fz);
+      const a = this.actorNamed('staff:' + f.id, f.id === 'ball_boy' ? 'male-b' : 'female-b', KITS.staff, ADULT_SCALE, fx, fz);
       a.seen = frameId;
       a.yaw = lerpAngle(a.yaw, f.yaw, 1 - Math.exp(-dt * 12));
       a.c.root.position.set(fx, 0, fz);

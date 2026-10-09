@@ -29,6 +29,7 @@
   "lane.passing_wall": "Passing Lane 2",
   "lane.sprint_track": "Sprint Lane 2",
   "staff.ball_boy": "Ball Boy",
+  "staff.ball_boy_2": "2nd Ball Boy",
   "pad.hire": "Hire {name}",
   "hint.desktop": "WASD or hold mouse",
   "hint.touch": "Drag to move",

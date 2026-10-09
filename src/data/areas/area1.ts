@@ -142,6 +142,7 @@ export const AREA1: AreaDef = {
     { id: 'p_wall', area: 1, pos: { x: 15.0, z: -4.4 }, cost: 50, stars: 2, xp: 12, requires: ['p_cones'], unlock: { type: 'station', id: 'passing_wall' }, icon: 'wall', nameKey: 'station.passing_wall', major: true },
     { id: 'p_cones_l2', area: 1, pos: { x: 7.3, z: -4.6 }, cost: 55, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'lane', station: 'dribble_cones' }, icon: 'lane', nameKey: 'lane.dribble_cones' },
     { id: 'p_ballboy', area: 1, pos: { x: 3.4, z: 1.6 }, cost: 165, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
+    { id: 'p_ballboy2', area: 1, pos: { x: 7.1, z: 2.2 }, cost: 150, stars: 1, xp: 10, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'ball_boy_2' }, icon: 'staff', nameKey: 'staff.ball_boy_2' },
     { id: 'p_bench', area: 1, pos: { x: 3.4, z: -0.1 }, cost: 45, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'object', id: 'bench' }, icon: 'bench', nameKey: 'obj.bench' },
     { id: 'p_sprint', area: 1, pos: { x: 2.9, z: 10.45 }, cost: 140, stars: 2, xp: 12, requires: ['p_ballboy'], unlock: { type: 'station', id: 'sprint_track' }, icon: 'track', nameKey: 'station.sprint_track', major: true },
     { id: 'p_flags', area: 1, pos: { x: 5.9, z: 9.8 }, cost: 75, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'object', id: 'flags' }, icon: 'flag', nameKey: 'obj.flags' },

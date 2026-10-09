@@ -99,6 +99,33 @@ describe('sim basics', () => {
     expect(sim.pile('st:shooting_goal')!.amount).toBeGreaterThan(0);
   });
 
+  it('two ball boys split the baskets and keep stations supplied', () => {
+    const sim = new Sim(createInitialState(undefined, 3));
+    const s = sim.state;
+    const order = ['p_crate', 'p_goal', 'p_cones', 'p_bench', 'p_wall', 'p_cones_l2', 'p_ballboy', 'p_ballboy2'];
+    for (const id of order) {
+      const pad = sim.world.pads.get(id)!;
+      s.cash += pad.cost;
+      for (let i = 0; i < 4 * 60 && !s.pads[id]?.done; i++) {
+        s.coach.x = s.coach.px = pad.pos.x;
+        s.coach.z = s.coach.pz = pad.pos.z;
+        sim.tick(DT);
+      }
+      expect(s.pads[id]?.done).toBe(true);
+    }
+    expect(s.staff.length).toBe(2);
+    s.coach.x = s.coach.px = s.coach.z = s.coach.pz = 0;
+    for (const id of Object.keys(s.stations)) s.stations[id]!.balls = 0;
+    let sameTarget = 0;
+    for (let i = 0; i < 40 * 60; i++) {
+      sim.tick(DT);
+      const [a, b] = s.staff;
+      if (a!.target && a!.target === b!.target) sameTarget++;
+    }
+    expect(sameTarget).toBe(0);
+    for (const id of Object.keys(s.stations)) expect(s.stations[id]!.balls).toBeGreaterThan(0);
+  });
+
   it('never soft-locks under random input for 20 minutes', () => {
     const sim = new Sim(createInitialState(undefined, 3));
     const rng = new Rng(77);
