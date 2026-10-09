@@ -5,12 +5,12 @@ import { PALETTE } from '../palette';
 
 const HALF_PI = Math.PI / 2;
 
-/** Yellow academy bus (faces +z, i.e. drives south). */
-export function buildBus(mat: Material): Group {
+/** Bus (faces +z, i.e. drives south). Yellow city bus by default; the team bus is academy blue. */
+export function buildBus(mat: Material, body: number = PALETTE.yellow, stripe: number = PALETTE.blue): Group {
   const root = new Group();
   const b = new Batch();
-  b.at(G.rbox(0.18, 3), PALETTE.yellow, 0, 1.35, 0, 0, 2.5, 2.1, 6.4);
-  b.at(G.rbox(0.1), PALETTE.blue, 0, 0.95, 0, 0, 2.54, 0.35, 6.3);
+  b.at(G.rbox(0.18, 3), body, 0, 1.35, 0, 0, 2.5, 2.1, 6.4);
+  b.at(G.rbox(0.1), stripe, 0, 0.95, 0, 0, 2.54, 0.35, 6.3);
   for (let i = 0; i < 4; i++) {
     b.at(G.rbox(0.06), 0x2a3d6a, -1.26, 1.75, -2.1 + i * 1.35, 0, 0.04, 0.7, 1.05);
     b.at(G.rbox(0.06), 0x2a3d6a, 1.26, 1.75, -2.1 + i * 1.35, 0, 0.04, 0.7, 1.05);

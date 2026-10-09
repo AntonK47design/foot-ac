@@ -261,6 +261,7 @@ async function boot(): Promise<void> {
         const r = sim.finishCurrentMatch();
         sim.state.flags.firstMatchPlayed = true;
         const release = (): void => {
+          view.endTrip();
           blockers.delete('match');
           refreshPause();
           updateHint();

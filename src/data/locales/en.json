@@ -84,8 +84,8 @@
   },
   "pad.unlock": "Unlock",
   "obj.podium": "Decide on {name}",
-  "obj.kickoff": "Kick off!",
-  "obj.match_pitch": "Match Pitch",
+  "obj.kickoff": "Board the team bus!",
+  "obj.match_pitch": "Team Bus",
   "obj.podium_name": "Graduation Podium",
   "team.us": "Wonderkids",
   "hud.squad": "Squad",
@@ -149,6 +149,9 @@
   "match.goal": "GOAL!",
   "match.saved": "SAVED!",
   "match.wide": "WIDE!",
-  "match.kickoff": "Kick off!",
-  "match.next_in": "Next match {time}"
+  "match.kickoff": "Away match!",
+  "match.next_in": "Next away match {time}",
+  "match.travel_out": "Off to {place}…",
+  "match.travel_home": "Heading home…",
+  "stadium.name": "Sunday Park Stadium"
 }

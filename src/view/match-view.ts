@@ -1,6 +1,6 @@
-import type { Scene } from 'three';
+import type { Object3D, Scene } from 'three';
 import { t } from '../core/i18n';
-import type { Rect } from '../data/types';
+import type { Rect, V2 } from '../data/types';
 import type { Chance, MatchPlayer, MatchScript } from '../sim/match';
 import type { MatchUi } from '../ui/match-ui';
 import type { LabelLayer } from '../ui/labels';
@@ -29,7 +29,17 @@ interface Body {
   oneShot: number;
 }
 
-type Phase = 'intro' | 'setup' | 'build' | 'pass' | 'aim' | 'shot' | 'react' | 'end' | 'done';
+type Phase = 'depart' | 'travel' | 'arrive' | 'intro' | 'setup' | 'build' | 'pass' | 'aim' | 'shot' | 'react' | 'end' | 'results' | 'return' | 'done';
+
+/** Team bus trip: where it parks at the academy and where it stops at the stadium. */
+export interface Trip {
+  bus: Object3D;
+  park: V2;
+  stop: V2;
+  place: string;
+  /** Camera back on the coach after the trip. */
+  home(): void;
+}
 
 export interface MatchHooks {
   /** Resolves chance i with Power Shot quality q (0..1); returns goal. */
@@ -72,7 +82,17 @@ export class MatchDirector {
     private readonly rect: Rect,
     private readonly goalW: number,
     private readonly ripple: (east: boolean) => void,
+    private readonly trip: Trip,
   ) {}
+
+  /** Pitch scale relative to the 13 × 5.2 m layout the choreography was designed on. */
+  private get sx(): number {
+    return (this.rect.x1 - this.rect.x0) / 13;
+  }
+
+  private get sz(): number {
+    return (this.rect.z1 - this.rect.z0) / 5.2;
+  }
 
   private get cx(): number {
     return (this.rect.x0 + this.rect.x1) / 2;
@@ -93,21 +113,25 @@ export class MatchDirector {
     const oppKit: Kit = { shirt: script.opponent.shirt, shorts: script.opponent.shorts, socks: script.opponent.shirt, trim: 0xffffff };
     this.ours = script.lineup.map((p, i) => this.body(p, KITS.academy, i));
     this.theirs = [0, 1, 2, 3, 4].map((i) => this.body(null, oppKit, i + 31 * (script.opponent.id.length + 1)));
-    this.formation();
-    for (const b of [...this.ours, ...this.theirs]) {
-      b.x = b.tx;
-      b.z = b.tz;
-    }
-    // landscape frames the whole pitch; portrait zooms in and follows the ball
+    for (const b of [...this.ours, ...this.theirs]) b.c.root.visible = false;
     this.portrait = this.rig.aspect < 1;
-    const w = this.portrait ? 10 : this.rect.x1 - this.rect.x0 + 3;
-    this.rig.setHold({ x: this.cx, z: this.cz + (this.portrait ? -0.6 : 0.6), w });
     this.ui.show(skippable);
     this.ui.onSkip = () => this.skip();
     this.updateScore();
-    this.ui.flash(t('match.kickoff_vs', { team: script.opponent.name }), 'info');
-    this.audio.play('whistle');
-    this.setPhase('intro');
+    // the team bus pulls out of the academy street…
+    const T = this.trip;
+    T.bus.position.set(T.park.x, -0.3, T.park.z);
+    T.bus.rotation.y = 0;
+    T.bus.visible = true;
+    this.rig.setHold({ x: T.park.x - 2, z: T.park.z, w: this.portrait ? 11 : 17 });
+    this.audio.play('honk');
+    this.setPhase('depart');
+  }
+
+  /** Match framing: landscape shows the whole pitch; portrait zooms in and follows the ball. */
+  private holdPitch(): void {
+    const w = this.portrait ? 10 : this.rect.x1 - this.rect.x0 + 3;
+    this.rig.setHold({ x: this.cx, z: this.cz + (this.portrait ? -0.6 : 0.6), w });
   }
 
   private body(p: MatchPlayer | null, kit: Kit, seed: number): Body {
@@ -123,14 +147,14 @@ export class MatchDirector {
 
   /** Kick-off positions: we defend west (x0) and attack east. */
   private formation(): void {
-    const { cx, cz } = this;
+    const { cx, cz, sx, sz } = this;
     const r = this.rect;
     const ours: Array<[number, number]> = [
       [r.x0 + 0.5, cz],
-      [cx - 3.6, cz - 1.6],
-      [cx - 3.6, cz + 1.6],
-      [cx - 1.2, cz - 1.5],
-      [cx - 1.2, cz + 1.5],
+      [cx - 3.6 * sx, cz - 1.6 * sz],
+      [cx - 3.6 * sx, cz + 1.6 * sz],
+      [cx - 1.2 * sx, cz - 1.5 * sz],
+      [cx - 1.2 * sx, cz + 1.5 * sz],
     ];
     ours.forEach(([x, z], i) => this.target(this.ours[i], x, z));
     ours.forEach(([x, z], i) => this.target(this.theirs[i], 2 * cx - x, z));
@@ -180,14 +204,26 @@ export class MatchDirector {
 
   skip(): void {
     if (!this.script || !this.hooks) return;
+    if (this.phase === 'depart' || this.phase === 'travel' || this.phase === 'arrive') this.arriveNow();
     for (let i = this.idx; i < this.script.chances.length; i++) this.hooks.resolve(i, 0.5);
     this.finish();
   }
 
+  /** Match over (played or skipped): results are shown while the team celebrates at the stadium. */
   private finish(): void {
     const hooks = this.hooks;
-    this.cleanup();
+    this.hooks = null;
+    this.timeScale = 1;
+    this.ui.hide();
+    this.setPhase('results');
     hooks?.done();
+  }
+
+  /** After the results: the bus takes everyone home. */
+  goHome(): void {
+    if (!this.active) return;
+    this.ui.fade(t('match.travel_home'), 1200);
+    this.setPhase('return');
   }
 
   private cleanup(): void {
@@ -199,7 +235,39 @@ export class MatchDirector {
     this.script = null;
     this.hooks = null;
     this.ui.hide();
+    const T = this.trip;
+    T.bus.position.set(T.park.x, -0.3, T.park.z);
+    T.bus.rotation.y = 0;
     this.rig.setHold(null);
+    T.home();
+  }
+
+  /** The bus is at the stadium: the teams run out from the door (north side of the bus) to their kick-off spots. */
+  private arriveNow(): void {
+    const T = this.trip;
+    T.bus.rotation.y = -Math.PI / 2;
+    T.bus.position.set(T.stop.x, -0.3, T.stop.z);
+    const door = { x: T.stop.x - 1.9, z: T.stop.z - 1.6 };
+    this.formation();
+    [...this.ours, ...this.theirs].forEach((b, i) => {
+      b.c.root.visible = true;
+      // ours from the bus, theirs already warming up on the pitch
+      if (i < this.ours.length) {
+        b.x = door.x + (i % 3) * 0.5;
+        b.z = door.z - Math.floor(i / 3) * 0.5;
+      } else {
+        b.x = b.tx;
+        b.z = b.tz;
+      }
+    });
+    this.ball.x = this.cx;
+    this.ball.z = this.cz;
+    this.ball.y = 0.15;
+    this.ball.k = 1;
+    this.holdPitch();
+    this.ui.flash(t('match.kickoff_vs', { team: this.script?.opponent.name ?? '' }), 'info');
+    this.audio.play('whistle');
+    this.setPhase('intro');
   }
 
   private updateScore(): void {
@@ -209,17 +277,54 @@ export class MatchDirector {
   }
 
   update(realDt: number, ballAt: BallAt): void {
-    if (!this.active || !this.script) return;
+    if (!this.active) return;
     this.ui.update(realDt);
     const dt = realDt * this.timeScale;
     this.time += dt;
     this.phaseT += dt;
+    const T = this.trip;
+    // ── trip phases (no script needed)
+    switch (this.phase) {
+      case 'depart': {
+        const k = Math.min(1, this.phaseT / 2.0);
+        T.bus.position.z = T.park.z + 16 * k * k;
+        this.rig.moveHold(T.park.x - 2, T.bus.position.z - 1);
+        if (this.enter()) window.setTimeout(() => this.active && this.ui.fade(t('match.travel_out', { place: T.place }), 1500), 1300);
+        if (this.phaseT > 2.0) this.setPhase('travel');
+        return;
+      }
+      case 'travel':
+        // the screen is dark: jump to the stadium road
+        if (this.enter()) {
+          T.bus.rotation.y = -Math.PI / 2;
+          T.bus.position.set(T.stop.x + 16, -0.3, T.stop.z);
+          // frame the road and the near touchline: the bus pulls up, then the camera eases onto the pitch
+          const fz = T.stop.z - 3.5;
+          this.rig.setHold({ x: T.stop.x, z: fz, w: this.portrait ? 12 : 18 });
+          this.rig.snap(T.stop.x, fz);
+        }
+        if (this.phaseT > 0.5) this.setPhase('arrive');
+        return;
+      case 'arrive': {
+        const k = Math.min(1, this.phaseT / 1.8);
+        T.bus.position.x = T.stop.x + 16 * (1 - k) * (1 - k);
+        if (k >= 1) this.arriveNow();
+        return;
+      }
+      case 'results':
+        this.moveBodies(dt);
+        return;
+      case 'return':
+        if (this.phaseT > 0.6) this.cleanup();
+        return;
+    }
+    if (!this.script) return;
     const c = this.chance();
     const { cx, cz } = this;
     const r = this.rect;
     switch (this.phase) {
       case 'intro':
-        if (this.phaseT > 1.4) {
+        if (this.phaseT > 2.2) {
           this.ui.clearBanner();
           this.setPhase('setup');
         }
@@ -251,16 +356,17 @@ export class MatchDirector {
         const passer = att[c.passer];
         const shooter = att[c.shooter];
         if (this.enter()) {
-          if (passer) this.target(passer, cx + dir * 1.2, cz + side * 1.8);
-          if (shooter) this.target(shooter, cx + dir * (r.x1 - r.x0) * 0.3, cz - side * 0.7);
+          const { sx, sz } = this;
+          if (passer) this.target(passer, cx + dir * 1.2 * sx, cz + side * 1.8 * sz);
+          if (shooter) this.target(shooter, cx + dir * (r.x1 - r.x0) * 0.3, cz - side * 0.7 * sz);
           // the other attackers support wide, defenders mark the shooter and press the passer, the keeper covers
           att.forEach((b, i) => {
-            if (i > 0 && b !== passer && b !== shooter) this.target(b, cx + dir * (i % 2 ? 0.2 : -1.0), cz - side * (i % 2 ? 1.9 : -0.2));
+            if (i > 0 && b !== passer && b !== shooter) this.target(b, cx + dir * (i % 2 ? 0.2 : -1.0) * sx, cz - side * (i % 2 ? 1.9 : -0.2) * sz);
           });
-          this.target(def[1], cx + dir * ((r.x1 - r.x0) * 0.3 + 0.9), cz - side * 0.2);
-          this.target(def[2], cx + dir * 2.2, cz + side * 1.9);
-          this.target(def[3], cx - dir * 0.6, cz - side * 1.9);
-          this.target(def[4], cx + dir * 0.4, cz + side * 0.6);
+          this.target(def[1], cx + dir * ((r.x1 - r.x0) * 0.3 + 0.9), cz - side * 0.2 * sz);
+          this.target(def[2], cx + dir * 2.2 * sx, cz + side * 1.9 * sz);
+          this.target(def[3], cx - dir * 0.6 * sx, cz - side * 1.9 * sz);
+          this.target(def[4], cx + dir * 0.4 * sx, cz + side * 0.6 * sz);
         }
         if (passer) {
           this.ball.x = passer.x + dir * 0.35;

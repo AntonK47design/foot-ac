@@ -21,6 +21,7 @@ export class MatchUi {
   private readonly needle: HTMLDivElement;
   private readonly zone: HTMLDivElement;
   private readonly skipBtn: HTMLButtonElement;
+  private readonly fadeEl: HTMLDivElement;
   private meterCb: ((q: number) => void) | null = null;
   private meterT = 0;
   private zoneCenter = 0.5;
@@ -38,6 +39,7 @@ export class MatchUi {
     this.needle = el('div', 'm-needle', bar);
     el('div', 'm-meter-hint', this.meter, t('match.power_hint'));
     this.skipBtn = el('button', 'm-skip hidden', this.root, t('match.skip'));
+    this.fadeEl = el('div', 'm-fade hidden', parent);
     this.skipBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.onSkip?.();
@@ -53,6 +55,16 @@ export class MatchUi {
       e.preventDefault();
       this.hit();
     });
+  }
+
+  /** Full-screen travel card (fades in, holds, fades out over `ms`). */
+  fade(text: string, ms: number): void {
+    this.fadeEl.innerHTML = `<div class="m-fade-card"><span class="m-fade-bus">🚌</span><b>${text}</b></div>`;
+    this.fadeEl.style.animationDuration = `${ms}ms`;
+    this.fadeEl.classList.remove('hidden', 'run');
+    void this.fadeEl.offsetWidth;
+    this.fadeEl.classList.add('run');
+    window.setTimeout(() => this.fadeEl.classList.add('hidden'), ms);
   }
 
   show(skippable: boolean): void {

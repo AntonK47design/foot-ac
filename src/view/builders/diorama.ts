@@ -35,6 +35,11 @@ const COL = {
   curbSide: 0xb7a88a,
   plotSide: 0x5a4c66,
   line: 0xffffff,
+  seatBlue: 0x2f6bff,
+  seatYellow: 0xffd23f,
+  concrete: 0xd9d1c4,
+  concreteDark: 0xb7ad9c,
+  wallOut: 0xe6e0d4,
 };
 
 export interface Diorama {
@@ -243,7 +248,7 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
 
   // ── street east (lower level) with the bus stop
-  const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.2, z1: P.z1 };
+  const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.8, z1: P.z1 };
   root.add(floor('asphalt', street, -0.3, 2));
   // base block top sits 4 cm under the asphalt (coplanar faces z-fight and flicker)
   b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.79, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
@@ -368,12 +373,15 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     [-4.5, -3.0],
     [-4.5, -4.4],
     [-16.0, 7.6],
+    [3.0, 7.2],
   ] as Array<[number, number]>) {
     kit.place(x, z).planter();
     aoBlobs.push({ x, z, r: 0.55 });
   }
   kit.place(9.4, 0.6).bin();
-  aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 });
+  props.put('bench', 0.6, 7.0, 0, 5);
+  kit.place(-1.6, 7.3).bin();
+  aoBlobs.push({ x: 9.4, z: 0.6, r: 0.35 }, { x: -1.6, z: 7.3, r: 0.35 });
   // graduation podium (prebuilt): faces the plaza
   const pod = AREA1.podium.pos;
   kit.place(pod.x, pod.z).podium();
@@ -477,65 +485,11 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       kit.place(at.x, at.z).dugout(1.8);
       break;
     case 'match_pitch': {
-      const mp = AREA1.matchPitch;
-      const r = mp.rect;
-      const turf = floor('turf', r, 0.012, 2);
-      const tt = (turf.material as MeshLambertMaterial).map;
-      if (tt) tt.repeat.set((r.x1 - r.x0) / 3, 1);
-      c.extra.push(turf);
-      const lw = 0.1;
-      const ly = 0.02;
-      const cx = (r.x0 + r.x1) / 2;
-      const cz = (r.z0 + r.z1) / 2;
-      b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z0));
-      b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z1));
-      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x0, ly, cz));
-      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x1, ly, cz));
-      b.add(flat(lw, r.z1 - r.z0), COL.line, trs(cx, ly, cz));
-      const seg = 20;
-      const rad = 1.1;
-      for (let i = 0; i < seg; i++) {
-        const a = ((i + 0.5) / seg) * Math.PI * 2;
-        b.add(flat(lw, (2 * Math.PI * rad) / seg + 0.02), COL.line, trs(cx + Math.cos(a) * rad, ly, cz + Math.sin(a) * rad, -a));
-      }
-      // goal boxes
-      for (const [gx, dir] of [
-        [r.x0, 1],
-        [r.x1, -1],
-      ] as Array<[number, number]>) {
-        b.add(flat(lw, 3.2), COL.line, trs(gx + dir * 1.2, ly, cz));
-        b.add(flat(1.2, lw), COL.line, trs(gx + dir * 0.6, ly, cz - 1.6));
-        b.add(flat(1.2, lw), COL.line, trs(gx + dir * 0.6, ly, cz + 1.6));
-        // goal on the line, net behind (outside the pitch)
-        const gw = mp.goalW;
-        const gh = 1.2;
-        const gd = 0.8;
-        kit.place(gx, cz, dir > 0 ? HALF_PI : -HALF_PI).goal(gw, gh, gd);
-        const nm = netMaterial();
-        const back = new Mesh(new PlaneGeometry(gw, gh, 8, 4), nm);
-        back.position.set(gx - dir * gd, gh / 2, cz);
-        back.rotation.y = HALF_PI;
-        c.nets.push(back);
-        c.extra.push(back);
-        for (const sz of [-1, 1]) {
-          const side = new Mesh(new PlaneGeometry(gd, gh), nm);
-          side.position.set(gx - (dir * gd) / 2, gh / 2, cz + (sz * gw) / 2);
-          c.extra.push(side);
-        }
-        const top = new Mesh(new PlaneGeometry(gd, gw), nm);
-        top.rotation.x = -HALF_PI;
-        top.position.set(gx - (dir * gd) / 2, gh, cz);
-        c.extra.push(top);
-      }
-      for (const [x, z] of [
-        [r.x0, r.z0],
-        [r.x1, r.z0],
-        [r.x0, r.z1],
-        [r.x1, r.z1],
-      ] as Array<[number, number]>)
-        kit.place(0, 0).cornerFlag(x, z);
-      // kick-off spot marker (big centre spot)
-      b.add(flat(0.3, 0.3), COL.line, trs(cx, ly + 0.002, cz, Math.PI / 4));
+      // Team Bus stop by the gate: matches are played away at the stadium
+      const K = AREA1.matchPitch.kickoff;
+      kit.place(K.x + 1.4, K.z - 0.3, 0).busStopSign();
+      kit.place(K.x - 1.2, K.z + 0.35, 0).bench(1.8);
+      aoBlobs.push({ x: K.x - 1.2, z: K.z + 0.35, r: 0.8 });
       break;
     }
     case 'shooting_goal': {
@@ -598,6 +552,163 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       break;
     }
   }
+  return finalize(c, mat);
+}
+
+/** Pitch surface, lines, goals with nets and corner flags (stadium). */
+function pitchMarkings(c: Ctx, r: Rect, goalW: number): void {
+  const { b, kit } = c;
+  const turf = floor('turf', r, 0.012, 2);
+  const tt = (turf.material as MeshLambertMaterial).map;
+  if (tt) tt.repeat.set((r.x1 - r.x0) / 3, 1);
+  c.extra.push(turf);
+  const lw = 0.1;
+  const ly = 0.02;
+  const cx = (r.x0 + r.x1) / 2;
+  const cz = (r.z0 + r.z1) / 2;
+  b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z0));
+  b.add(flat(r.x1 - r.x0, lw), COL.line, trs(cx, ly, r.z1));
+  b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x0, ly, cz));
+  b.add(flat(lw, r.z1 - r.z0), COL.line, trs(r.x1, ly, cz));
+  b.add(flat(lw, r.z1 - r.z0), COL.line, trs(cx, ly, cz));
+  const seg = 24;
+  const rad = 1.5;
+  for (let i = 0; i < seg; i++) {
+    const a = ((i + 0.5) / seg) * Math.PI * 2;
+    b.add(flat(lw, (2 * Math.PI * rad) / seg + 0.02), COL.line, trs(cx + Math.cos(a) * rad, ly, cz + Math.sin(a) * rad, -a));
+  }
+  b.add(flat(0.3, 0.3), COL.line, trs(cx, ly + 0.002, cz, Math.PI / 4));
+  for (const [gx, dir] of [
+    [r.x0, 1],
+    [r.x1, -1],
+  ] as Array<[number, number]>) {
+    b.add(flat(lw, 4.4), COL.line, trs(gx + dir * 1.6, ly, cz));
+    b.add(flat(1.6, lw), COL.line, trs(gx + dir * 0.8, ly, cz - 2.2));
+    b.add(flat(1.6, lw), COL.line, trs(gx + dir * 0.8, ly, cz + 2.2));
+    const gh = 1.3;
+    const gd = 0.9;
+    kit.place(gx, cz, dir > 0 ? HALF_PI : -HALF_PI).goal(goalW, gh, gd);
+    const nm = netMaterial();
+    const back = new Mesh(new PlaneGeometry(goalW, gh, 8, 4), nm);
+    back.position.set(gx - dir * gd, gh / 2, cz);
+    back.rotation.y = HALF_PI;
+    c.nets.push(back);
+    c.extra.push(back);
+    for (const sz of [-1, 1]) {
+      const side = new Mesh(new PlaneGeometry(gd, gh), nm);
+      side.position.set(gx - (dir * gd) / 2, gh / 2, cz + (sz * goalW) / 2);
+      c.extra.push(side);
+    }
+    const top = new Mesh(new PlaneGeometry(gd, goalW), nm);
+    top.rotation.x = -HALF_PI;
+    top.position.set(gx - (dir * gd) / 2, gh, cz);
+    c.extra.push(top);
+  }
+  for (const [x, z] of [
+    [r.x0, r.z0],
+    [r.x1, r.z0],
+    [r.x0, r.z1],
+    [r.x1, r.z1],
+  ] as Array<[number, number]>)
+    kit.place(0, 0).cornerFlag(x, z);
+}
+
+/** Tiered seating along x (faces +z) or along z (faces ±x). */
+function stand(c: Ctx, x0: number, x1: number, zFront: number, tiers: number, axis: 'x' | 'z', facing: number): void {
+  const { b } = c;
+  const len = x1 - x0;
+  const mid = (x0 + x1) / 2;
+  const seatCols = [COL.seatBlue, COL.seatYellow];
+  for (let i = 0; i < tiers; i++) {
+    const off = zFront - facing * i * 0.95;
+    const h = 0.4 + i * 0.5;
+    const cx = axis === 'x' ? mid : off;
+    const cz = axis === 'x' ? off : mid;
+    const w = axis === 'x' ? len : 0.95;
+    const d = axis === 'x' ? 0.95 : len;
+    b.at(G.box(), COL.concrete, cx, h / 2 - 0.02, cz, 0, w, h, d);
+    b.at(G.box(), COL.concreteDark, cx, h - 0.01, cz, 0, axis === 'x' ? w : 0.97, 0.03, axis === 'x' ? 0.97 : d);
+    const n = Math.floor(len / 0.62);
+    for (let k = 0; k < n; k++) {
+      const t = x0 + 0.31 + k * 0.62 + (len - n * 0.62) / 2;
+      const col = seatCols[(k + i) % 2] as number;
+      const sx = axis === 'x' ? t : off + facing * 0.12;
+      const sz = axis === 'x' ? off + facing * 0.12 : t;
+      b.at(G.rbox(0.08), col, sx, h + 0.12, sz, 0, axis === 'x' ? 0.46 : 0.36, 0.2, axis === 'x' ? 0.36 : 0.46);
+      b.at(G.rbox(0.08), col, axis === 'x' ? sx : sx - facing * 0.18, h + 0.36, axis === 'x' ? sz - facing * 0.18 : sz, 0, axis === 'x' ? 0.46 : 0.08, 0.34, axis === 'x' ? 0.08 : 0.46);
+    }
+  }
+  // back wall with academy trim
+  const back = zFront - facing * tiers * 0.95 + facing * 0.4;
+  const bh = 0.4 + tiers * 0.5 + 0.9;
+  if (axis === 'x') {
+    b.at(G.box(), COL.wallOut, mid, bh / 2, back, 0, len, bh, 0.2);
+    b.at(G.box(), COL.trim, mid, bh - 0.05, back + facing * 0.11, 0, len, 0.12, 0.02);
+  } else {
+    b.at(G.box(), COL.wallOut, back, bh / 2, mid, 0, 0.2, bh, len);
+    b.at(G.box(), COL.trim, back + facing * 0.11, bh - 0.05, mid, 0, 0.02, 0.12, len);
+  }
+}
+
+/** The away ground: its own island with stands, floodlights, dugouts and a road where the team bus arrives. */
+export function buildStadium(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { b, kit, root, aoBlobs, decals, props } = c;
+  const S = AREA1.matchPitch.stadium;
+  const P = S.plot;
+  const r = AREA1.matchPitch.rect;
+  const pw = P.x1 - P.x0;
+  const pd = P.z1 - P.z0;
+  const pcx = (P.x0 + P.x1) / 2;
+  const pcz = (P.z0 + P.z1) / 2;
+  b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
+  const curbW = 0.38;
+  for (const [x, z, w, d] of [
+    [pcx, P.z0 + curbW / 2, pw, curbW],
+    [pcx, P.z1 - curbW / 2, pw, curbW],
+    [P.x0 + curbW / 2, pcz, curbW, pd],
+    [P.x1 - curbW / 2, pcz, curbW, pd],
+  ] as Array<[number, number, number, number]>) {
+    b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
+  }
+  root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0 + curbW, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
+  // apron around the pitch
+  root.add(floor('curb', { x0: r.x0 - 1.4, z0: r.z0 - 1.0, x1: r.x1 + 1.4, z1: r.z1 + 1.0 }, 0.008, 1));
+  pitchMarkings(c, r, AREA1.matchPitch.goalW);
+  // stands: main stand behind the far touchline, two end stands
+  stand(c, r.x0 - 1.0, r.x1 + 1.0, r.z0 - 1.6, 3, 'x', 1);
+  stand(c, r.z0 - 0.6, r.z1 + 0.4, r.x0 - 2.2, 2, 'z', 1);
+  stand(c, r.z0 - 0.6, r.z1 + 0.4, r.x1 + 2.2, 2, 'z', -1);
+  kit.place((r.x0 + r.x1) / 2, r.z0 - 5.1).scoreboard();
+  for (const [x, z] of [
+    [r.x0 - 2.6, r.z0 - 3.6],
+    [r.x1 + 2.6, r.z0 - 3.6],
+    [r.x0 - 2.6, r.z1 + 1.8],
+    [r.x1 + 2.6, r.z1 + 1.8],
+  ] as Array<[number, number]>) {
+    kit.place(x, z, 0).floodlight();
+    aoBlobs.push({ x, z, r: 0.7 });
+  }
+  // dugouts on the near touchline, facing the pitch
+  const dz = r.z1 + 1.7;
+  for (const dx of [-4.5, 4.5]) {
+    kit.place((r.x0 + r.x1) / 2 + dx, dz, Math.PI).dugout(3.0);
+    aoBlobs.push({ x: (r.x0 + r.x1) / 2 + dx, z: dz, r: 1.4 });
+  }
+  decals.add('banner', 1.2, 1.2, trs((r.x0 + r.x1) / 2 - 7, 1.9, r.z0 - 4.3));
+  decals.add('banner', 1.2, 1.2, trs((r.x0 + r.x1) / 2 + 7, 1.9, r.z0 - 4.3));
+  props.put('bush', P.x0 + 0.8, P.z1 - 0.8, 0, 5);
+  props.put('bush', P.x1 - 0.8, P.z1 - 0.8, 0, 5);
+  props.put('bush', P.x0 + 0.8, P.z0 + 0.8, 0, 5);
+  props.put('bush', P.x1 - 0.8, P.z0 + 0.8, 0, 5);
+  // road along the south edge (lower level, top of its base below the asphalt) + bus stop
+  const R = S.road;
+  root.add(floor('asphalt', R, -0.3, 2));
+  b.at(G.box(), 0x2a2540, (R.x0 + R.x1) / 2, -0.79, (R.z0 + R.z1) / 2, 0, R.x1 - R.x0, 0.9, R.z1 - R.z0);
+  for (let x = R.x0 + 1; x < R.x1; x += 3) b.add(flat(1.6, 0.16), 0xf4f0e4, trs(x, -0.285, (R.z0 + R.z1) / 2 + 1.0));
+  kit.place(S.busStop.x - 3.4, P.z1 + 0.5, 0, 1, -0.3).busStopSign();
+  // gate gap in the curb where the players walk up from the bus
+  b.at(G.rbox(0.06), 0xd9cfb6, S.busStop.x, -0.12, P.z1 - 0.2, 0, 2.4, 0.3, 1.0, 0.3, 0);
   return finalize(c, mat);
 }
 

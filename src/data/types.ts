@@ -111,8 +111,19 @@ export interface AreaDef {
   lockers: { seats: V2[]; yaw: number };
   /** Graduation podium: the graduate stands on `top`, others wait on `line`; the coach decides at `coachSpot`. */
   podium: { pos: V2; top: V2; coachSpot: V2; line: V2[] };
-  /** 5-a-side match pitch (an unlockable object); the coach starts matches at `kickoff`. */
-  matchPitch: { objectId: string; rect: Rect; kickoff: V2; goalW: number };
+  /**
+   * Matches are played away at the stadium (a separate island reached by the team bus). `objectId` unlocks the
+   * Team Bus stop; the coach boards at `kickoff`; `rect` is the stadium pitch (world coords, far from the academy).
+   */
+  matchPitch: {
+    objectId: string;
+    rect: Rect;
+    kickoff: V2;
+    goalW: number;
+    /** Where the team bus parks on the academy street (faces +z). */
+    busPark: V2;
+    stadium: { plot: Rect; road: Rect; busStop: V2 };
+  };
   /** Static obstacles (walls, fences, fixed furniture) — always present. */
   obstacles: Rect[];
   /** Walkable rects for NPC navigation (plot + street corridor to the bus). */

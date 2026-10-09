@@ -131,18 +131,8 @@ export const AREA1: AreaDef = {
     { id: 'bench', kind: 'decor', variant: 'dugout', area: 1, pos: { x: 3.4, z: -1.4 }, rot: 2, footprint: [{ x0: -1.6, z0: -0.6, x1: 1.6, z1: 0.6 }] },
     { id: 'flags', kind: 'decor', variant: 'flags', area: 1, pos: { x: 5.9, z: 11.2 }, rot: 0, footprint: [] },
     { id: 'water_cooler', kind: 'decor', variant: 'cooler', area: 1, pos: { x: -10.4, z: -4.3 }, rot: 0, footprint: [{ x0: -0.3, z0: -0.3, x1: 0.3, z1: 0.3 }] },
-    {
-      id: 'match_pitch',
-      kind: 'pitch',
-      area: 1,
-      pos: { x: 2.5, z: 6.0 },
-      rot: 0,
-      // the two goals (nets sit just outside the pitch lines)
-      footprint: [
-        { x0: -7.4, z0: -1.4, x1: -6.4, z1: 1.4 },
-        { x0: 6.4, z0: -1.4, x1: 7.4, z1: 1.4 },
-      ],
-    },
+    // the Team Bus stop (matches are played away at the stadium)
+    { id: 'match_pitch', kind: 'pitch', area: 1, pos: { x: 13.6, z: 1.9 }, rot: 0, footprint: [] },
     { id: 'bus_shelter', kind: 'shelter', area: 1, pos: { x: 15.0, z: -1.4 }, rot: 0, footprint: [{ x0: -0.9, z0: -0.4, x1: 0.9, z1: 0.4 }] },
   ],
   pads: [
@@ -155,7 +145,7 @@ export const AREA1: AreaDef = {
     { id: 'p_cones_l2', area: 1, pos: { x: 7.3, z: -4.6 }, cost: 55, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'lane', station: 'dribble_cones' }, icon: 'lane', nameKey: 'lane.dribble_cones' },
     { id: 'p_ballboy', area: 1, pos: { x: 5.5, z: 3.0 }, cost: 190, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
     { id: 'p_ballboy2', area: 1, pos: { x: 7.1, z: 2.2 }, cost: 150, stars: 1, xp: 10, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'ball_boy_2' }, icon: 'staff', nameKey: 'staff.ball_boy_2' },
-    { id: 'p_match', area: 1, pos: { x: 2.5, z: 2.3 }, cost: 100, stars: 2, xp: 14, requires: ['p_cones_l2'], unlock: { type: 'object', id: 'match_pitch' }, icon: 'pitch', nameKey: 'obj.match_pitch', major: true },
+    { id: 'p_match', area: 1, pos: { x: 13.6, z: 1.9 }, cost: 85, stars: 2, xp: 14, requires: ['p_cones_l2'], unlock: { type: 'object', id: 'match_pitch' }, icon: 'pitch', nameKey: 'obj.match_pitch', major: true },
     { id: 'p_bench', area: 1, pos: { x: 3.4, z: -0.1 }, cost: 45, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'object', id: 'bench' }, icon: 'bench', nameKey: 'obj.bench' },
     { id: 'p_sprint', area: 1, pos: { x: 2.9, z: 10.45 }, cost: 140, stars: 2, xp: 12, requires: ['p_ballboy'], unlock: { type: 'station', id: 'sprint_track' }, icon: 'track', nameKey: 'station.sprint_track', major: true },
     { id: 'p_flags', area: 1, pos: { x: 5.9, z: 9.8 }, cost: 75, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'object', id: 'flags' }, icon: 'flag', nameKey: 'obj.flags' },
@@ -178,7 +168,14 @@ export const AREA1: AreaDef = {
       { x: -13.3, z: -0.7 },
     ],
   },
-  matchPitch: { objectId: 'match_pitch', rect: { x0: -4.0, z0: 3.4, x1: 9.0, z1: 8.6 }, kickoff: { x: 2.5, z: 2.3 }, goalW: 2.6 },
+  matchPitch: {
+    objectId: 'match_pitch',
+    rect: { x0: 71, z0: -5.5, x1: 89, z1: 3.5 },
+    kickoff: { x: 13.6, z: 1.9 },
+    goalW: 3.0,
+    busPark: { x: 21.1, z: 4.2 },
+    stadium: { plot: { x0: 64, z0: -10.5, x1: 96, z1: 9 }, road: { x0: 60, z0: 9, x1: 100, z1: 13.6 }, busStop: { x: 80, z: 11.3 } },
+  },
   lockers: {
     // front bench first, then the back bench (both face the camera)
     seats: [
@@ -221,6 +218,7 @@ export const AREA1: AreaDef = {
     { x0: -6.7, z0: -1.15, x1: -5.7, z1: -0.45 },
     { x0: -15.15, z0: -2.3, x1: -12.85, z1: -1.7 },
     { x0: -10.5, z0: -1.85, x1: -8.7, z1: -0.95 },
+    { x0: -0.4, z0: 6.8, x1: 1.6, z1: 7.25 },
     { x0: -15.9, z0: 3.5, x1: -15.3, z1: 5.7 },
     // construction sites (office, gym) behind fences
     { x0: -13.0, z0: 1.2, x1: -6.6, z1: 6.75 },

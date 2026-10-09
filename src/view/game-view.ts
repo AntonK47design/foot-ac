@@ -35,7 +35,7 @@ import type { AudioSystem } from './audio';
 import { Batch } from './batch';
 import { ballGeometry } from './builders/ball';
 import { DecalBatch } from './builders/decals';
-import { buildDiorama, buildUnlockable, type UnlockGeo } from './builders/diorama';
+import { buildDiorama, buildStadium, buildUnlockable, type UnlockGeo } from './builders/diorama';
 import { PropKit } from './builders/football';
 import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
@@ -190,6 +190,9 @@ export class GameView {
   private readonly kickoffRing: PadMesh;
   /** Match cinematic (created on first use). */
   private director: MatchDirector | null = null;
+  /** The away ground (its own island far from the academy) and the team bus that drives there. */
+  private readonly stadium: UnlockView;
+  private readonly teamBus: Group;
   private readonly unlocks = new Map<string, UnlockView>();
   private readonly pads = new Map<string, PadView>();
   /** Seconds the coach has stood still (guide arrow hint after the tutorial). */
@@ -280,6 +283,19 @@ export class GameView {
 
     this.bus = buildBus(core.mat);
     scene.add(this.bus);
+    this.teamBus = buildBus(core.mat, PALETTE.blue, PALETTE.yellow);
+    this.teamBus.visible = false;
+    scene.add(this.teamBus);
+    const sd = buildStadium(assets, AREA1_LAYOUT, core.mat);
+    scene.add(sd.root);
+    this.stadium = {
+      root: sd.root,
+      lanes: 1,
+      nets: sd.nets,
+      netRest: sd.nets.map((n) => Float32Array.from((n.geometry.attributes.position as BufferAttribute).array as Float32Array)),
+      ripple: 0,
+      rippleX: 0,
+    };
 
     this.podiumRing = makePad(PALETTE.star, 0x1d2433, 1.0, 0.6);
     const pc = sim.area.podium.coachSpot;
@@ -740,6 +756,14 @@ export class GameView {
     }
 
     for (const u of this.unlocks.values()) this.updateNets(u, dt);
+    this.updateNets(this.stadium, dt);
+    // team bus parked on the academy street (the director drives it during away trips)
+    if (!this.matchActive) {
+      const bp = sim.area.matchPitch.busPark;
+      this.teamBus.visible = !!s.built[sim.area.matchPitch.objectId];
+      this.teamBus.position.set(bp.x, -0.3, bp.z);
+      this.teamBus.rotation.y = 0;
+    }
 
     // ── bus
     const busZ = s.bus.pz + (s.bus.z - s.bus.pz) * alpha;
@@ -899,13 +923,32 @@ export class GameView {
   startMatch(script: MatchScript, ui: MatchUi, ourName: string, skippable: boolean, hooks: MatchHooks): void {
     if (!this.director) {
       const mp = this.sim.area.matchPitch;
-      this.director = new MatchDirector(this.core.scene, this.assets, this.rig, this.fx, this.audio, this.labels, ui, mp.rect, mp.goalW, () => {
-        const u = this.unlocks.get(mp.objectId);
-        if (u) {
-          u.ripple = 1;
-          u.rippleX = 0;
-        }
-      });
+      const st = this.stadium;
+      this.director = new MatchDirector(
+        this.core.scene,
+        this.assets,
+        this.rig,
+        this.fx,
+        this.audio,
+        this.labels,
+        ui,
+        mp.rect,
+        mp.goalW,
+        () => {
+          st.ripple = 1;
+          st.rippleX = 0;
+        },
+        {
+          bus: this.teamBus,
+          park: mp.busPark,
+          stop: mp.stadium.busStop,
+          place: t('stadium.name'),
+          home: () => {
+            const c = this.sim.state.coach;
+            this.rig.snap(c.x, c.z);
+          },
+        },
+      );
     }
     // the squad's training figures make way for the match line-ups
     for (const [k, a] of this.actors) {
@@ -916,17 +959,20 @@ export class GameView {
     this.director.start(script, ourName, skippable, hooks);
   }
 
-  /** Squad members train on the match pitch between matches (keepy-uppies). */
+  /** After the results: the team bus brings everyone home. */
+  endTrip(): void {
+    this.director?.goHome();
+  }
+
+  /** Squad members wait by the Team Bus stop between away matches (keepy-uppies). */
   private drawSquad(dt: number, frameId: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void): void {
-    const r = this.sim.area.matchPitch.rect;
-    const cx = (r.x0 + r.x1) / 2;
-    const cz = (r.z0 + r.z1) / 2;
+    const K = this.sim.area.matchPitch.kickoff;
     const spots: Array<[number, number]> = [
-      [cx - 3.5, cz - 1.0],
-      [cx - 1.2, cz + 1.3],
-      [cx + 1.2, cz - 1.2],
-      [cx + 3.5, cz + 1.0],
-      [cx + 5.0, cz - 0.2],
+      [K.x - 2.8, K.z - 0.5],
+      [K.x - 1.6, K.z - 1.2],
+      [K.x - 3.8, K.z + 0.3],
+      [K.x - 4.4, K.z - 0.9],
+      [K.x - 2.4, K.z + 0.6],
     ];
     this.sim.state.squad.forEach((p, i) => {
       const [x, z] = spots[i % spots.length] as [number, number];

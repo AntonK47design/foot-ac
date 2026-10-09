@@ -55,7 +55,7 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
 - **Plot**: raised 0.25 m with a light curb on all sides; outside is the dark void (+ distant silhouettes, blueprint ghosts of locked areas).
 - **Clubhouse**: back walls 2.4 m, side walls full height, front walls 0.3 m stubs, doorways 1.6 m. Rooms: Reception (desk, waiting **benches**, trophy cabinet, posters of fictional clubs), Changing Room (lockers, benches, kit hooks). Later: Office, Physio.
 - **Training pitch**: half-size, mowing stripes, crisp lines, low fence with academy-colour boards; each drill on its own surface.
-- **Graduation podium** (gold/silver/bronze blocks + star backdrop) on the plaza in front of the clubhouse; **5-a-side Match Pitch** (turf, lines, goals with nets, corner flags) on the south plaza, with the squad training on it.
+- **Graduation podium** (gold/silver/bronze blocks + star backdrop) on the plaza in front of the clubhouse; **Team Bus stop** by the gate (squad juggling while they wait, blue team bus parked on the street). Matches are played **away at the stadium**: a separate island (pitch 18×9 m with nets, 3-tier main stand, two end stands, floodlights, scoreboard, dugouts, road with bus stop) reached by a short bus trip.
 - **Locked expansions**: translucent blue blueprint ghosts behind construction fences with padlock + price sign.
 - **No mud blobs.** Ever.
 
