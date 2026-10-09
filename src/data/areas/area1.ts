@@ -1,0 +1,155 @@
+import type { AreaDef } from '../types';
+
+/**
+ * Area 1 "Sunday Park". World coordinates in metres: +x east (screen right), +z south (towards camera).
+ * Pads sit on the interaction spot of what they unlock (basket, crate front, …).
+ */
+export const AREA1: AreaDef = {
+  id: 1,
+  nameKey: 'area.1',
+  bounds: { x0: -17, z0: -15, x1: 17, z1: 13 },
+  navBounds: { x0: -17, z0: -15, x1: 21, z1: 13 },
+  spawn: { x: 0, z: 3 },
+  gate: {
+    busStop: { x: 21.5, z: 3 },
+    door: { x: 19.8, z: 3.4 },
+    inside: { x: 15.8, z: 3 },
+    exit: { x: 19.8, z: 3.4 },
+  },
+  desk: {
+    coachSpot: { x: 7.3, z: 3 },
+    traineeSpot: { x: 10.7, z: 3 },
+    pile: { x: 8.9, z: 5 },
+  },
+  crate: { spot: { x: -4, z: 3.3 } },
+  stations: [
+    {
+      id: 'shooting_goal',
+      kind: 'shoot',
+      stat: 'SHO',
+      area: 1,
+      center: { x: -5, z: -8 },
+      rot: 0,
+      lanes: [
+        { spot: { x: -1, z: 0.8 }, target: { x: -1.3, z: -4.1 } },
+        { spot: { x: 1, z: 0.8 }, target: { x: 1.3, z: -4.1 } },
+      ],
+      basket: { x: 3, z: 1.6 },
+      pile: { x: -3.1, z: 1.6 },
+      queueStart: { x: 0, z: 2.8 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [{ x0: -2.7, z0: -5.2, x1: 2.7, z1: -3.2 }],
+    },
+    {
+      id: 'dribble_cones',
+      kind: 'dribble',
+      stat: 'DRI',
+      area: 1,
+      center: { x: 5, z: -8 },
+      rot: 0,
+      lanes: [
+        { spot: { x: 0, z: 2.2 }, target: { x: 0, z: -4.4 }, footprint: [{ x0: -0.45, z0: -4.6, x1: 0.45, z1: 1.1 }] },
+        { spot: { x: 2, z: 2.2 }, target: { x: 2, z: -4.4 }, footprint: [{ x0: 1.55, z0: -4.6, x1: 2.45, z1: 1.1 }] },
+      ],
+      basket: { x: -2.2, z: 2.4 },
+      pile: { x: 4.2, z: 2.4 },
+      queueStart: { x: 1, z: 3.4 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [],
+    },
+    {
+      id: 'passing_wall',
+      kind: 'pass',
+      stat: 'PAS',
+      area: 1,
+      center: { x: -11, z: -2 },
+      rot: 1,
+      lanes: [
+        { spot: { x: -0.8, z: 0.6 }, target: { x: -0.8, z: -3.1 } },
+        { spot: { x: 0.8, z: 0.6 }, target: { x: 0.8, z: -3.1 } },
+      ],
+      basket: { x: -2.6, z: 1.1 },
+      pile: { x: 2.7, z: 1.1 },
+      queueStart: { x: 0, z: 2.3 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [{ x0: -2.6, z0: -3.9, x1: 2.6, z1: -3.2 }],
+    },
+    {
+      id: 'sprint_track',
+      kind: 'sprint',
+      stat: 'PAC',
+      area: 1,
+      center: { x: -4, z: 10 },
+      rot: 3,
+      lanes: [
+        { spot: { x: 0, z: 6 }, target: { x: 0, z: -6 } },
+        { spot: { x: 1.2, z: 6 }, target: { x: 1.2, z: -6 } },
+      ],
+      pile: { x: -1.7, z: 6.6 },
+      queueStart: { x: 0, z: 7.3 },
+      queueStep: { x: 0, z: 1 },
+      footprint: [],
+    },
+  ],
+  objects: [
+    { id: 'ball_crate', kind: 'crate', area: 1, pos: { x: -4, z: 1.7 }, rot: 0, footprint: [{ x0: -0.7, z0: -0.55, x1: 0.7, z1: 0.55 }] },
+    { id: 'desk', kind: 'desk', area: 1, pos: { x: 9, z: 3 }, rot: 1, footprint: [{ x0: -1.1, z0: -0.45, x1: 1.1, z1: 0.45 }] },
+    {
+      id: 'chairs_1',
+      kind: 'chairs',
+      area: 1,
+      pos: { x: 12.7, z: 6.6 },
+      rot: 0,
+      footprint: [],
+      seats: [
+        { x: 11.5, z: 6.6 },
+        { x: 12.7, z: 6.6 },
+        { x: 13.9, z: 6.6 },
+      ],
+    },
+    {
+      id: 'chairs_2',
+      kind: 'chairs',
+      area: 1,
+      pos: { x: 15.7, z: 6.6 },
+      rot: 0,
+      footprint: [],
+      seats: [
+        { x: 15.1, z: 6.6 },
+        { x: 16.3, z: 6.6 },
+      ],
+    },
+    { id: 'bench', kind: 'decor', variant: 'bench', area: 1, pos: { x: 13.5, z: -4 }, rot: 1, footprint: [{ x0: -1.2, z0: -0.35, x1: 1.2, z1: 0.35 }] },
+    { id: 'flags', kind: 'decor', variant: 'flags', area: 1, pos: { x: 0, z: -13.6 }, rot: 0, footprint: [] },
+    { id: 'water_cooler', kind: 'decor', variant: 'cooler', area: 1, pos: { x: 12, z: -0.6 }, rot: 0, footprint: [{ x0: -0.4, z0: -0.4, x1: 0.4, z1: 0.4 }] },
+    { id: 'bus_shelter', kind: 'shelter', area: 1, pos: { x: 15.3, z: 10.4 }, rot: 0, footprint: [{ x0: -1.6, z0: -0.6, x1: 1.6, z1: 0.6 }] },
+  ],
+  pads: [
+    { id: 'p_crate', area: 1, pos: { x: -4, z: 3.3 }, cost: 10, stars: 1, xp: 8, requires: [], unlock: { type: 'object', id: 'ball_crate' }, icon: 'ball', nameKey: 'obj.ball_crate', major: true },
+    { id: 'p_goal', area: 1, pos: { x: -2, z: -6.4 }, cost: 20, stars: 2, xp: 10, requires: ['p_crate'], unlock: { type: 'station', id: 'shooting_goal' }, icon: 'goal', nameKey: 'station.shooting_goal', major: true },
+    { id: 'p_cones', area: 1, pos: { x: 2.8, z: -5.6 }, cost: 20, stars: 2, xp: 10, requires: ['p_goal'], unlock: { type: 'station', id: 'dribble_cones' }, icon: 'cones', nameKey: 'station.dribble_cones', major: true },
+    { id: 'p_chairs2', area: 1, pos: { x: 15.7, z: 8.4 }, cost: 30, stars: 1, xp: 8, requires: ['p_goal'], unlock: { type: 'object', id: 'chairs_2' }, icon: 'chair', nameKey: 'obj.chairs' },
+    { id: 'p_goal_l2', area: 1, pos: { x: -7.9, z: -3.6 }, cost: 40, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'lane', station: 'shooting_goal' }, icon: 'lane', nameKey: 'lane.shooting_goal' },
+    { id: 'p_wall', area: 1, pos: { x: -10, z: 0.6 }, cost: 50, stars: 2, xp: 12, requires: ['p_cones'], unlock: { type: 'station', id: 'passing_wall' }, icon: 'wall', nameKey: 'station.passing_wall', major: true },
+    { id: 'p_cones_l2', area: 1, pos: { x: 9.2, z: -3.4 }, cost: 65, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'lane', station: 'dribble_cones' }, icon: 'lane', nameKey: 'lane.dribble_cones' },
+    { id: 'p_ballboy', area: 1, pos: { x: -6.6, z: 4.8 }, cost: 110, stars: 2, xp: 14, requires: ['p_wall'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
+    { id: 'p_bench', area: 1, pos: { x: 12.2, z: -2.2 }, cost: 60, stars: 1, xp: 8, requires: ['p_goal_l2'], unlock: { type: 'object', id: 'bench' }, icon: 'bench', nameKey: 'obj.bench' },
+    { id: 'p_sprint', area: 1, pos: { x: -10.4, z: 8.2 }, cost: 140, stars: 2, xp: 12, requires: ['p_ballboy'], unlock: { type: 'station', id: 'sprint_track' }, icon: 'track', nameKey: 'station.sprint_track', major: true },
+    { id: 'p_flags', area: 1, pos: { x: 0, z: -11.8 }, cost: 120, stars: 1, xp: 8, requires: ['p_bench'], unlock: { type: 'object', id: 'flags' }, icon: 'flag', nameKey: 'obj.flags' },
+    { id: 'p_wall_l2', area: 1, pos: { x: -12.6, z: 2.7 }, cost: 180, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'lane', station: 'passing_wall' }, icon: 'lane', nameKey: 'lane.passing_wall' },
+    { id: 'p_shelter', area: 1, pos: { x: 13.4, z: 9.2 }, cost: 220, stars: 1, xp: 10, requires: ['p_chairs2', 'p_wall'], unlock: { type: 'object', id: 'bus_shelter' }, icon: 'shelter', nameKey: 'obj.bus_shelter' },
+    { id: 'p_cooler', area: 1, pos: { x: 10.6, z: 0.2 }, cost: 260, stars: 1, xp: 8, requires: ['p_flags'], unlock: { type: 'object', id: 'water_cooler' }, icon: 'cooler', nameKey: 'obj.water_cooler' },
+    { id: 'p_track_l2', area: 1, pos: { x: -5.5, z: 12.3 }, cost: 320, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'lane', station: 'sprint_track' }, icon: 'lane', nameKey: 'lane.sprint_track' },
+  ],
+  starterPiles: [
+    { id: 'starter_a', pos: { x: 2.6, z: 1.3 }, amount: 15 },
+    { id: 'starter_b', pos: { x: -2.6, z: -2.0 }, amount: 25 },
+  ],
+  ambientKids: [
+    { x: 4.6, z: 7.2 },
+    { x: 8.4, z: 8.6 },
+  ],
+};
+
+/** Prebuilt objects present from the start. */
+export const PREBUILT_OBJECTS = ['desk', 'chairs_1'];

@@ -1,0 +1,38 @@
+{
+  "name": "wonderkid-academy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "node tools/lan.mjs",
+    "build": "tsc --noEmit && vite build",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "preview": "vite preview",
+    "check": "tsc --noEmit && eslint .",
+    "test": "vitest run",
+    "sim": "tsx tools/economy-sim.ts",
+    "size": "vite build && tsx tools/size-check.ts",
+    "e2e": "npm run build:e2e && playwright test",
+    "zip": "vite build && tsx tools/size-check.ts && tsx tools/zip.ts"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.20.5",
+    "@types/three": "^0.186.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "qrcode-terminal": "^0.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}

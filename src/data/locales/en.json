@@ -1,0 +1,92 @@
+{
+  "game.title": "Wonderkid Academy",
+  "area.1": "Sunday Park",
+  "area.2.locked": "Training Ground",
+  "area.coming_soon": "Coming soon",
+
+  "obj.collect_cash": "Collect cash",
+  "obj.unlock": "Unlock {name}",
+  "obj.sign": "Sign {name}",
+  "obj.grab_balls": "Grab balls",
+  "obj.bring_balls": "Bring balls",
+  "obj.save_for": "Save up: {name}",
+
+  "obj.ball_crate": "Ball Crate",
+  "obj.chairs": "More Chairs",
+  "obj.bench": "Team Bench",
+  "obj.flags": "Bunting",
+  "obj.water_cooler": "Water Cooler",
+  "obj.bus_shelter": "Bus Shelter",
+  "station.shooting_goal": "Shooting Goal",
+  "station.dribble_cones": "Dribble Cones",
+  "station.passing_wall": "Passing Wall",
+  "station.sprint_track": "Sprint Track",
+  "lane.shooting_goal": "Shooting Lane 2",
+  "lane.dribble_cones": "Cone Lane 2",
+  "lane.passing_wall": "Passing Lane 2",
+  "lane.sprint_track": "Sprint Lane 2",
+  "staff.ball_boy": "Ball Boy",
+
+  "pad.hire": "Hire {name}",
+
+  "hint.desktop": "WASD or hold mouse",
+  "hint.touch": "Drag to move",
+
+  "hud.level": "Lv {level}",
+  "hud.stars": "{stars}/{total}",
+  "hud.settings": "Settings",
+
+  "desk.full": "Full",
+  "bubble.balls": "Need balls!",
+
+  "toast.level_up": "Academy level {level}!",
+  "toast.hired": "{name} hired! Baskets refill automatically",
+  "toast.graduated": "{name} graduated! +{cash}",
+  "toast.first_trainee": "{name} wants to join!",
+  "toast.progress_loaded": "Progress loaded from your account",
+  "toast.ad_unavailable": "Ad not available, try again later",
+  "toast.reset_done": "Progress reset",
+  "toast.area_preview": "More areas coming soon!",
+
+  "popup.stat": "+{n} {stat}",
+
+  "settings.title": "Settings",
+  "settings.sound": "Sound",
+  "settings.music": "Music",
+  "settings.vibration": "Vibration",
+  "settings.graphics": "Graphics",
+  "settings.graphics.auto": "Auto",
+  "settings.graphics.low": "Low",
+  "settings.graphics.high": "High",
+  "settings.language": "Language",
+  "settings.reset": "Reset progress",
+  "settings.reset_confirm": "Tap again to erase everything",
+  "settings.close": "Close",
+  "settings.on": "On",
+  "settings.off": "Off",
+  "settings.muted_by_platform": "Muted in CrazyGames settings",
+
+  "lang.en": "English",
+
+  "rarity.common": "Common",
+  "rarity.rare": "Rare",
+  "rarity.epic": "Epic",
+  "rarity.wonderkid": "Wonderkid",
+
+  "pos.GK": "GK",
+  "pos.DF": "DF",
+  "pos.MF": "MF",
+  "pos.FW": "FW",
+
+  "stat.PAC": "PAC",
+  "stat.SHO": "SHO",
+  "stat.PAS": "PAS",
+  "stat.DRI": "DRI",
+
+  "card.ovr": "OVR",
+  "card.age": "{age} yrs",
+
+  "context.lost": "Tap to continue",
+
+  "trainee.count": { "one": "{count} trainee", "other": "{count} trainees" }
+}
