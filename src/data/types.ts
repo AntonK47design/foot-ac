@@ -107,8 +107,8 @@ export interface AreaDef {
   objects: ObjectDef[];
   pads: PadDef[];
   starterPiles: StarterPile[];
-  /** Ambient kids passing a ball (view only). */
-  ambientKids: V2[];
+  /** Changing-room bench seats where signed trainees put on the academy kit. */
+  lockers: { seats: V2[]; yaw: number };
   /** Static obstacles (walls, fences, fixed furniture) — always present. */
   obstacles: Rect[];
   /** Walkable rects for NPC navigation (plot + street corridor to the bus). */

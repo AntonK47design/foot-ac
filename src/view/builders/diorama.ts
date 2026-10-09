@@ -244,9 +244,10 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   // ── street east (lower level) with the bus stop
   const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.2, z1: P.z1 };
   root.add(floor('asphalt', street, -0.3, 2));
-  b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.75, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
-  for (let z = street.z0 + 1; z < street.z1; z += 3) b.add(flat(0.16, 1.6), 0xf4f0e4, trs(street.x0 + 3.2, -0.28, z));
-  kit.place(L.gate.x + 0.6, L.busStop.z - 1.6).busStopSign();
+  // base block top sits 4 cm under the asphalt (coplanar faces z-fight and flicker)
+  b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.79, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
+  for (let z = street.z0 + 1; z < street.z1; z += 3) b.add(flat(0.16, 1.6), 0xf4f0e4, trs(street.x0 + 3.2, -0.285, z));
+  kit.place(L.gate.x + 0.6, L.busStop.z - 1.6, 0, 1, -0.3).busStopSign();
   // gate gap in the curb (ramp)
   b.at(G.rbox(0.06), 0xd9cfb6, P.x1 - 0.2, -0.12, L.gate.z, 0, 1.0, 0.3, 1.8, 0, 0.3);
 
@@ -380,8 +381,6 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   props.put('bush', -12.9, 8.9, 0, 5);
   props.put('bush', 13.0, 8.9, 0, 5);
   props.put('bush', 12.9, -9.2, 0, 5);
-  kit.place(0.7, 0.5, -0.3).ballRack(6);
-  aoBlobs.push({ x: 0.7, z: 0.5, r: 0.8 });
   kit.place(0, 0).coneStack(-2.2, 0.3);
   kit.place(0, 0).coneStack(-2.55, 0.6);
   kit.place(-10.6, -1.5, 0).bench(2.2);
@@ -496,8 +495,6 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       const bk = geo?.basket ?? { x: sl.x0 + 0.75, z: sl.z1 - 0.8 };
       kit.place(bk.x, bk.z, 0.3).ballCart();
       aoBlobs.push({ x: bk.x, z: bk.z, r: 0.8 });
-      kit.place(0, 0).mannequin(gx0 + 1.0, goalZ + 2.3, 0);
-      kit.place(0, 0).mannequin(gx0 + 1.6, goalZ + 2.3, 0);
       for (const l of (geo?.lanes ?? []).slice(0, lanes)) b.add(flat(0.36, 0.36), COL.line, trs(l.spot.x, 0.021, l.spot.z, Math.PI / 4));
       if (lanes > 1) kit.place(sl.x1 - 0.6, sl.z1 - 0.9, -0.5).popUpGoal();
       break;

@@ -36,8 +36,8 @@ export class PropKit {
   ) {}
 
   /** Sets the placement for the following parts. */
-  place(x: number, z: number, ry = 0, s = 1): this {
-    this.base = trs(x, 0, z, ry, s, s, s);
+  place(x: number, z: number, ry = 0, s = 1, y = 0): this {
+    this.base = trs(x, y, z, ry, s, s, s);
     return this;
   }
 
@@ -291,10 +291,10 @@ export class PropKit {
 
   /** Covered dugout bench. Local: open side faces +z. */
   dugout(w = 3.2): void {
-    this.add(G.rbox(0.1), C.offWhite, 0, 1.0, -0.55, 0, w, 2.0, 0.1);
-    for (const sx of [-1, 1]) this.add(G.rbox(0.1), C.offWhite, (sx * w) / 2, 1.0, 0, 0, 0.1, 2.0, 1.1);
-    this.add(G.rbox(0.1), C.blue, 0, 2.05, 0.05, 0, w + 0.2, 0.12, 1.4, 0.08);
-    this.add(G.rbox(0.1), C.yellow, 0, 1.98, 0.74, 0, w + 0.2, 0.08, 0.04);
+    // open-top: it stands in front of the pitch, so a roof would hide the drills from the camera
+    this.add(G.rbox(0.1), C.offWhite, 0, 0.55, -0.55, 0, w, 1.1, 0.1);
+    this.add(G.rbox(0.1), C.blue, 0, 1.12, -0.55, 0, w + 0.1, 0.08, 0.16);
+    for (const sx of [-1, 1]) this.add(G.rbox(0.1), C.offWhite, (sx * w) / 2, 0.45, 0, 0, 0.1, 0.9, 1.1);
     for (let i = 0; i < 4; i++) {
       const x = -w / 2 + 0.5 + (i * (w - 1)) / 3;
       this.add(G.rbox(0.25), C.blue, x, 0.48, -0.25, 0, 0.55, 0.1, 0.45);

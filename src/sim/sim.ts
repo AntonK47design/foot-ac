@@ -174,6 +174,14 @@ export class Sim {
           p = this.area.desk.traineeSpot;
           t.state = 'atDesk';
           break;
+        case 'toLocker':
+        case 'changing': {
+          const ls = this.area.lockers.seats[t.seat];
+          if (ls) p = ls;
+          t.state = 'changing';
+          t.yaw = this.area.lockers.yaw;
+          break;
+        }
         case 'queued':
           if (t.stationId) {
             const ss = s.stations[t.stationId];
@@ -272,7 +280,7 @@ export class Sim {
   activeTrainees(): number {
     let n = 0;
     for (const t of this.state.trainees)
-      if (t.state === 'queued' || t.state === 'toLane' || t.state === 'training') n++;
+      if (t.state === 'toLocker' || t.state === 'changing' || t.state === 'queued' || t.state === 'toLane' || t.state === 'training') n++;
     return n;
   }
 
@@ -634,8 +642,25 @@ export class Sim {
     t.waitT = 0;
     this.addXp(BALANCE.xp.perSign);
     this.events.emit('signed', { id: t.id, fee });
-    this.sendToStation(t);
+    this.sendToLocker(t);
     this.events.emit('saveNeeded', { reason: 'sign' });
+  }
+
+  /** Signed trainees change into the academy kit in the changing room; if every seat is taken they go straight out. */
+  private sendToLocker(t: Trainee): void {
+    const seats = this.area.lockers.seats;
+    for (let i = 0; i < seats.length; i++) {
+      let taken = false;
+      for (const o of this.state.trainees) if (o !== t && o.seat === i && (o.state === 'toLocker' || o.state === 'changing')) taken = true;
+      const sp = seats[i];
+      if (taken || !sp) continue;
+      t.seat = i;
+      t.state = 'toLocker';
+      t.repT = 0;
+      this.setGoal(t, sp.x, sp.z);
+      return;
+    }
+    this.sendToStation(t);
   }
 
   private sendToStation(t: Trainee): void {
@@ -783,6 +808,21 @@ export class Sim {
         case 'atDesk':
           t.waitT += dt;
           break;
+        case 'toLocker':
+          if (this.moveAgent(t, speed, dt)) {
+            t.state = 'changing';
+            t.repT = 0;
+            t.yaw = this.area.lockers.yaw;
+          }
+          break;
+        case 'changing':
+          t.repT += dt / BALANCE.trainee.changeTime;
+          if (t.repT >= 1) {
+            t.repT = 0;
+            t.seat = -1;
+            this.sendToStation(t);
+          }
+          break;
         case 'queued': {
           const ss = t.stationId ? s.stations[t.stationId] : undefined;
           if (!ss || !t.stationId) break;
@@ -836,7 +876,7 @@ export class Sim {
       t.repT = 0;
       this.events.emit('repStart', { traineeId: t.id, stationId: t.stationId });
     }
-    t.repT += dt / cfg.repTime;
+    t.repT += dt / (cfg.repTime * this.perk('repTimeMult'));
     if (t.repT < 1) return;
     // rep complete
     t.repT = 0;
@@ -845,7 +885,7 @@ export class Sim {
     const before = t.stats[st.stat];
     t.stats[st.stat] = Math.min(t.cap, before + cfg.statGain);
     const gain = t.stats[st.stat] - before;
-    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity]);
+    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult'));
     const p = this.pile('st:' + t.stationId);
     if (p) p.amount += cash;
     t.reps++;
@@ -866,6 +906,13 @@ export class Sim {
     }
   }
 
+  /** Product of a perk multiplier over every built decor object. */
+  perk(key: 'feeMult' | 'repTimeMult' | 'gradBonusMult'): number {
+    let m = 1;
+    for (const [id, p] of Object.entries(BALANCE.perks)) if (this.state.built[id]) m *= p[key] ?? 1;
+    return m;
+  }
+
   /** A trainee whose trainable stats are all capped can't reach the target; let them graduate. */
   private ovrStalled(t: Trainee): boolean {
     for (const id of Object.keys(this.state.stations)) if (t.stats[this.station(id).stat] < t.cap) return false;
@@ -874,7 +921,7 @@ export class Sim {
 
   private graduate(t: Trainee): void {
     const s = this.state;
-    const bonus = BALANCE.trainee.graduationBonus;
+    const bonus = Math.round(BALANCE.trainee.graduationBonus * this.perk('gradBonusMult'));
     const p = this.pile('desk');
     if (p) p.amount += bonus;
     s.stats.graduated++;

@@ -31,7 +31,7 @@ export const BALANCE = {
   basket: { zoneRadius: 1.35 },
   bus: {
     firstDelay: 0.6,
-    interval: 9,
+    interval: 13,
     driveIn: 2.0,
     dwell: 1.2,
     driveOut: 2.0,
@@ -45,11 +45,13 @@ export const BALANCE = {
     repsPerVisit: 3,
     /** OVR points gained before graduating (area 1). */
     gradOvrGain: 4,
-    maxQueue: 3,
+    maxQueue: 1,
     moodWaitSec: 18,
     /** Seconds without progress before the stuck watchdog teleports an NPC. */
     stuckSec: 3,
     graduationBonus: 30,
+    /** Seconds on the changing-room bench putting on the academy kit after signing. */
+    changeTime: 1.6,
     initialChairs: 3,
   },
   rarity: {
@@ -81,6 +83,12 @@ export const BALANCE = {
   staff: {
     ballBoy: { speed: 3.3, carryCap: 6, refillBelow: 0.75 },
   },
+  /** Effects of decor objects once built (multipliers, stack multiplicatively). */
+  perks: {
+    flags: { feeMult: 1.2 },
+    water_cooler: { repTimeMult: 0.8 },
+    bench: { gradBonusMult: 2 },
+  } as Record<string, { feeMult?: number; repTimeMult?: number; gradBonusMult?: number }>,
   /** Cumulative XP needed to reach level index+1 (level 1 = 0 XP). */
   levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400],
   xp: { perGraduation: 15, perSign: 2 },
@@ -89,6 +97,10 @@ export const BALANCE = {
     interval: 0.25,
     /** Don't send the player to collect piles smaller than this unless nothing else to do. */
     minPileWorth: 8,
+    /** The 3D guide arrow always shows until this many unlocks (tutorial)... */
+    guideUnlocks: 3,
+    /** ...after that only when the coach has stood still this long (s). */
+    hintIdleSec: 5,
   },
   camera: {
     /** Half-extent (m) of the ground area kept visible around the coach, at start. */

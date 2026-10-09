@@ -20,7 +20,7 @@ import {
 import { BALANCE } from '../data/balance';
 import { AREA1_LAYOUT } from '../data/areas/area1-layout';
 import type { IconId, PadDef, Rarity } from '../data/types';
-import { formatCash, t } from '../core/i18n';
+import { formatCash, hasKey, t } from '../core/i18n';
 import type { Sim } from '../sim/sim';
 import type { Trainee } from '../sim/state';
 import { lerpAngle } from '../sim/geom';
@@ -97,6 +97,11 @@ function easeOutBack(k: number): number {
   return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
 }
 
+/** Short description of what a built object does ('' when it has no perk). */
+function perkText(objId: string): string {
+  return hasKey('perk.' + objId) ? t('perk.' + objId) : '';
+}
+
 function tri(p: number): number {
   return p < 0.5 ? p * 2 : 2 - p * 2;
 }
@@ -168,6 +173,8 @@ export class GameView {
   private readonly deskRing: PadMesh;
   private readonly unlocks = new Map<string, UnlockView>();
   private readonly pads = new Map<string, PadView>();
+  /** Seconds the coach has stood still (guide arrow hint after the tutorial). */
+  private coachIdle = 0;
   private readonly actors = new Map<string, Actor>();
   private readonly pops: Pop[] = [];
   private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide });
@@ -182,8 +189,6 @@ export class GameView {
   private readonly hit = new Vector3();
   private celebrateUntil = 0;
   private readonly geos: Record<string, UnlockGeo> = {};
-  private readonly ambient: Actor[] = [];
-  private ambientBall = { from: 0, t: 0 };
   private readonly tmpColor = new Color();
 
   constructor(
@@ -262,7 +267,6 @@ export class GameView {
     this.deskRing.position.set(ds.x, 0.035, ds.z);
     scene.add(this.deskRing);
 
-    this.makeAmbient();
     this.syncBuilt(false);
     this.wire();
     // portrait (rendered from the real coach model)
@@ -370,6 +374,9 @@ export class GameView {
       this.dustRing(e.x, e.z);
       this.rig.shake(0.18);
       this.popups.text(e.x, 2.2, e.z, `+${e.stars} ★`, 'star');
+      const ud = this.sim.world.pads.get(e.padId)?.unlock;
+      const perk = ud?.type === 'object' ? perkText(ud.id) : '';
+      if (perk) this.hud.toast(perk, 'info');
       this.hud.bumpStars();
       if (e.major) {
         const u = this.sim.world.pads.get(e.padId)?.unlock;
@@ -494,35 +501,6 @@ export class GameView {
     return a;
   }
 
-  /** View-only life for the first frame: kids in the changing room and two kids passing on the plaza. */
-  private makeAmbient(): void {
-    const L = AREA1_LAYOUT;
-    const cr = L.rooms[1]?.rect;
-    if (!cr) return;
-    const bx = (cr.x0 + cr.x1) / 2;
-    const bz = (cr.z0 + cr.z1) / 2 - 0.4;
-    const mk = (model: CharacterKey, kit: typeof KITS.academy, x: number, z: number, ry: number, anim: CharAnim): void => {
-      const c = new Character(this.assets, model, kit, KID_SCALE);
-      c.root.position.set(x, 0, z);
-      c.root.rotation.y = ry;
-      c.play(anim, 0);
-      c.seek((x * 7 + z * 3) % 1.5);
-      this.core.scene.add(c.root);
-      this.ambient.push({ c, lx: x, lz: z, yaw: ry, lastRep: 0, seen: 0 });
-    };
-    mk('female-d', KITS.academy, bx - 0.8, bz + 0.05, 0, 'sit');
-    mk('male-e', KITS.academy, bx + 0.9, bz + 0.9, -0.5, 'idle');
-    const k = this.sim.area.ambientKids;
-    const a = k[0];
-    const b = k[1];
-    if (a && b) {
-      mk('male-f', casualKit(31), a.x, a.z, Math.atan2(b.x - a.x, b.z - a.z), 'idle');
-      mk('female-b', casualKit(32), b.x, b.z, Math.atan2(a.x - b.x, a.z - b.z), 'idle');
-    }
-    const ob = { x: -11.6, z: 4.6 };
-    mk('female-e', casualKit(33), ob.x + 0.05, ob.z - 0.4, Math.PI / 2, 'sit');
-  }
-
   // ───────────────────────────── per-frame ─────────────────────────────
 
   frame(alpha: number, dt: number): void {
@@ -640,9 +618,6 @@ export class GameView {
       this.actors.delete(k);
     }
 
-    // ── ambient life
-    this.updateAmbient(dt, ballAt);
-
     // animation update (far characters at 30 Hz)
     const fxp = this.rig.focus.x;
     const fzp = this.rig.focus.z;
@@ -650,7 +625,6 @@ export class GameView {
       const p = a.c.root.position;
       a.c.update(dt, Math.hypot(p.x - fxp, p.z - fzp) > 13 ? 30 : 60);
     }
-    for (const a of this.ambient) a.c.update(dt, 30);
 
     this.balls.count = bi;
     this.balls.instanceMatrix.needsUpdate = true;
@@ -703,6 +677,7 @@ export class GameView {
     this.bus.visible = s.bus.phase !== 'away';
     if (this.bus.visible && s.bus.phase === 'stopped') this.bus.position.y = -0.3 + Math.abs(Math.sin(this.time * 10)) * 0.02;
 
+    this.coachIdle = Math.hypot(c.vx, c.vz) < 0.2 ? this.coachIdle + dt : 0;
     this.updateArrow(cx, cz);
     this.fx.update(dt, this.time);
     this.labels.end();
@@ -718,10 +693,16 @@ export class GameView {
     let yaw = tr.yaw;
     let anim: CharAnim = 'idle';
     let animSpeed = 1;
-    const signed = !(tr.state === 'arriving' || tr.state === 'seated' || tr.state === 'toDesk' || tr.state === 'atDesk');
-    if (signed && !a.c.root.userData.kit) {
+    // casual clothes until halfway through changing on the locker-room bench
+    const pre = tr.state === 'arriving' || tr.state === 'seated' || tr.state === 'toDesk' || tr.state === 'atDesk' || tr.state === 'toLocker';
+    const kitOn = !pre && !(tr.state === 'changing' && tr.repT < 0.5);
+    if (kitOn && !a.c.root.userData.kit) {
       a.c.setKit(this.assets, KITS.academy);
       a.c.root.userData.kit = true;
+      if (tr.state === 'changing') {
+        this.fx.burst(x, 0.9, z, 18, 0.5);
+        this.audio.play('pop', 1.2);
+      }
     }
     if (tr.state === 'training' && tr.stationId) {
       const st = sim.station(tr.stationId);
@@ -797,7 +778,7 @@ export class GameView {
         }
         a.lastRep = p;
       }
-    } else if (tr.state === 'seated') {
+    } else if (tr.state === 'seated' || tr.state === 'changing') {
       anim = 'sit';
     } else if (tr.moving) {
       anim = tr.state === 'leaving' ? 'run' : 'walk';
@@ -814,32 +795,14 @@ export class GameView {
       this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card"><span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble need">${icon('ball')}<span class="emo">😟</span></div>`);
+    } else if (tr.state === 'changing') {
+      this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble">👕</div>`);
     } else if (tr.state === 'seated' && tr.waitT > BALANCE.trainee.moodWaitSec) {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<div class="bubble">⏳<span class="emo">😴</span></div>`);
     } else {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${rc}">${ovr}</span>`);
     }
     return a;
-  }
-
-  private updateAmbient(dt: number, ballAt: (x: number, y: number, z: number, rot?: number, scale?: number) => void): void {
-    const kids = this.sim.area.ambientKids;
-    const a = kids[0];
-    const b = kids[1];
-    const ka = this.ambient[2];
-    const kb = this.ambient[3];
-    if (!a || !b || !ka || !kb) return;
-    const ab = this.ambientBall;
-    ab.t += dt / 1.5;
-    if (ab.t >= 1) {
-      ab.t = 0;
-      ab.from = 1 - ab.from;
-      (ab.from === 0 ? ka : kb).c.play('kick', 0.08, 1.2);
-    }
-    const from = ab.from === 0 ? a : b;
-    const to = ab.from === 0 ? b : a;
-    const k = Math.max(0, (ab.t - 0.3) / 0.7);
-    ballAt(from.x + (to.x - from.x) * k, 0.15 + Math.sin(k * Math.PI) * 0.8, from.z + (to.z - from.z) * k, this.time * 8);
   }
 
   private updatePads(): void {
@@ -890,7 +853,8 @@ export class GameView {
   private padTag(p: PadDef, afford: boolean): string {
     const rem = Math.ceil(this.sim.padRemaining(p));
     const name = p.unlock.type === 'staff' ? t('pad.hire', { name: t(p.nameKey) }) : t(p.nameKey);
-    return `<div class="pad2${afford ? ' ok' : ''}"><div class="pad2-price">${icon('cash')}<b>${formatCash(rem)}</b></div><div class="pad2-name">${icon(p.icon)}<i>${t('pad.unlock')}</i>${name}</div></div>`;
+    const perk = p.unlock.type === 'object' ? perkText(p.unlock.id) : '';
+    return `<div class="pad2${afford ? ' ok' : ''}"><div class="pad2-price">${icon('cash')}<b>${formatCash(rem)}</b></div><div class="pad2-name">${icon(p.icon)}<i>${t('pad.unlock')}</i>${name}</div>${perk ? `<div class="pad2-perk">${perk}</div>` : ''}</div>`;
   }
 
   private updateNets(u: UnlockView, dt: number): void {
@@ -921,6 +885,14 @@ export class GameView {
       return;
     }
     const near = Math.hypot(o.x - cx, o.z - cz) < o.radius * 0.8;
+    // guided only during the tutorial; afterwards the player plans their own route (arrow returns when idle)
+    const OB = BALANCE.objectives;
+    const guided = this.sim.state.stats.unlocks < OB.guideUnlocks || this.coachIdle >= OB.hintIdleSec;
+    if (!guided) {
+      this.arrow.visible = false;
+      edge.classList.add('hidden');
+      return;
+    }
     this.arrow.visible = !near;
     this.arrow.position.set(o.x, 1.9 + Math.abs(Math.sin(this.time * 4)) * 0.4, o.z);
     // face the camera (camera never rotates); tilt back so it reads from the 52° view

@@ -41,6 +41,8 @@ export type TraineeState =
   | 'seated'
   | 'toDesk'
   | 'atDesk'
+  | 'toLocker'
+  | 'changing'
   | 'queued'
   | 'toLane'
   | 'training'
@@ -66,6 +68,7 @@ export interface Trainee extends Agent {
   gradOvr: number;
   cap: number;
   state: TraineeState;
+  /** Reception seat index while waiting; changing-room seat index while toLocker/changing; else -1. */
   seat: number;
   arrivalOrder: number;
   stationId: string | null;

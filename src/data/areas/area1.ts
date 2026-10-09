@@ -141,23 +141,31 @@ export const AREA1: AreaDef = {
     { id: 'p_goal_l2', area: 1, pos: { x: 0.1, z: -5.4 }, cost: 40, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'lane', station: 'shooting_goal' }, icon: 'lane', nameKey: 'lane.shooting_goal' },
     { id: 'p_wall', area: 1, pos: { x: 12.1, z: -3.7 }, cost: 50, stars: 2, xp: 12, requires: ['p_cones'], unlock: { type: 'station', id: 'passing_wall' }, icon: 'wall', nameKey: 'station.passing_wall', major: true },
     { id: 'p_cones_l2', area: 1, pos: { x: 7.6, z: -4.4 }, cost: 55, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'lane', station: 'dribble_cones' }, icon: 'lane', nameKey: 'lane.dribble_cones' },
-    { id: 'p_ballboy', area: 1, pos: { x: -2.6, z: 1.3 }, cost: 175, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
+    { id: 'p_ballboy', area: 1, pos: { x: -2.6, z: 1.3 }, cost: 185, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
     { id: 'p_bench', area: 1, pos: { x: 4.4, z: 0.4 }, cost: 45, stars: 1, xp: 8, requires: ['p_cones'], unlock: { type: 'object', id: 'bench' }, icon: 'bench', nameKey: 'obj.bench' },
     { id: 'p_sprint', area: 1, pos: { x: 2.8, z: 7.85 }, cost: 140, stars: 2, xp: 12, requires: ['p_ballboy'], unlock: { type: 'station', id: 'sprint_track' }, icon: 'track', nameKey: 'station.sprint_track', major: true },
     { id: 'p_flags', area: 1, pos: { x: 5.6, z: 7.6 }, cost: 75, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'object', id: 'flags' }, icon: 'flag', nameKey: 'obj.flags' },
     { id: 'p_wall_l2', area: 1, pos: { x: 9.4, z: -4.4 }, cost: 180, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'lane', station: 'passing_wall' }, icon: 'lane', nameKey: 'lane.passing_wall' },
     { id: 'p_shelter', area: 1, pos: { x: 12.3, z: 0.6 }, cost: 220, stars: 1, xp: 10, requires: ['p_chairs2', 'p_wall'], unlock: { type: 'object', id: 'bus_shelter' }, icon: 'shelter', nameKey: 'obj.bus_shelter' },
-    { id: 'p_cooler', area: 1, pos: { x: -3.0, z: -1.2 }, cost: 260, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'object', id: 'water_cooler' }, icon: 'cooler', nameKey: 'obj.water_cooler' },
+    { id: 'p_cooler', area: 1, pos: { x: -3.0, z: -1.2 }, cost: 110, stars: 1, xp: 8, requires: ['p_flags'], unlock: { type: 'object', id: 'water_cooler' }, icon: 'cooler', nameKey: 'obj.water_cooler' },
     { id: 'p_track_l2', area: 1, pos: { x: -2.9, z: 6.3 }, cost: 320, stars: 1, xp: 8, requires: ['p_sprint'], unlock: { type: 'lane', station: 'sprint_track' }, icon: 'lane', nameKey: 'lane.sprint_track' },
   ],
   starterPiles: [
     { id: 'starter_a', pos: { x: -3.0, z: -0.6 }, amount: 15 },
     { id: 'starter_b', pos: { x: 0.8, z: -0.9 }, amount: 25 },
   ],
-  ambientKids: [
-    { x: 9.0, z: 2.4 },
-    { x: 12.0, z: 3.0 },
-  ],
+  lockers: {
+    // front bench first, then the back bench (both face the camera)
+    seats: [
+      { x: -5.1, z: -4.65 },
+      { x: -3.7, z: -4.65 },
+      { x: -4.4, z: -4.65 },
+      { x: -5.1, z: -6.25 },
+      { x: -3.7, z: -6.25 },
+      { x: -4.4, z: -6.25 },
+    ],
+    yaw: Math.PI,
+  },
   obstacles: [
     // clubhouse walls (back, west, middle with doorway, east), front stubs with doorways
     { x0: -13.3, z0: -9.5, x1: -1.6, z1: -9.0 },
@@ -175,15 +183,16 @@ export const AREA1: AreaDef = {
     { x0: -6.4, z0: -9.0, x1: -2.4, z1: -8.35 },
     { x0: -5.85, z0: -6.6, x1: -2.95, z1: -6.0 },
     { x0: -5.85, z0: -5.0, x1: -2.95, z1: -4.4 },
+    // dead-end alley between the clubhouse east wall and the pitch fence (too narrow to path out of)
+    { x0: -1.95, z0: -9.5, x1: -0.65, z1: -2.05 },
     // pitch fence (west + south with three gates)
     { x0: -0.95, z0: -9.5, x1: -0.65, z1: -2.05 },
     { x0: -0.95, z0: -2.35, x1: 1.0, z1: -2.05 },
     { x0: 2.6, z0: -2.35, x1: 6.2, z1: -2.05 },
     { x0: 7.8, z0: -2.35, x1: 9.8, z1: -2.05 },
     { x0: 11.4, z0: -2.35, x1: 13.3, z1: -2.05 },
-    // plaza furniture: tactics board, ball rack, outside bench, planters, park benches
+    // plaza furniture: tactics board, outside bench, planters, park benches
     { x0: -0.95, z0: -1.25, x1: 0.05, z1: -0.55 },
-    { x0: 0.0, z0: 0.15, x1: 1.45, z1: 0.85 },
     { x0: -11.75, z0: -1.8, x1: -9.45, z1: -1.2 },
     { x0: -2.1, z0: -2.0, x1: -1.5, z1: -1.4 },
     { x0: 12.5, z0: 5.7, x1: 13.1, z1: 6.3 },

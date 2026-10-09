@@ -1135,3 +1135,13 @@ body {
     display: none;
   }
 }
+.pad2-perk {
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #ffd23f;
+  color: var(--ol);
+  font-family: var(--display);
+  font-size: 14px;
+  white-space: nowrap;
+}
