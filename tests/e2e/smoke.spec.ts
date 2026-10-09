@@ -31,7 +31,8 @@ test.describe('desktop', () => {
     expect(o2?.key).toBe('obj.unlock');
     await steerKeys(page, o2!.x, o2!.z, 12_000, 0.3);
     await expect.poll(async () => (await coach(page)).stars, { timeout: 5000 }).toBe(1);
-    await expect(page.locator('.starbar-text')).toHaveText('1/20');
+    const total = await page.evaluate(() => (window.__wk!.sim as { world: { totalStars: number } }).world.totalStars);
+    await expect(page.locator('.starbar-text')).toHaveText(`1/${total}`);
     // save → reload
     await page.evaluate(() => (window.__wk!.persist as (r: string) => void)('test'));
     const before = await coach(page);
