@@ -317,7 +317,14 @@ async function boot(): Promise<void> {
   }
 }
 
-boot().catch((e: unknown) => {
+const showcase = import.meta.env.DEV && new URLSearchParams(location.search).get('showcase') === '1';
+(showcase
+  ? import('./view/showcase').then((m) => {
+      document.getElementById('boot')?.remove();
+      return m.runShowcase(document.getElementById('game') as HTMLDivElement);
+    })
+  : boot()
+).catch((e: unknown) => {
   // last-resort: never leave a blank page; log for the debug overlay / QA
   console.error('[boot]', e);
 });

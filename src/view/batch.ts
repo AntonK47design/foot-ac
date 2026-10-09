@@ -78,18 +78,33 @@ export class Batch {
     return this.parts.length === 0;
   }
 
-  geometry(): BufferGeometry {
+  geometry(ao = false): BufferGeometry {
     const g = mergeGeometries(this.parts, false);
+    if (ao) bakeGroundAo(g);
     for (const p of this.parts) p.dispose();
     this.parts.length = 0;
     g.computeBoundingSphere();
     return g;
   }
 
-  build(material: Material): Mesh {
-    const mesh = new Mesh(this.geometry(), material);
+  build(material: Material, ao = false): Mesh {
+    const mesh = new Mesh(this.geometry(ao), material);
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     return mesh;
   }
+}
+
+/** Baked vertex AO: darkens vertices close to the ground (wall bases, furniture feet). */
+export function bakeGroundAo(g: BufferGeometry, strength = 0.32, height = 0.55): void {
+  const pos = g.attributes.position;
+  const col = g.attributes.color;
+  if (!pos || !col) return;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const k = Math.min(1, Math.max(0, y / height));
+    const f = 1 - strength * (1 - k * k * (3 - 2 * k));
+    col.setXYZ(i, col.getX(i) * f, col.getY(i) * f, col.getZ(i) * f);
+  }
+  col.needsUpdate = true;
 }

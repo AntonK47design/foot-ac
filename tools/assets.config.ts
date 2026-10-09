@@ -12,8 +12,8 @@ export interface AssetGroup {
   id: string;
   area1: boolean;
   models: Record<string, AssetSource>;
-  /** Keep animations (characters). */
-  animations?: boolean;
+  /** Characters: one GLB per model, kit UV remap, shared clips from `clipSource`. */
+  characters?: { clipSource: string; clips: string[] };
 }
 
 export interface PackInfo {
@@ -25,6 +25,13 @@ export interface PackInfo {
 }
 
 export const PACKS: Record<string, PackInfo> = {
+  'kenney-mini-characters': {
+    title: 'Mini Characters 1.0',
+    author: 'Kenney (www.kenney.nl)',
+    url: 'https://kenney.nl/assets/mini-characters',
+    license: 'CC0 1.0',
+    licenseFile: 'kenney/mini-characters/License.txt',
+  },
   'kaykit-furniture': {
     title: 'KayKit Furniture Bits 1.0',
     author: 'Kay Lousberg',
@@ -58,7 +65,19 @@ export const PACKS: Record<string, PackInfo> = {
 const f = (dir: string, pack: string, names: string[]): Record<string, AssetSource> =>
   Object.fromEntries(names.map((n) => [n, { file: `${dir}/${n}.gltf`, pack }]));
 
+const CHAR_DIR = 'kenney/mini-characters/Models/GLB format';
+const CHARS = ['male-a', 'male-b', 'male-c', 'male-d', 'male-e', 'male-f', 'female-a', 'female-b', 'female-c', 'female-d', 'female-e', 'female-f'];
+
 export const GROUPS: AssetGroup[] = [
+  {
+    id: 'characters',
+    area1: true,
+    models: Object.fromEntries(CHARS.map((c) => [c, { file: `${CHAR_DIR}/character-${c}.glb`, pack: 'kenney-mini-characters' }])),
+    characters: {
+      clipSource: 'male-a',
+      clips: ['idle', 'walk', 'sprint', 'sit', 'pick-up', 'emote-yes', 'holding-both', 'attack-kick-right', 'interact-right', 'crouch', 'jump'],
+    },
+  },
   {
     id: 'props-area1',
     area1: true,

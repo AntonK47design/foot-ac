@@ -1,8 +1,12 @@
 import { PerspectiveCamera, Vector3 } from 'three';
 import { BALANCE } from '../data/balance';
 
-const FOV = 35;
+/** ART_BIBLE §5 */
+const FOV = 48;
 const PITCH = (52 * Math.PI) / 180;
+/** Visible world width (m) at the focus point: portrait → landscape. */
+const WIDTH_PORTRAIT = 9.5;
+const WIDTH_LANDSCAPE = 17;
 
 /**
  * Fixed 3/4 follow camera. Distance is derived from the aspect ratio so roughly the same
@@ -20,7 +24,7 @@ export class CameraRig {
   aspect = 16 / 9;
 
   constructor() {
-    this.camera = new PerspectiveCamera(FOV, 16 / 9, 1, 260);
+    this.camera = new PerspectiveCamera(FOV, 16 / 9, 0.5, 220);
   }
 
   resize(w: number, h: number): void {
@@ -38,13 +42,11 @@ export class CameraRig {
   private updateDistance(): void {
     const tanH = Math.tan(((FOV / 2) * Math.PI) / 180);
     const a = this.aspect;
-    // narrower world width in portrait so characters stay readable; more height instead
-    const wk = Math.min(1, Math.max(0.6, 0.6 + (a - 0.5) * 0.5));
-    const W = this.view * wk;
-    const H = this.view * 0.7;
-    const dW = W / (tanH * a);
-    const dH = (H * Math.sin(PITCH)) / tanH;
-    this.dist = Math.max(dW, dH);
+    const k = Math.min(1, Math.max(0, (a - 0.46) / (1.78 - 0.46)));
+    // zoom out only as the playable area grows (view grows beyond the base)
+    const grow = this.view / BALANCE.camera.baseView;
+    const W = (WIDTH_PORTRAIT + (WIDTH_LANDSCAPE - WIDTH_PORTRAIT) * k) * grow;
+    this.dist = W / 2 / (tanH * a);
   }
 
   snap(x: number, z: number): void {

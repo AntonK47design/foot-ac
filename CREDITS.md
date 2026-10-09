@@ -7,6 +7,7 @@
 - **KayKit Furniture Bits 1.0** by Kay Lousberg, CC0 1.0 — https://github.com/KayKit-Game-Assets/KayKit-Furniture-Bits-1.0 (licence: `assets-src/kaykit/furniture-bits/LICENSE.txt`)
 - **KayKit Prototype Bits 1.0** by Kay Lousberg, CC0 1.0 — https://github.com/KayKit-Game-Assets/KayKit-Prototype-Bits-1.0 (licence: `assets-src/kaykit/prototype-bits/LICENSE.txt`)
 - **KayKit Restaurant Bits 1.0** by Kay Lousberg, CC0 1.0 — https://github.com/KayKit-Game-Assets/KayKit-Restaurant-Bits-1.0 (licence: `assets-src/kaykit/restaurant-bits/LICENSE.txt`)
+- **Mini Characters 1.0** by Kenney (www.kenney.nl), CC0 1.0 — https://kenney.nl/assets/mini-characters (licence: `assets-src/kenney/mini-characters/License.txt`)
 
 ## Fonts
 - **Fredoka** by The Fredoka Project Authors, SIL Open Font License 1.1 (via @fontsource/fredoka, Latin subset).

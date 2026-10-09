@@ -3,14 +3,12 @@
   "area.1": "Sunday Park",
   "area.2.locked": "Training Ground",
   "area.coming_soon": "Coming soon",
-
   "obj.collect_cash": "Collect cash",
   "obj.unlock": "Unlock {name}",
   "obj.sign": "Sign {name}",
   "obj.grab_balls": "Grab balls",
   "obj.bring_balls": "Bring balls",
   "obj.save_for": "Save up: {name}",
-
   "obj.ball_crate": "Ball Crate",
   "obj.chairs": "Waiting Bench",
   "obj.bench": "Team Bench",
@@ -26,19 +24,14 @@
   "lane.passing_wall": "Passing Lane 2",
   "lane.sprint_track": "Sprint Lane 2",
   "staff.ball_boy": "Ball Boy",
-
   "pad.hire": "Hire {name}",
-
   "hint.desktop": "WASD or hold mouse",
   "hint.touch": "Drag to move",
-
-  "hud.level": "Lv {level}",
+  "hud.level": "LVL {level}",
   "hud.stars": "{stars}/{total}",
   "hud.settings": "Settings",
-
   "desk.full": "Full",
   "bubble.balls": "Need balls!",
-
   "toast.level_up": "Academy level {level}!",
   "toast.hired": "{name} hired! Baskets refill automatically",
   "toast.graduated": "{name} graduated! +{cash}",
@@ -47,9 +40,7 @@
   "toast.ad_unavailable": "Ad not available, try again later",
   "toast.reset_done": "Progress reset",
   "toast.area_preview": "More areas coming soon!",
-
   "popup.stat": "+{n} {stat}",
-
   "settings.title": "Settings",
   "settings.sound": "Sound",
   "settings.music": "Music",
@@ -65,28 +56,25 @@
   "settings.on": "On",
   "settings.off": "Off",
   "settings.muted_by_platform": "Muted in CrazyGames settings",
-
   "lang.en": "English",
-
   "rarity.common": "Common",
   "rarity.rare": "Rare",
   "rarity.epic": "Epic",
   "rarity.wonderkid": "Wonderkid",
-
   "pos.GK": "GK",
   "pos.DF": "DF",
   "pos.MF": "MF",
   "pos.FW": "FW",
-
   "stat.PAC": "PAC",
   "stat.SHO": "SHO",
   "stat.PAS": "PAS",
   "stat.DRI": "DRI",
-
   "card.ovr": "OVR",
   "card.age": "{age} yrs",
-
   "context.lost": "Tap to continue",
-
-  "trainee.count": { "one": "{count} trainee", "other": "{count} trainees" }
+  "trainee.count": {
+    "one": "{count} trainee",
+    "other": "{count} trainees"
+  },
+  "pad.unlock": "Unlock"
 }

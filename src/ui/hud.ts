@@ -20,6 +20,7 @@ export class Hud {
   private readonly starFill: HTMLDivElement;
   private readonly starText: HTMLSpanElement;
   private readonly levelText: HTMLSpanElement;
+  private readonly portrait: HTMLDivElement;
   private readonly levelRing: SVGCircleElement;
   private readonly objPill: HTMLDivElement;
   private readonly objIcon: HTMLSpanElement;
@@ -37,7 +38,8 @@ export class Hud {
     this.gear = el('button', 'btn-round gear', tl, icon('gear'));
     this.gear.setAttribute('aria-label', t('hud.settings'));
     const badge = el('div', 'badge', tl);
-    badge.innerHTML = `<svg viewBox="0 0 44 44" class="ring"><circle cx="22" cy="22" r="19" class="ring-bg"/><circle cx="22" cy="22" r="19" class="ring-fg"/></svg>`;
+    badge.innerHTML = `<div class="portrait"></div><svg viewBox="0 0 44 44" class="ring"><circle cx="22" cy="22" r="19" class="ring-bg"/><circle cx="22" cy="22" r="19" class="ring-fg"/></svg>`;
+    this.portrait = badge.querySelector('.portrait') as HTMLDivElement;
     this.levelRing = badge.querySelector('.ring-fg') as SVGCircleElement;
     this.levelText = el('span', 'badge-lv', badge);
 
@@ -83,7 +85,8 @@ export class Hud {
 
   setStars(stars: number, total: number): void {
     this.starFill.style.width = `${Math.min(100, (stars / Math.max(1, total)) * 100)}%`;
-    this.starText.textContent = t('hud.stars', { stars, total });
+    const txt = t('hud.stars', { stars, total });
+    if (this.starText.textContent !== txt) this.starText.textContent = txt;
   }
 
   bumpStars(): void {
@@ -94,21 +97,31 @@ export class Hud {
     bar.classList.add('bump');
   }
 
+  /** Rendered coach face (data URL). */
+  setPortrait(url: string): void {
+    this.portrait.style.backgroundImage = `url(${url})`;
+  }
+
   setLevel(level: number, progress: number): void {
-    this.levelText.textContent = String(level);
+    const txt = t('hud.level', { level });
+    if (this.levelText.textContent !== txt) {
+      this.levelText.textContent = txt;
+      bounce(this.levelText);
+    }
     const c = 2 * Math.PI * 19;
     this.levelRing.style.strokeDasharray = `${c}`;
     this.levelRing.style.strokeDashoffset = `${c * (1 - Math.max(0, Math.min(1, progress)))}`;
   }
 
-  setObjective(o: Objective | null): void {
+  /** `iconUrl`: icon rendered from the real 3D model (icon atlas); falls back to the SVG icon. */
+  setObjective(o: Objective | null, iconUrl?: string): void {
     if (!o) {
       this.objPill.classList.add('hidden');
       return;
     }
     const params: Record<string, string | number> = { ...(o.params ?? {}) };
     if (typeof params.name === 'string' && hasKey(params.name)) params.name = t(params.name);
-    this.objIcon.innerHTML = icon(o.icon === 'sign' ? 'sign' : o.icon);
+    this.objIcon.innerHTML = iconUrl ? `<img alt="" src="${iconUrl}">` : icon(o.icon === 'sign' ? 'sign' : o.icon);
     this.objText.textContent = t(o.key, params);
     this.objPill.classList.remove('hidden');
     this.objPill.classList.remove('pop');
@@ -151,4 +164,10 @@ export class Hud {
   }
 
   static formatNumber = formatNumber;
+}
+
+function bounce(e: HTMLElement): void {
+  e.classList.remove('bump');
+  void e.offsetWidth;
+  e.classList.add('bump');
 }

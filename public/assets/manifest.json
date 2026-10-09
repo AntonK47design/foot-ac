@@ -1,4 +1,23 @@
 {
+  "characters": {
+    "file": "characters/",
+    "area1": true,
+    "bytes": 1127560,
+    "models": [
+      "male-a",
+      "male-b",
+      "male-c",
+      "male-d",
+      "male-e",
+      "male-f",
+      "female-a",
+      "female-b",
+      "female-c",
+      "female-d",
+      "female-e",
+      "female-f"
+    ]
+  },
   "props-area1": {
     "file": "props-area1.glb",
     "area1": true,
