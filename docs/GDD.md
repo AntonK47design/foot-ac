@@ -1,5 +1,10 @@
 # Build "Wonderkid Academy": a 3D football academy builder for CrazyGames
 
+> **Art overhaul override (2026-10-09):** `docs/ART_BIBLE.md` overrides this spec where they conflict:
+> §8 "procedural by default" → rigged CC0 characters + CC0 prop packs via the asset pipeline;
+> §8 "never a black void" → a dark desaturated void around a raised, bright academy plot;
+> §2/§11 size and load budgets → initial ≤ 6 MB (hard cap 10 MB), gameplayStart ≤ 4 s desktop / ≤ 8 s mobile Fast 4G, triangles ≤ 400 k.
+
 > Saved verbatim from the project brief. This is the source of truth for design and acceptance criteria.
 
 ## 0. Your role and mission

@@ -24,3 +24,10 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 18. **Mock ads default to `adsDisabledBasicLaunch`**, mirroring Basic Launch. With `VITE_ADS=off` the wrapper never calls the adapter.
 19. **E2E runs against a production build with test hooks** (`--mode e2e` → `VITE_TEST_HOOKS=1` → `window.__wk`). The debug overlay and hooks are compiled out of the normal prod build.
 20. **Touch e2e uses CDP touch events** (real pointerType `touch`) on Chromium device emulation. WebKit isn't installed in CI, so the iPhone profile runs on Chromium with iPhone viewport/UA/touch.
+
+## Art overhaul
+
+21. **`docs/ART_BIBLE.md` overrides GDD §8 and the size budget** (user directive): dark void + raised plot, rigged CC0 characters, CC0 prop packs, initial ≤ 6 MB, tris ≤ 400 k.
+22. **Asset sources reachable from the build environment**: KayKit packs (official GitHub repos, CC0) clone fine and are imported into `assets-src/kaykit/` with their licence files (Furniture, Prototype, City Builder, Restaurant Bits). kenney.nl, quaternius.com and itch.io are blocked by the sandbox network policy; Kenney Mini Characters must be supplied by the user. Third-party GitHub re-bundles of mixed packs were rejected (unverifiable licence provenance).
+23. **Touch hint**: the initial input method uses `matchMedia('(pointer: coarse)')` as well as the SDK device type, and the first pointer event of any type switches the hint immediately (fixes WASD hint in phone emulation with the mock platform).
+24. **"Chairs" → "benches"** in all player-facing names (football-themed furniture).

@@ -55,6 +55,8 @@ export class Input {
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerUp);
     layer.addEventListener('contextmenu', (e) => e.preventDefault());
+    // first pointer anywhere decides the hint (touch on a laptop, mouse on a tablet…)
+    window.addEventListener('pointerdown', (e) => this.setMethod(e.pointerType === 'mouse' ? 'mouse' : 'touch'), { capture: true, passive: true });
   }
 
   onMethodChange(fn: (m: InputMethod) => void): void {

@@ -81,7 +81,9 @@ async function boot(): Promise<void> {
   };
 
   const view = new GameView(core, sim, hud, audio, worldUi, haptic);
-  const initialMethod: InputMethod = device === 'desktop' ? 'keyboard' : 'touch';
+  // the mock reports 'desktop' everywhere; a coarse primary pointer means touch (phones, tablets, touch emulation)
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const initialMethod: InputMethod = device !== 'desktop' || coarse ? 'touch' : 'keyboard';
   const input = new Input(inputLayer, initialMethod);
 
   // ── sizing (live rotation, iOS address bar)

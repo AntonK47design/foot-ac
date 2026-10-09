@@ -1,10 +1,10 @@
 # Wonderkid Academy — working rules
 
-3D idle-arcade football academy builder for CrazyGames (three.js + TS + Vite). Full spec: `docs/GDD.md`. Decisions log: `docs/DECISIONS.md`.
+3D idle-arcade football academy builder for CrazyGames (three.js + TS + Vite). Full spec: `docs/GDD.md`. **Look: `docs/ART_BIBLE.md` (overrides GDD §8 and the size budget).** Decisions log: `docs/DECISIONS.md`.
 
 ## Non-negotiables (§2)
-- Gameplay ≤ 3 s. No title screen/menu/Play button/splash. `gameplayStart()` on first controllable frame.
-- Initial download ≤ 3 MB (fail > 5 MB); JS ≤ 400 KB brotli. Lazy-load everything not needed in the first 2 min.
+- Gameplay ≤ 4 s desktop / ≤ 8 s mobile Fast 4G. No title screen/menu/Play button/splash. `gameplayStart()` on first controllable frame.
+- Initial download ≤ 6 MB (fail > 10 MB); JS ≤ 400 KB brotli. Lazy-load everything not needed in the first 2 min (Area 1 assets load before gameplayStart).
 - `base: './'`, relative paths, ≤ 1,500 files. No runtime network except the CrazyGames SDK script. Fonts bundled locally.
 - No fullscreen button, external links, cross-promo, own ads, `alert/confirm/prompt`.
 - Never bind Escape or browser shortcuts. Movement via `KeyboardEvent.code`. `preventDefault` on arrows/space.
@@ -22,7 +22,7 @@
 - Handle WebGL context loss. Pause sim+render when hidden. Save on `visibilitychange:hidden` and `pagehide`.
 
 ## Budgets (§11)
-Initial ≤ 3 MB · JS ≤ 400 KB br · gameplayStart ≤ 2.5 s desktop / ≤ 6 s mobile · draw calls ≤ 150 · tris ≤ 300 k · heap < 250 MB · DPR cap High 2 / Mid 1.5 / Low 1 · textures ≤ 1024 px.
+Initial ≤ 6 MB (hard 10 MB) · JS ≤ 400 KB br · gameplayStart ≤ 4 s desktop / ≤ 8 s mobile · draw calls ≤ 150 · tris ≤ 400 k · Low ≥ 30 FPS with 30 characters · heap < 250 MB · DPR cap High 2 / Mid 1.5 / Low 1 · textures ≤ 1024 px.
 
 ## SDK (§6)
 - Only `src/platform/*` touches `window.CrazyGames`. Every call in try/catch. Fallback: `MockPlatform`.
@@ -44,6 +44,8 @@ Initial ≤ 3 MB · JS ≤ 400 KB br · gameplayStart ≤ 2.5 s desktop / ≤ 6 
 - Content is data in `src/data/`; all tunables in `src/data/balance.ts` (no magic numbers in systems).
 - Time via `core/clock.ts`, randomness via `core/rng.ts` (seeded).
 - Hot paths: no per-frame allocations; use pools; reuse vectors.
-- Static scenery is merged per material (vertex colours); humanoids are per-part `InstancedMesh`.
+- Art: CC0 packs in `assets-src/` (with licences) → `tools/assets.ts` (prune/dedupe/weld/meshopt, WebP ≤ 512 px) → `public/assets/*.glb` + manifest; load with GLTFLoader + MeshoptDecoder.
+- Never ship primitive placeholders; if an asset is missing, stop and ask. No real clubs/brands on posters, banners, kits.
+- `?showcase` / debug code never ships in prod builds.
 - UI is DOM/CSS overlay; scale with `clamp()`; text via `t()` from `core/i18n.ts`.
 - Log design decisions in `docs/DECISIONS.md`.
