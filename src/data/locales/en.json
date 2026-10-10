@@ -312,5 +312,7 @@
   "up.st:freekick": "Free-Kick Wall",
   "up.st:agility": "Agility Course",
   "up.st:skills": "Skills Square",
-  "toast.area2": "Training Ground open!"
+  "toast.area2": "Training Ground open!",
+  "obj.meet_first": "Meet your first player at the desk",
+  "obj.collect_fees": "Collect training fees"
 }

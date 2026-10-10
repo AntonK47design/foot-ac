@@ -155,3 +155,14 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 69. **Renamed to "Kickoff Academy: Football Tycoon"** (user request). It reuses the name of the user's first CrazyGames game, "Kickoff Academy". That game never left Basic Launch, so there is no "2": a sequel number would point to a game players can't find. The subtitle carries the search words "football" and "tycoon".
     - **Changed:** `GAME_TITLE`, `game.title`, the page title, the upload zip (`kickoff-academy.zip`) and the package name.
     - **Kept on purpose:** the save keys (`wk_` prefix), so existing progress stays, and the "Wonderkid" rarity tier.
+70. **Tutorial: never "save up" with no income** (playtest: "told to unlock the Dribble Cones without the money; new players won't know where to go").
+    - **Meet your first player:** after the goal, the objective is the sign-up desk ("Meet your first player at the desk", then "Sign Leo"), while the bus brings the first player.
+    - **Collect training fees:** until the first Ball Boy, an objective with nothing to buy points at the busiest drill's fee pile instead of the pad it can't afford. That includes the first player still changing, whose fees land at the first drill.
+    - **Balls before the first rep:** after the first signing and before the first ball delivery, the objective is grab → bring balls.
+    - **Starting cash unchanged ($40):** raising it to $50 sped the opening past the §5.2 targets.
+71. **Economy sim: dead air judged over 10 seeds.** The 60 s / 90 s "never without a purchase or match" checks and the first-automation window failed on 2–3 of 10 seeds in every version. They passed only because the three fixed seeds happened to land well; one bus arriving 2 s later shifts the whole run. These checks now run 10 seeds each:
+    - **Focused bot:** median dead air ≤ 60 s (3–20 min) and ≤ 90 s (20–40 min), worst run ≤ 75 s and ≤ 110 s.
+    - **Distracted bot:** median ≤ 90 s and ≤ 120 s, worst ≤ 120 s and ≤ 140 s.
+    - **First automation:** median 2:15–4:00 (focused) or ≤ 5:00 (distracted).
+
+    The opening-beat checks still run per seed.

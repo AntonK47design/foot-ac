@@ -59,6 +59,22 @@ export function computeObjective(sim: Sim): Objective | null {
     return { key: 'obj.unlock', params: { name: bestPad.nameKey }, icon: bestPad.icon, x: bestPad.pos.x, z: bestPad.pos.z, targetId: bestPad.id, radius: BALANCE.pad.radius };
   }
 
+  // 4b. tutorial: once the bus is coming, wait at the sign-up desk for the first player (never "save up" with no income yet)
+  if (s.flags.busEnabled && s.stats.signed === 0) {
+    const sp = area.desk.coachSpot;
+    let first = null as (typeof s.trainees)[number] | null;
+    for (const t of s.trainees) if (!first || t.arrivalOrder < first.arrivalOrder) first = t;
+    return first
+      ? { key: 'obj.sign', params: { name: firstName(first) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius }
+      : { key: 'obj.meet_first', icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
+  }
+
+  // 4c. tutorial: after the first signing, stock the goal before the player gets there (grab → bring balls)
+  if (s.stats.signed > 0 && !s.flags.firstDelivery && s.built.ball_crate && !sim.hasStaff('ball_boy')) {
+    const need = sim.neediestStation(1, undefined, 'ball');
+    if (need) return ballObjective(sim, need);
+  }
+
   // 5. collect cash if the piles would make the next pad affordable
   let pileTotal = 0;
   for (const p of s.piles) pileTotal += Math.floor(p.amount);
@@ -126,6 +142,27 @@ export function computeObjective(sim: Sim): Objective | null {
   if (pileTotal >= BALANCE.objectives.minPileWorth) {
     const p = nearestPile();
     if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
+  }
+
+  // 7b. early game, nothing to buy yet: point at where money is about to land (the busiest drill's fee pile)
+  let busiest: string | null = null;
+  const early = !sim.hasStaff('ball_boy');
+  let bestLoad = 0;
+  for (const id of Object.keys(s.stations)) {
+    const ss = s.stations[id];
+    if (!ss) continue;
+    let load = ss.queue.length;
+    for (const o of ss.occupants) if (o) load++;
+    if (load > bestLoad) {
+      bestLoad = load;
+      busiest = id;
+    }
+  }
+  // the first player is still changing: their fees will land at the first drill
+  if (!busiest && s.stats.signed > 0 && s.stats.reps === 0) busiest = Object.keys(s.stations)[0] ?? null;
+  if (busiest && early) {
+    const p = sim.pile('st:' + busiest);
+    if (p) return { key: 'obj.collect_fees', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
   // 8. save up for the cheapest pad
