@@ -10,3 +10,4 @@ screenshots/
 
 # capture tool scratch (frames, supersampled renders)
 store/.*
+store/*.mp4
