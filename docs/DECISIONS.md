@@ -152,6 +152,6 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
       - the guide arrow shows whenever the objective is the gate;
       - opening the gate pans the camera to the Hydration Point, with a "Training Ground open!" toast;
       - the arrow then guides the first 3 Training Ground purchases, like the Sunday Park tutorial (`objectives.guideUnlocksNewArea`).
-69. **Renamed to "Kickoff Academy 2"** (user request). It is the sequel to the user's first CrazyGames game, "Kickoff Academy", so the "2" points returning players to it.
-    - **Changed:** `GAME_TITLE`, `game.title`, the page title, the upload zip (`kickoff-academy-2.zip`) and the package name.
+69. **Renamed to "Kickoff Academy: Football Tycoon"** (user request). It reuses the name of the user's first CrazyGames game, "Kickoff Academy". That game never left Basic Launch, so there is no "2": a sequel number would point to a game players can't find. The subtitle carries the search words "football" and "tycoon".
+    - **Changed:** `GAME_TITLE`, `game.title`, the page title, the upload zip (`kickoff-academy.zip`) and the package name.
     - **Kept on purpose:** the save keys (`wk_` prefix), so existing progress stays, and the "Wonderkid" rarity tier.

@@ -1,4 +1,4 @@
-# Kickoff Academy 2 — working rules
+# Kickoff Academy: Football Tycoon — working rules
 
 3D idle-arcade football academy builder for CrazyGames (three.js + TS + Vite). Full spec: `docs/GDD.md`. **Look: `docs/ART_BIBLE.md` (overrides GDD §8 and the size budget).** Decisions log: `docs/DECISIONS.md`.
 
