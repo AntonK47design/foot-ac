@@ -1,4 +1,6 @@
 import type { AreaDef } from '../types';
+import { AREA3_LOCKED, AREA3_OBJECTS, AREA3_OBSTACLES, AREA3_PADS, AREA3_STAFF_SPOTS, AREA3_STATIONS } from './area3';
+import { AREA1_LAYOUT } from './area1-layout';
 
 /**
  * Area 1 "Sunday Park" on the diorama layout (see area1-layout.ts and docs/ART_BIBLE.md §3).
@@ -11,12 +13,14 @@ export const AREA1: AreaDef = {
   id: 1,
   nameKey: 'area.1',
   bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
-  navBounds: { x0: -17.0, z0: -12.0, x1: 20.0, z1: 40.0 },
+  navBounds: { x0: -17.0, z0: -12.0, x1: 20.0, z1: 76.0 },
   walkable: [
     { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
     { x0: 16.0, z0: -0.6, x1: 20.0, z1: 1.4 },
     // Area 2 "Training Ground" (south); the gate and the plot border are obstacles
     { x0: -16.6, z0: 11.6, x1: 16.6, z1: 39.6 },
+    // Area 3 "Youth Stadium"
+    { x0: -16.6, z0: 39.6, x1: 16.6, z1: 75.6 },
   ],
   spawn: { x: -6.8, z: -1.6 },
   gate: {
@@ -32,13 +36,19 @@ export const AREA1: AreaDef = {
   },
   crate: { spot: { x: 5.5, z: 1.65 } },
   water: { objectId: 'hydration', spot: { x: 13.8, z: 16.1 } },
-  expansion: {
-    gateObjectId: 'area2_gate',
-    plot: { x0: -17, z0: 12, x1: 17, z1: 40 },
-    bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 39.6 },
-    // construction fence across the gate until the Training Ground opens
-    lockedObstacles: [{ x0: 8.5, z0: 11.6, x1: 12.5, z1: 12.4 }],
-  },
+  bibs: { objectId: 'kit_room', spot: { x: 10.1, z: 43.0 } },
+  expansions: [
+    {
+      area: 2,
+      gateObjectId: 'area2_gate',
+      plot: AREA1_LAYOUT.area2.plot,
+      bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 39.6 },
+      // construction fence across the gate until the Training Ground opens
+      lockedObstacles: [{ x0: 8.5, z0: 11.6, x1: 12.5, z1: 12.4 }],
+    },
+    { area: 3, gateObjectId: 'area3_gate', plot: AREA1_LAYOUT.area3.plot, bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 75.6 }, lockedObstacles: AREA3_LOCKED },
+  ],
+  shop: { objectId: 'fan_shop', pile: AREA1_LAYOUT.area3.shopPile },
   stations: [
     {
       id: 'shooting_goal',
@@ -202,6 +212,7 @@ export const AREA1: AreaDef = {
       queueStep: { x: 0, z: 1 },
       footprint: [{ x0: -2.2, z0: -2.6, x1: 2.2, z1: -2.0 }],
     },
+    ...AREA3_STATIONS,
   ],
   objects: [
     { id: 'ball_crate', kind: 'crate', area: 1, pos: { x: 5.5, z: 0.6 }, rot: 0, footprint: [{ x0: -0.5, z0: -0.5, x1: 0.5, z1: 0.5 }] },
@@ -274,6 +285,7 @@ export const AREA1: AreaDef = {
         { x0: -12.15, z0: 5.05, x1: 12.15, z1: 5.35 },
       ],
     },
+    ...AREA3_OBJECTS,
   ],
   pads: [
     { id: 'p_crate', area: 1, pos: { x: 5.5, z: 1.65 }, cost: 10, stars: 1, xp: 8, requires: [], unlock: { type: 'object', id: 'ball_crate' }, icon: 'ball', nameKey: 'obj.ball_crate', major: true },
@@ -322,6 +334,8 @@ export const AREA1: AreaDef = {
     { id: 'p2_asst_fk', area: 2, pos: { x: 7.0, z: 14.2 }, cost: 5200, stars: 1, xp: 12, requires: ['p2_fk_l2', 'p2_asst_rondo'], unlock: { type: 'staff', id: 'assistant:freekick' }, icon: 'whistle', nameKey: 'staff.assistant_fk' },
     { id: 'p2_asst_agility', area: 2, pos: { x: -4.0, z: 21.4 }, cost: 5800, stars: 1, xp: 12, requires: ['p2_agility_l2', 'p2_asst_fk'], unlock: { type: 'staff', id: 'assistant:agility' }, icon: 'whistle', nameKey: 'staff.assistant_agility' },
     { id: 'p2_asst_skills', area: 2, pos: { x: 5.6, z: 22.0 }, cost: 6400, stars: 1, xp: 12, requires: ['p2_skills_l2', 'p2_asst_agility'], unlock: { type: 'staff', id: 'assistant:skills' }, icon: 'whistle', nameKey: 'staff.assistant_skills' },
+    // ── Area 3 "Youth Stadium" (the gate needs every Training Ground pad; filled in below)
+    ...AREA3_PADS,
   ],
   starterPiles: [
     { id: 'starter_a', pos: { x: -4.8, z: -1.6 }, amount: 15 },
@@ -358,6 +372,7 @@ export const AREA1: AreaDef = {
     'assistant:freekick': { x: 7.0, z: 14.2, yaw: HALF_PI },
     'assistant:agility': { x: -4.0, z: 21.4, yaw: Math.PI },
     'assistant:skills': { x: 5.6, z: 22.0, yaw: HALF_PI },
+    ...AREA3_STAFF_SPOTS,
   },
   safe: { x: -7.9, z: 5.6 },
   lockers: {
@@ -415,12 +430,16 @@ export const AREA1: AreaDef = {
     // border between Sunday Park and the Training Ground (gate gap x 8.5…12.5; locked separately)
     { x0: -17.0, z0: 11.6, x1: 8.5, z1: 12.4 },
     { x0: 12.5, z0: 11.6, x1: 17.0, z1: 12.4 },
+    ...AREA3_OBSTACLES,
   ],
 };
 
 // The Training Ground gate opens once every Sunday Park pad is done.
 const gate = AREA1.pads.find((p) => p.id === 'p2_gate');
 if (gate) gate.requires = AREA1.pads.filter((p) => p.area === 1).map((p) => p.id);
+// …and the Youth Stadium gate once every Training Ground pad is done.
+const gate3 = AREA1.pads.find((p) => p.id === 'p3_gate');
+if (gate3) gate3.requires = AREA1.pads.filter((p) => p.area === 2).map((p) => p.id);
 
 /** Prebuilt objects present from the start. */
 export const PREBUILT_OBJECTS = ['desk', 'chairs_1'];

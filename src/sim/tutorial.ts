@@ -47,6 +47,15 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => !!s.state.flags.firstWater || s.hasStaff('water_carrier'),
     objective: (s) => ballObjective(s, 'gym'),
   },
+  // ── Youth Stadium (starts once its gate shows up)
+  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => padObjective(s, 'p3_gate') },
+  { id: 'kit', done: (s) => padDone(s, 'p3_kit'), objective: (s) => padObjective(s, 'p3_kit') },
+  { id: 'crossing', done: (s) => padDone(s, 'p3_crossing'), objective: (s) => padObjective(s, 'p3_crossing') },
+  {
+    id: 'bibs',
+    done: (s) => !!s.state.flags.firstBib || s.hasStaff('kit_manager'),
+    objective: (s) => ballObjective(s, 'crossing'),
+  },
 ];
 
 function isVisible(sim: Sim, padId: string): boolean {

@@ -19,10 +19,10 @@ import {
 } from 'three';
 import { BALANCE } from '../data/balance';
 import { AREA1_LAYOUT } from '../data/areas/area1-layout';
-import type { IconId, PadDef, Rarity } from '../data/types';
+import type { IconId, PadDef, Rarity, Supply } from '../data/types';
 import { formatCash, hasKey, t } from '../core/i18n';
 import type { Sim } from '../sim/sim';
-import type { Trainee } from '../sim/state';
+import { runnerSupply, type Trainee } from '../sim/state';
 import { lerpAngle } from '../sim/geom';
 import { computeOvr, firstName } from '../sim/players';
 import type { MatchScript } from '../sim/match';
@@ -35,7 +35,7 @@ import type { AudioSystem } from './audio';
 import { Batch } from './batch';
 import { ballGeometry } from './builders/ball';
 import { DecalBatch } from './builders/decals';
-import { buildArea2Base, buildArea2Lock, buildDiorama, buildStadium, buildUnlockable, type UnlockGeo } from './builders/diorama';
+import { buildArea2Base, buildArea2Lock, buildArea3Base, buildArea3Lock, buildDiorama, buildStadium, buildUnlockable, type UnlockGeo } from './builders/diorama';
 import { PropKit } from './builders/football';
 import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
@@ -51,9 +51,15 @@ import { MatchDirector, type MatchHooks } from './match-view';
 
 const MAX_BALLS = 260;
 const MAX_BOTTLES = 160;
+const MAX_BIBS = 160;
 const MAX_BILLS = 420;
 const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
+/** Plot culling margins (m) around the camera focus: north = towards the screen top. */
+const PLOT_SEE_NORTH = 30;
+const PLOT_SEE_SOUTH = 20;
+/** Characters further than this sideways from the focus are off-screen even in wide landscape. */
+const CHAR_SEE_X = 26;
 /** Staff looks: model + kit per staff id (ball boys) or kind. */
 const STAFF_LOOK: Record<string, { model: CharacterKey; kit: Kit }> = {
   ball_boy: { model: 'male-b', kit: KITS.staff },
@@ -63,7 +69,12 @@ const STAFF_LOOK: Record<string, { model: CharacterKey; kit: Kit }> = {
   accountant: { model: 'female-c', kit: { shirt: 0x3a4256, shorts: 0x3a4256, socks: 0x1d2433, trim: 0xffffff } },
   water_carrier: { model: 'female-d', kit: { shirt: 0x38c6e8, shorts: 0x1f2f5c, socks: 0xffffff, trim: 0xffffff } },
   water_carrier_2: { model: 'male-f', kit: { shirt: 0x38c6e8, shorts: 0x1f2f5c, socks: 0xffffff, trim: 0xffffff } },
+  kit_manager: { model: 'male-a', kit: { shirt: 0xb6f03c, shorts: 0x2b2f3d, socks: 0x2b2f3d, trim: 0xffffff } },
+  kit_manager_2: { model: 'female-e', kit: { shirt: 0xb6f03c, shorts: 0x2b2f3d, socks: 0x2b2f3d, trim: 0xffffff } },
+  shopkeeper: { model: 'female-c', kit: { shirt: 0xe2583e, shorts: 0x1f2f5c, socks: 0x1f2f5c, trim: 0xffd23f } },
 };
+/** Supply chip / bubble icon per supply. */
+const SUPPLY_ICON: Record<Supply, string> = { ball: 'ball', water: 'water', bib: 'bib' };
 /** Root lift while sitting so the hips rest on the bench seat (bench top 0.53 m, sit-clip hips ≈ 0.05 m). */
 const SIT_LIFT = 0.47;
 const ADULT_SCALE = 1.85;
@@ -132,7 +143,21 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
   const kind =
     id === 'lane'
       ? (
-          { shooting_goal: 'goal', dribble_cones: 'cones', passing_wall: 'wall', sprint_track: 'track', gym: 'gym', rondo: 'rondo', freekick: 'freekick', agility: 'agility', skills: 'skills' } as Record<
+          {
+            shooting_goal: 'goal',
+            dribble_cones: 'cones',
+            passing_wall: 'wall',
+            sprint_track: 'track',
+            gym: 'gym',
+            rondo: 'rondo',
+            freekick: 'freekick',
+            agility: 'agility',
+            skills: 'skills',
+            crossing: 'crossing',
+            heading: 'heading',
+            juggling: 'juggling',
+            reaction: 'reaction',
+          } as Record<
             string,
             IconId
           >
@@ -213,6 +238,46 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
     case 'physio':
       k.treatmentBed();
       break;
+    case 'bib':
+      k.bibBasket(4);
+      break;
+    case 'crossing':
+      k.place(0, -0.5).goal(1.8, 1.0, 0.6);
+      k.place(0, 0).cornerFlag(0.7, 0.4);
+      k.place(0, 0).ball(-0.4, 0.15, 0.5, 0.28);
+      break;
+    case 'heading':
+      k.pendulumFrame(1.3);
+      k.place(0, 0).ball(0, 1.5, 0, 0.28);
+      break;
+    case 'juggling':
+      k.cone(-0.5, 0, 1.0, 0xffd23f);
+      k.place(0, 0).cone(0.5, 0, 1.0);
+      k.place(0, 0).ball(0, 0.7, 0.1, 0.3);
+      break;
+    case 'reaction':
+      k.reactionBoard(1.8);
+      break;
+    case 'tactics':
+      k.tacticsBoard();
+      break;
+    case 'analysis':
+      k.screenDesk();
+      break;
+    case 'shop':
+      k.kiosk(1.6, 1.3);
+      break;
+    case 'stadium':
+      k.place(0, 0, 0.4).goal(1.8, 1.0, 0.7);
+      k.place(0, 0).cornerFlag(1.0, 0.6);
+      break;
+    case 'stand':
+      k.bench(1.6);
+      k.place(0, -0.5, 0, 1, 0.5).bench(1.6);
+      break;
+    case 'lights':
+      k.place(0, 0, 0, 0.45).floodlight();
+      break;
     case 'cash':
     default:
       b.at(G.rbox(0.25), 0x3ddc84, 0, 0.1, 0, 0.3, 0.9, 0.12, 0.5);
@@ -243,7 +308,12 @@ export class GameView {
   private readonly stadium: UnlockView;
   /** Training Ground construction overlay (removed when the gate opens). */
   private area2Lock: Group | null = null;
+  /** Each plot's ground (one merged batch each): hidden when the camera is far from it (a plot-sized bounding sphere never frustum-culls). */
+  private readonly plotRoots: Array<{ root: Group; z0: number; z1: number }>;
+  /** Youth Stadium construction overlay. */
+  private area3Lock: Group | null = null;
   private readonly bottles: InstancedMesh;
+  private readonly bibs: InstancedMesh;
   private readonly teamBus: Group;
   private readonly unlocks = new Map<string, UnlockView>();
   private readonly pads = new Map<string, PadView>();
@@ -280,10 +350,22 @@ export class GameView {
     this.popups = new Popups(uiRoot, this.projector, icon('coin'));
     const base = buildDiorama(assets, AREA1_LAYOUT, core.mat);
     scene.add(base.root);
-    scene.add(buildArea2Base(assets, AREA1_LAYOUT, core.mat).root);
+    const a2 = buildArea2Base(assets, AREA1_LAYOUT, core.mat).root;
+    scene.add(a2);
+    const a3 = buildArea3Base(assets, AREA1_LAYOUT, core.mat).root;
+    scene.add(a3);
+    this.plotRoots = [
+      { root: base.root, z0: AREA1_LAYOUT.plot.z0, z1: AREA1_LAYOUT.plot.z1 },
+      { root: a2, z0: AREA1_LAYOUT.area2.plot.z0, z1: AREA1_LAYOUT.area2.plot.z1 },
+      { root: a3, z0: AREA1_LAYOUT.area3.plot.z0, z1: AREA1_LAYOUT.area3.plot.z1 },
+    ];
     if (!sim.area2Open()) {
       this.area2Lock = buildArea2Lock(assets, AREA1_LAYOUT, core.mat).root;
       scene.add(this.area2Lock);
+    }
+    if (!sim.area3Open()) {
+      this.area3Lock = buildArea3Lock(assets, AREA1_LAYOUT, core.mat).root;
+      scene.add(this.area3Lock);
     }
     this.fx = new Fx(scene);
     this.fx.scale = TIERS[core.tier].particles;
@@ -307,6 +389,15 @@ export class GameView {
     this.bottles.frustumCulled = false;
     this.bottles.castShadow = true;
     scene.add(this.bottles);
+
+    const bibKit = new Batch();
+    new PropKit(bibKit, new DecalBatch()).place(0, 0).bib(0, -0.03, 0);
+    this.bibs = new InstancedMesh(bibKit.geometry(), new MeshLambertMaterial({ vertexColors: true }), MAX_BIBS);
+    this.bibs.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.bibs.count = 0;
+    this.bibs.frustumCulled = false;
+    this.bibs.castShadow = true;
+    scene.add(this.bibs);
 
     const bill = new Batch();
     bill.at(G.rbox(0.25), PALETTE.cash, 0, 0, 0, 0, 0.72, 0.09, 0.4);
@@ -386,9 +477,46 @@ export class GameView {
     coachIcon.seek(0);
     this.hud.setPortrait(this.icons.render('portrait', coachIcon.root, { yaw: 0.35, pitch: 0.15, zoom: 2.2, focusY: 0.78 }));
     // pre-render the whole icon atlas, then free the offscreen context
-    for (const id of ['ball', 'cash', 'sign', 'goal', 'cones', 'wall', 'track', 'chair', 'staff', 'bench', 'flag', 'shelter', 'cooler', 'pitch', 'podium', 'whistle', 'gate', 'water', 'gym', 'rondo', 'freekick', 'agility', 'skills', 'physio'])
+    for (const id of [
+      'ball',
+      'cash',
+      'sign',
+      'goal',
+      'cones',
+      'wall',
+      'track',
+      'chair',
+      'staff',
+      'bench',
+      'flag',
+      'shelter',
+      'cooler',
+      'pitch',
+      'podium',
+      'whistle',
+      'gate',
+      'water',
+      'gym',
+      'rondo',
+      'freekick',
+      'agility',
+      'skills',
+      'physio',
+      'bib',
+      'crossing',
+      'heading',
+      'juggling',
+      'reaction',
+      'tactics',
+      'analysis',
+      'shop',
+      'stadium',
+      'stand',
+      'lights',
+    ])
       this.iconUrl(id);
-    for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track', 'gym', 'rondo', 'freekick', 'agility', 'skills']) this.iconUrl('lane', st);
+    for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track', 'gym', 'rondo', 'freekick', 'agility', 'skills', 'crossing', 'heading', 'juggling', 'reaction'])
+      this.iconUrl('lane', st);
     this.icons.dispose();
     this.iconsDone = true;
   }
@@ -414,7 +542,29 @@ export class GameView {
   private unlockKeys(): Array<{ id: string; lanes: number }> {
     const s = this.sim.state;
     const out: Array<{ id: string; lanes: number }> = [];
-    for (const id of ['ball_crate', 'chairs_2', 'bench', 'flags', 'water_cooler', 'bus_shelter', 'match_pitch', 'accountant', 'area2_gate', 'hydration', 'physio', 'seven_pitch'])
+    for (const id of [
+      'ball_crate',
+      'chairs_2',
+      'bench',
+      'flags',
+      'water_cooler',
+      'bus_shelter',
+      'match_pitch',
+      'accountant',
+      'area2_gate',
+      'hydration',
+      'physio',
+      'seven_pitch',
+      'area3_gate',
+      'kit_room',
+      'tactics_room',
+      'analysis_lab',
+      'fan_shop',
+      'youth_stadium',
+      'stand_main',
+      'stand_sides',
+      'stadium_lights',
+    ])
       if (s.built[id]) out.push({ id, lanes: 1 });
     for (const [id, ss] of Object.entries(s.stations)) out.push({ id, lanes: ss.lanes });
     return out;
@@ -428,6 +578,13 @@ export class GameView {
     } else if (!this.sim.area2Open() && !this.area2Lock) {
       this.area2Lock = buildArea2Lock(this.assets, AREA1_LAYOUT, this.core.mat).root;
       this.core.scene.add(this.area2Lock);
+    }
+    if (this.sim.area3Open() && this.area3Lock) {
+      this.core.scene.remove(this.area3Lock);
+      this.area3Lock = null;
+    } else if (!this.sim.area3Open() && !this.area3Lock) {
+      this.area3Lock = buildArea3Lock(this.assets, AREA1_LAYOUT, this.core.mat).root;
+      this.core.scene.add(this.area3Lock);
     }
     for (const { id, lanes } of this.unlockKeys()) {
       const cur = this.unlocks.get(id);
@@ -500,11 +657,12 @@ export class GameView {
       this.hud.bumpStars();
       if (e.major) {
         const u = this.sim.world.pads.get(e.padId)?.unlock;
-        if (u && u.type === 'object' && u.id === this.sim.area.expansion.gateObjectId) {
-          // show the player where the new area is: pan to the Hydration Point, the first pad in there
-          const w = this.sim.area.water.spot;
+        const exp = u && u.type === 'object' ? this.sim.area.expansions.find((x) => x.gateObjectId === u.id) : undefined;
+        if (exp) {
+          // show the player where the new area is: pan to its supply point, the first pad in there
+          const w = exp.area === 3 ? this.sim.area.bibs.spot : this.sim.area.water.spot;
           this.rig.panTo(w.x, w.z);
-          this.hud.toast(t('toast.area2'), 'gold', 3200);
+          this.hud.toast(t(exp.area === 3 ? 'toast.area3' : 'toast.area2'), 'gold', 3200);
         } else if (u && u.type === 'station') {
           const c = this.sim.station(u.id).def.center;
           this.rig.panTo((c.x + e.x) / 2, (c.z + e.z) / 2);
@@ -677,6 +835,9 @@ export class GameView {
     if (this.rig.panning && Math.hypot(sim.input.x, sim.input.z) > 0.2) this.rig.cancelPan();
     this.rig.update(dt, cx, cz, c.vx, c.vz);
     if (this.core.sun.castShadow) this.core.followSun(this.rig.focus.x, this.rig.focus.z);
+    // the camera sees ~20 m north (screen top) and ~10 m south of its focus; keep generous margins
+    const fz = this.rig.focus.z;
+    for (const pr of this.plotRoots) pr.root.visible = pr.z1 > fz - PLOT_SEE_NORTH && pr.z0 < fz + PLOT_SEE_SOUTH;
 
     for (let i = this.pops.length - 1; i >= 0; i--) {
       const p = this.pops[i] as Pop;
@@ -710,6 +871,21 @@ export class GameView {
       dummy.scale.setScalar(1.1);
       dummy.updateMatrix();
       this.bottles.setMatrixAt(wi++, dummy.matrix);
+    };
+    let ci = 0;
+    const bibAt = (x: number, y: number, z: number, ry = 0): void => {
+      if (ci >= MAX_BIBS) return;
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(0, ry, 0);
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      this.bibs.setMatrixAt(ci++, dummy.matrix);
+    };
+    /** One carried / stored item of a supply (ball, bottle or folded bib). */
+    const itemAt = (kind: Supply, x: number, y: number, z: number, i: number): void => {
+      if (kind === 'water') bottleAt(x, y, z, Math.sin(this.time * 6 + i) * 0.05);
+      else if (kind === 'bib') bibAt(x, y, z, Math.sin(i * 1.7) * 0.15);
+      else ballAt(x, y, z, i * 0.7);
     };
     let ri = 0;
     const ringAt = (x: number, z: number, rarity: Rarity): void => {
@@ -745,11 +921,10 @@ export class GameView {
     {
       const fx = Math.sin(this.coachYaw + YAW_OFFSET);
       const fz = Math.cos(this.coachYaw + YAW_OFFSET);
-      const water = sim.coachCarryKind() === 'water';
-      for (let i = 0; i < c.carry; i++) {
-        if (water) bottleAt(cx + fx * 0.48, 0.82 + i * 0.3, cz + fz * 0.48, Math.sin(this.time * 6 + i) * 0.05);
-        else ballAt(cx + fx * 0.48, 0.78 + i * 0.3, cz + fz * 0.48, i * 0.7);
-      }
+      const kind = sim.coachCarryKind();
+      // bibs stack flat (thin), balls and bottles tower
+      const step = kind === 'bib' ? 0.08 : 0.3;
+      for (let i = 0; i < c.carry; i++) itemAt(kind, cx + fx * 0.48, (kind === 'bib' ? 0.95 : kind === 'water' ? 0.82 : 0.78) + i * step, cz + fz * 0.48, i);
     }
 
     // ── staff (ball boys walk; receptionist, assistant coaches and the accountant work from their spots)
@@ -757,7 +932,8 @@ export class GameView {
     for (const f of s.staff) {
       const fx = f.px + (f.x - f.px) * alpha;
       const fz = f.pz + (f.z - f.pz) * alpha;
-      const runner = f.kind === 'ball_boy' || f.kind === 'water_carrier';
+      const carries = runnerSupply(f.kind);
+      const runner = !!carries;
       const look = STAFF_LOOK[runner ? f.id : f.kind] ?? STAFF_LOOK.ball_boy;
       const a = this.actorNamed('staff:' + f.id, look.model, look.kit, ADULT_SCALE, fx, fz);
       a.seen = frameId;
@@ -771,22 +947,29 @@ export class GameView {
       else a.c.play('idle');
       const dx = Math.sin(a.yaw + YAW_OFFSET);
       const dz = Math.cos(a.yaw + YAW_OFFSET);
-      for (let i = 0; i < f.carry; i++) {
-        if (f.kind === 'water_carrier') bottleAt(fx + dx * 0.48, 0.82 + i * 0.3, fz + dz * 0.48);
-        else ballAt(fx + dx * 0.48, 0.78 + i * 0.3, fz + dz * 0.48, i);
-      }
+      if (carries)
+        for (let i = 0; i < f.carry; i++) itemAt(carries, fx + dx * 0.48, (carries === 'bib' ? 0.95 : carries === 'water' ? 0.82 : 0.78) + i * (carries === 'bib' ? 0.08 : 0.3), fz + dz * 0.48, i);
     }
 
     // ── baskets + supply chips
     for (const [id, ss] of Object.entries(s.stations)) {
       const st = sim.station(id);
       if (!st.basket) continue;
-      const water = st.supply === 'water';
+      const sup: Supply = st.supply ?? 'ball';
       const n = Math.min(ss.balls, 8);
       for (let i = 0; i < n; i++) {
-        if (water) bottleAt(st.basket.x - 0.3 + (i % 3) * 0.3, 0.32, st.basket.z - 0.12 + Math.floor(i / 3) * 0.24);
+        if (sup === 'water') bottleAt(st.basket.x - 0.3 + (i % 3) * 0.3, 0.32, st.basket.z - 0.12 + Math.floor(i / 3) * 0.24);
+        else if (sup === 'bib') bibAt(st.basket.x, 0.3 + i * 0.06, st.basket.z, i * 0.4);
         else ballAt(st.basket.x - 0.4 + (i % 4) * 0.27, 1.02 + Math.floor(i / 4) * 0.22, st.basket.z + 0.02, i);
       }
+      // heading pendulums: the ball hangs still while nobody is heading it
+      if (st.kind === 'heading')
+        for (let i = 0; i < ss.lanes; i++) {
+          const occ = ss.occupants[i];
+          const tr = occ ? sim.trainee(occ) : undefined;
+          const l = st.lanes[i];
+          if (l && (!tr || tr.state !== 'training')) ballAt(l.target.x, 1.55, l.target.z + 0.05, 0, 0.26);
+        }
       const low = ss.balls === 0 && ss.occupants.some((o) => o > 0);
       const lv = sim.upLevel('st:' + id);
       this.labels.place(
@@ -795,7 +978,7 @@ export class GameView {
         1.0,
         st.basket.z + 0.3,
         '',
-        `<div class="chip-supply${low ? ' low' : ''}${water ? ' water' : ''}">${icon(water ? 'water' : 'ball')}<b>${ss.balls}/${st.cfg.basketCap}</b>${lv > 0 ? `<i class="lv">Lv ${lv + 1}</i>` : ''}</div>`,
+        `<div class="chip-supply${low ? ' low' : ''}${sup !== 'ball' ? ' ' + sup : ''}">${icon(SUPPLY_ICON[sup])}<b>${ss.balls}/${st.cfg.basketCap}</b>${lv > 0 ? `<i class="lv">Lv ${lv + 1}</i>` : ''}</div>`,
       );
     }
 
@@ -826,6 +1009,19 @@ export class GameView {
     }
     if (this.director?.active) this.director.update(dt, ballAt);
 
+    // ── Fan Shop keeper behind the counter
+    if (s.built.fan_shop) {
+      const sh = AREA1_LAYOUT.area3.shop;
+      const kx = (sh.x0 + sh.x1) / 2 + Math.sin(this.time * 0.4) * 0.8;
+      const kz = sh.z1 - 0.75;
+      const look = STAFF_LOOK.shopkeeper as { model: CharacterKey; kit: Kit };
+      const a = this.actorNamed('shopkeeper', look.model, look.kit, ADULT_SCALE, kx, kz);
+      a.seen = frameId;
+      a.c.root.position.set(kx, 0, kz);
+      a.c.root.rotation.y = Math.PI + YAW_OFFSET;
+      a.c.play((this.time % 6) < 1.4 ? 'interact' : 'idle');
+    }
+
     // remove actors of trainees that left
     for (const [k, a] of this.actors) {
       if (a.seen === frameId) continue;
@@ -833,18 +1029,26 @@ export class GameView {
       this.actors.delete(k);
     }
 
-    // animation update (far characters at 30 Hz)
+    // animation update: near 60 Hz, far 30 Hz, off-screen (other plots) 8 Hz — the full academy is ~70 characters
     const fxp = this.rig.focus.x;
     const fzp = this.rig.focus.z;
     for (const a of this.actors.values()) {
       const p = a.c.root.position;
-      a.c.update(dt, Math.hypot(p.x - fxp, p.z - fzp) > 13 ? 30 : 60);
+      // skinned meshes skip frustum culling: hide characters well outside the view (render + shadow pass)
+      const dz = p.z - fzp;
+      const vis = Math.abs(p.x - fxp) < CHAR_SEE_X && dz > -PLOT_SEE_NORTH && dz < PLOT_SEE_SOUTH;
+      a.c.root.visible = vis;
+      if (!vis) continue;
+      const d = Math.hypot(p.x - fxp, dz);
+      a.c.update(dt, d > 26 ? 8 : d > 13 ? 30 : 60);
     }
 
     this.balls.count = bi;
     this.balls.instanceMatrix.needsUpdate = true;
     this.bottles.count = wi;
     this.bottles.instanceMatrix.needsUpdate = true;
+    this.bibs.count = ci;
+    this.bibs.instanceMatrix.needsUpdate = true;
     this.rings.count = ri;
     this.rings.instanceMatrix.needsUpdate = true;
     if (this.rings.instanceColor) this.rings.instanceColor.needsUpdate = true;
@@ -892,6 +1096,21 @@ export class GameView {
         G2.plot.z0 - 0.5,
         '',
         `<div class="lock-sign">${icon('lock')}<span>${t('area.2.sign')}</span><b>${have >= total ? t('area.2.open') : t('area.2.req', { have, stars: total })}</b></div>`,
+      );
+    }
+
+    // ── the Youth Stadium gate sign once the Training Ground is open
+    if (sim.area2Open() && !sim.area3Open()) {
+      const G3 = AREA1_LAYOUT.area3;
+      const total = sim.world.areaStars[2] ?? 0;
+      const have = sim.areaStars().have;
+      this.labels.place(
+        'gh:area3',
+        G3.gateGap[0] - 0.9,
+        2.3,
+        G3.plot.z0 - 0.5,
+        '',
+        `<div class="lock-sign">${icon('lock')}<span>${t('area.3.sign')}</span><b>${have >= total ? t('area.2.open') : t('area.3.req', { have, stars: total })}</b></div>`,
       );
     }
 
@@ -1010,15 +1229,17 @@ export class GameView {
             break;
           }
           // ── Training Ground drills
-          case 'freekick': {
-            // curled shot over the mannequin wall into the goal
+          case 'freekick':
+          case 'crossing': {
+            // curled shot over the mannequin wall into the goal / a lofted cross from the wing
             if (tr.repActive) {
               if (a.lastRep < strike && p >= strike) this.audio.play('kick', 0.9 + Math.random() * 0.2);
               if (p < strike) ballAt(fx, 0.15, fz);
               else {
                 const k = Math.min(1, (p - strike) / 0.3);
-                const curl = Math.sin(k * Math.PI) * 0.7 * (lane.spot.x < st.def.center.x ? 1 : -1);
-                if (k < 1) ballAt(fx + (lane.target.x - fx) * k + curl, 0.15 + Math.sin(k * Math.PI) * 2.1, fz + (lane.target.z - fz) * k, p * 30);
+                const curl = st.kind === 'freekick' ? Math.sin(k * Math.PI) * 0.7 * (lane.spot.x < st.def.center.x ? 1 : -1) : 0;
+                const loft = st.kind === 'crossing' ? 2.6 : 2.1;
+                if (k < 1) ballAt(fx + (lane.target.x - fx) * k + curl, 0.15 + Math.sin(k * Math.PI) * loft, fz + (lane.target.z - fz) * k, p * 30);
                 else ballAt(lane.target.x, Math.max(0.15, 0.9 - (p - strike - 0.3) * 3), lane.target.z, 0);
                 if (a.lastRep < strike + 0.3 && p >= strike + 0.3) {
                   const u = this.unlocks.get(tr.stationId);
@@ -1067,6 +1288,47 @@ export class GameView {
             }
             break;
           }
+          // ── Youth Stadium drills
+          case 'heading': {
+            // the pendulum ball swings back off each header
+            const hit = tr.repActive && p >= strike;
+            const k = hit ? Math.min(1, (p - strike) / 0.55) : 0;
+            const swing = hit ? Math.sin(k * Math.PI * 2) * (1 - k) * 0.9 : Math.sin(this.time * 2 + lane.target.x) * 0.06;
+            ballAt(lane.target.x, 1.55 + Math.abs(swing) * 0.25, lane.target.z + 0.05 - swing, 0, 0.26);
+            if (tr.repActive) {
+              if (a.lastRep < strike && p >= strike) this.audio.play('kick', 1.4 + Math.random() * 0.2);
+              anim = p > strike - 0.15 && p < strike + 0.2 ? 'cheer' : 'idle';
+            }
+            break;
+          }
+          case 'juggling': {
+            // keepy-uppies: the ball pops up off the foot four times a rep
+            if (tr.repActive) {
+              const ph = (p * 4) % 1;
+              const y = 0.18 + Math.sin(ph * Math.PI) * 0.85;
+              if (Math.floor(a.lastRep * 4) !== Math.floor(p * 4)) this.audio.play('kick', 1.5 + Math.random() * 0.2);
+              ballAt(fx, y, fz, p * 25);
+              anim = ph < 0.25 ? 'kick' : 'idle';
+              animSpeed = 1.6;
+            } else ballAt(fx, 0.15, fz);
+            break;
+          }
+          case 'reaction': {
+            // sprint to the light board, slap the pod, jog back
+            if (tr.repActive) {
+              const k = p < 0.45 ? p / 0.45 : 1 - (p - 0.45) / 0.55;
+              x = lane.spot.x + ux * len * k;
+              z = lane.spot.z + uz * len * k;
+              yaw = p < 0.45 ? Math.atan2(-ux, -uz) : Math.atan2(ux, uz);
+              anim = p < 0.45 ? 'run' : 'walk';
+              animSpeed = p < 0.45 ? 1.5 : 1;
+              if (a.lastRep < 0.45 && p >= 0.45) {
+                this.fx.burst(lane.target.x - 0.4, 1.1, lane.target.z, 6, 0.3);
+                this.audio.play('pop', 1.5);
+              }
+            }
+            break;
+          }
         }
         a.lastRep = p;
       }
@@ -1101,7 +1363,7 @@ export class GameView {
     } else if (atDesk || tr.state === 'arriving' || tr.state === 'toDesk') {
       this.labels.place(key, x, HEAD_Y + 0.25, z, '', `<div class="card${tr.scouted ? ' scouted' : ''}">${tr.scouted ? icon('star') : ''}<span class="nm">${firstName(tr)}</span><span class="pos">${t('pos.' + tr.position)}</span><span class="ovr ${rc}">${ovr}</span></div>`);
     } else if (sim.isWaitingForBalls(tr)) {
-      const need = tr.stationId && sim.station(tr.stationId).supply === 'water' ? 'water' : 'ball';
+      const need = SUPPLY_ICON[(tr.stationId ? sim.station(tr.stationId).supply : null) ?? 'ball'];
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble need">${icon(need)}<span class="emo">😟</span></div>`);
     } else if (tr.state === 'changing') {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble">👕</div>`);
@@ -1169,7 +1431,25 @@ export class GameView {
     const sx = (S7.x0 + S7.x1) / 2;
     const sz = (S7.z0 + S7.z1) / 2;
     // with the Training Ground pitch the squad trains there; before that they wait by the Team Bus stop
-    const spots: Array<[number, number]> = this.sim.state.built.seven_pitch
+    const Y = AREA1_LAYOUT.area3.stadium;
+    const yx = (Y.x0 + Y.x1) / 2;
+    const yz = (Y.z0 + Y.z1) / 2;
+    // the Youth Stadium (11-a-side) beats the 7-a-side pitch beats the bus stop
+    const spots: Array<[number, number]> = this.sim.state.built.youth_stadium
+      ? [
+          [yx - 9.6, yz],
+          [yx - 6.4, yz - 3.6],
+          [yx - 6.8, yz - 1.2],
+          [yx - 6.8, yz + 1.2],
+          [yx - 6.4, yz + 3.6],
+          [yx - 2.8, yz - 3.0],
+          [yx - 3.2, yz],
+          [yx - 2.8, yz + 3.0],
+          [yx + 1.0, yz - 2.4],
+          [yx + 1.4, yz + 0.4],
+          [yx + 1.0, yz + 2.8],
+        ]
+      : this.sim.state.built.seven_pitch
       ? [
           [sx - 8.5, sz],
           [sx - 4.5, sz - 2.6],

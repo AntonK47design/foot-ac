@@ -28,6 +28,10 @@ export interface BotReport {
   midGameGap: { from: number; to: number; gap: number };
   /** Same, 20:00 → 40:00 (Training Ground). */
   lateGameGap: { from: number; to: number; gap: number };
+  /** Same, 40:00 → 70:00 (Youth Stadium). */
+  endGameGap: { from: number; to: number; gap: number };
+  /** When the last pad of each area was bought (index = area id). */
+  areaDoneAt: Array<number | undefined>;
   longestPurchaseGap: { from: number; to: number; gap: number };
   longestUnaffordable: { from: number; gap: number };
   finalCash: number;
@@ -165,7 +169,7 @@ export function runBot(opts: BotOptions): BotReport {
     if (pads.length === 0) {
       if (contentDoneAt === null) {
         contentDoneAt = sim.state.time;
-        timeline.push({ t: sim.state.time, what: 'all pads unlocked (Sunday Park + Training Ground)' });
+        timeline.push({ t: sim.state.time, what: 'all pads unlocked (every area)' });
       }
     } else {
       let piles = 0;
@@ -209,6 +213,16 @@ export function runBot(opts: BotOptions): BotReport {
       if (t - q0 > lateGameGap.gap) lateGameGap = { from: q0, to: t, gap: t - q0 };
       q0 = t;
     }
+  const endGameGap = gapIn([...unlockTimes, ...upgradeTimes, ...matchTimes], 2400, Math.min(4200, total));
+  const areaDoneAt: Array<number | undefined> = [];
+  for (const p of sim.world.padList) {
+    const t = marks['unlock:' + p.id];
+    const prevDone = areaDoneAt[p.area];
+    // undefined as soon as one pad of the area is missing
+    if (t === undefined) areaDoneAt[p.area] = Infinity;
+    else if (prevDone !== Infinity) areaDoneAt[p.area] = Math.max(prevDone ?? 0, t);
+  }
+  for (let a = 0; a < areaDoneAt.length; a++) if (areaDoneAt[a] === Infinity) areaDoneAt[a] = undefined;
   void BALANCE;
   return {
     timeline,
@@ -218,6 +232,8 @@ export function runBot(opts: BotOptions): BotReport {
     matchTimes,
     midGameGap,
     lateGameGap,
+    endGameGap,
+    areaDoneAt,
     longestPurchaseGap,
     longestUnaffordable,
     finalCash: sim.state.cash,
@@ -227,6 +243,18 @@ export function runBot(opts: BotOptions): BotReport {
     contentDoneAt,
     sim,
   };
+}
+
+/** Longest stretch in [from, to] without an event. */
+function gapIn(times: number[], from: number, to: number): { from: number; to: number; gap: number } {
+  let best = { from, to: from, gap: 0 };
+  if (to <= from) return best;
+  let p0 = from;
+  for (const t of [...times.filter((x) => x >= from && x <= to).sort((a, b) => a - b), to]) {
+    if (t - p0 > best.gap) best = { from: p0, to: t, gap: t - p0 };
+    p0 = t;
+  }
+  return best;
 }
 
 export function fmt(t: number): string {

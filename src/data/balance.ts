@@ -47,6 +47,8 @@ export const BALANCE = {
     gradOvrGain: 4,
     /** …once the Training Ground is open (more drills → longer, richer careers). */
     gradOvrGainArea2: 7,
+    /** …once the Youth Stadium is open. */
+    gradOvrGainArea3: 9,
     /** Station choice: extra score per metre of walking (keeps trainees near their drills). */
     distWeight: 0.12,
     maxQueue: 1,
@@ -88,10 +90,15 @@ export const BALANCE = {
     freekick: { repTime: 2.6, cashPerRep: 22, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
     agility: { repTime: 3.4, cashPerRep: 25, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
     skills: { repTime: 3.0, cashPerRep: 27, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'water' },
+    // Youth Stadium drills: fed with training bibs from the Kit Room
+    crossing: { repTime: 2.8, cashPerRep: 40, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'bib' },
+    heading: { repTime: 2.6, cashPerRep: 44, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'bib' },
+    juggling: { repTime: 3.0, cashPerRep: 48, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'bib' },
+    reaction: { repTime: 3.2, cashPerRep: 54, statGain: 1, ballsPerRep: 1, basketCap: 6, supply: 'bib' },
   } as Record<StationKind, { repTime: number; cashPerRep: number; statGain: number; ballsPerRep: number; basketCap: number; supply: Supply | null }>,
   staff: {
     ballBoy: { speed: 3.8, carryCap: 6, refillBelow: 0.75 },
-    /** Water Carriers work like ball boys (same speed/carry upgrades) between the Hydration Point and the drills. */
+    /** Water Carriers and Kit Managers work like ball boys (same speed/carry upgrades) between their source and the drills. */
     /** Receptionist signs on their own at this multiple of the coach's sign time. */
     receptionist: { signTimeMult: 1.6 },
     /** An Assistant Coach at a drill: rep time multiplier. */
@@ -117,6 +124,9 @@ export const BALANCE = {
     /** With the Training Ground's 7-a-side pitch: squad size and match cash multiplier. */
     sizeSeven: 7,
     sevenCashMult: 1.5,
+    /** With the Youth Stadium: 11-a-side and its match cash multiplier (replaces the 7-a-side one). */
+    sizeEleven: 11,
+    stadiumCashMult: 2.5,
     /** Line-up gaps are filled with academy subs of this OVR. */
     subOvr: 32,
   },
@@ -221,8 +231,23 @@ export const BALANCE = {
     bench: { transferMult: 1.25 },
     physio: { repTimeMult: 0.85 },
   } as Record<string, { feeMult?: number; repTimeMult?: number; transferMult?: number }>,
+  /** Youth Stadium (Area 3) facilities. */
+  area3: {
+    /** Tactics Room: every stat of a graduate gets this bonus (OVR bonus for sales and the squad). */
+    tacticsStatBonus: 2,
+    /** Analysis Lab: added to our line-up strength in matches. */
+    analysisStrength: 4,
+    /** Fan Shop: takings per second on its pile; ×(1 + per stand built) and ×(1 + per Fan Shop upgrade level). */
+    shopCashPerSec: 6,
+    shopPerStand: 0.5,
+    /** Match cash: each stand and the floodlights add to the stadium multiplier. */
+    standCashMult: 0.3,
+    lightsCashMult: 0.2,
+  },
   /** Cumulative XP needed to reach level index+1 (level 1 = 0 XP). */
-  levelXp: [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400, 4500, 5800, 7300, 9000, 11000, 13300, 16000, 19000, 22500],
+  levelXp: [
+    0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500, 3400, 4500, 5800, 7300, 9000, 11000, 13300, 16000, 19000, 22500, 26500, 31000, 36000, 41500, 47500,
+  ],
   xp: { perGraduation: 15, perSign: 2, perUpgrade: 6 },
   objectives: {
     /** Re-evaluate objective this often (s). */

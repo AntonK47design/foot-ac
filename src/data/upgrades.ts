@@ -23,6 +23,11 @@ export type UpgradeId =
   | 'st:freekick'
   | 'st:agility'
   | 'st:skills'
+  | 'st:crossing'
+  | 'st:heading'
+  | 'st:juggling'
+  | 'st:reaction'
+  | 'academy_shop'
   | 'academy_matchday'
   | 'academy_bus'
   | 'academy_offline';
@@ -76,9 +81,15 @@ export const UPGRADES: UpgradeDef[] = [
   up('st:freekick', 'stations', 'freekick', 4, 4300, 1.6, 0.12, { built: 'freekick' }),
   up('st:agility', 'stations', 'agility', 4, 5200, 1.6, 0.12, { built: 'agility' }),
   up('st:skills', 'stations', 'skills', 4, 6200, 1.6, 0.12, { built: 'skills' }),
+  // Youth Stadium drills
+  up('st:crossing', 'stations', 'crossing', 4, 9000, 1.6, 0.12, { built: 'crossing' }),
+  up('st:heading', 'stations', 'heading', 4, 10500, 1.6, 0.12, { built: 'heading' }),
+  up('st:juggling', 'stations', 'juggling', 4, 12000, 1.6, 0.12, { built: 'juggling' }),
+  up('st:reaction', 'stations', 'reaction', 4, 14000, 1.6, 0.12, { built: 'reaction' }),
   // Academy
   up('academy_matchday', 'academy', 'trophy', 4, 1300, 1.65, 0.25, { built: 'match_pitch' }),
   up('academy_bus', 'academy', 'shelter', 4, 1000, 1.65, 0.1),
+  up('academy_shop', 'academy', 'shop', 4, 12000, 1.65, 0.25, { built: 'fan_shop' }),
   // offline earnings cap: 1 h + 1 h per level (→ 4 h); step must match BALANCE.meta.offline.perLevelSec
   up('academy_offline', 'academy', 'clock', 3, 1500, 1.8, 3600),
 ];

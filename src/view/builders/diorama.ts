@@ -117,6 +117,15 @@ class PropMerger {
   }
 }
 
+/** The academy street (lower level) beside one plot, x from `x0`, z0…z1. */
+function streetSegment(c: Ctx, x0: number, z0: number, z1: number): void {
+  const street: Rect = { x0, z0, x1: x0 + 5.8, z1 };
+  c.root.add(floor('asphalt', street, -0.3, 2));
+  // base block top sits 4 cm under the asphalt (coplanar faces z-fight and flicker)
+  c.b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.79, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
+  for (let z = Math.ceil((street.z0 - 1) / 3) * 3 + 1; z < street.z1; z += 3) c.b.add(flat(0.16, 1.6), 0xf4f0e4, trs(street.x0 + 3.2, -0.285, z));
+}
+
 function floor(p: Pattern, r: Rect, y: number, tile = 1): Mesh {
   const w = r.x1 - r.x0;
   const d = r.z1 - r.z0;
@@ -180,7 +189,8 @@ function newCtx(assets: Assets, L: Layout): Ctx {
   return { assets, L, b, decals, kit: new PropKit(b, decals), props: new PropMerger(assets), extra: [], nets: [], aoBlobs: [], aoStrips: [], anchors: {}, root: new Group() };
 }
 
-function finalize(c: Ctx, mat: Material): Diorama {
+/** `castShadow: false` for wide ground batches (curbs, hedges, planters): they'd go through the shadow pass whole. */
+function finalize(c: Ctx, mat: Material, opts: { castShadow?: boolean } = {}): Diorama {
   const { root } = c;
   const ao = aoTextures();
   const blobs: BufferGeometry[] = [];
@@ -211,7 +221,7 @@ function finalize(c: Ctx, mat: Material): Diorama {
   }
   if (!c.b.empty) {
     const statics = c.b.build(mat, true);
-    statics.castShadow = true;
+    statics.castShadow = opts.castShadow ?? true;
     statics.receiveShadow = true;
     root.add(statics);
   }
@@ -251,12 +261,8 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
   }
 
-  // ── street east (lower level) with the bus stop; it runs on past the Training Ground
-  const street: Rect = { x0: P.x1, z0: P.z0, x1: P.x1 + 5.8, z1: L.area2.plot.z1 };
-  root.add(floor('asphalt', street, -0.3, 2));
-  // base block top sits 4 cm under the asphalt (coplanar faces z-fight and flicker)
-  b.at(G.box(), 0x2a2540, (street.x0 + street.x1) / 2, -0.79, (street.z0 + street.z1) / 2, 0, street.x1 - street.x0, 0.9, street.z1 - street.z0);
-  for (let z = street.z0 + 1; z < street.z1; z += 3) b.add(flat(0.16, 1.6), 0xf4f0e4, trs(street.x0 + 3.2, -0.285, z));
+  // ── street east (lower level) with the bus stop; each plot builds the stretch beside it (keeps batches local)
+  streetSegment(c, P.x1, P.z0, P.z1);
   kit.place(L.gate.x + 0.6, L.busStop.z - 1.6, 0, 1, -0.3).busStopSign();
   // gate gap in the curb (ramp)
   b.at(G.rbox(0.06), 0xd9cfb6, P.x1 - 0.2, -0.12, L.gate.z, 0, 1.0, 0.3, 1.8, 0, 0.3);
@@ -471,14 +477,16 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
   const pcz = (P.z0 + P.z1) / 2;
   b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
   const curbW = 0.38;
+  // the south curb leaves a gap for the Youth Stadium gate
+  const [ya, yb] = L.area3.gateGap;
   for (const [x, z, w, d] of [
-    [pcx, P.z1 - curbW / 2, pw, curbW],
+    [(P.x0 + ya) / 2, P.z1 - curbW / 2, ya - P.x0, curbW],
+    [(yb + P.x1) / 2, P.z1 - curbW / 2, P.x1 - yb, curbW],
     [P.x0 + curbW / 2, pcz, curbW, pd],
     [P.x1 - curbW / 2, pcz, curbW, pd],
   ] as Array<[number, number, number, number]>) {
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
   }
-  b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
   // border hedge between the two plots (gate gap stays open)
   const [ga, gb] = A.gateGap;
   for (const [x0, x1] of [
@@ -490,6 +498,7 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
     }
     b.at(G.rbox(0.1), COL.curbSide, (x0 + x1) / 2, 0.08, P.z0 + 0.05, 0, x1 - x0, 0.16, 0.5);
   }
+  streetSegment(c, P.x1, P.z0, P.z1);
   root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
   // zone floors: gym rubber, rondo turf disc, free-kick turf, agility astro, skills deck, walkway
   root.add(floor('rubberBlue', A.gym, 0.012, 1));
@@ -528,14 +537,12 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
     [-16.0, 27.6],
     [16.0, 28.8],
     [-16.0, 38.8],
-    [16.0, 38.8],
     [7.8, 19.9],
   ] as Array<[number, number]>) {
     kit.place(x, z).planter();
     aoBlobs.push({ x, z, r: 0.55 });
   }
   props.put('bush', -13.6, 27.4, 0, 5);
-  props.put('bush', 14.6, 39.0, 0, 5);
   props.put('bush', -14.6, 39.0, 0, 5);
   props.put('streetlight', 8.2, 13.2, 0, 4, 0, 0.1);
   props.put('streetlight', 8.2, 27.0, 0, 4, 0, 0.1);
@@ -548,7 +555,7 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
   ] as Array<[number, number, number]>)
     kit.place(x, z).flagpole(col);
   anchors(c, A);
-  return finalize(c, mat);
+  return finalize(c, mat, { castShadow: false });
 }
 
 function anchors(c: Ctx, A: Layout['area2']): void {
@@ -571,6 +578,123 @@ export function buildArea2Lock(assets: Assets, L: Layout, mat: Material): Dioram
   for (let x = ga + 0.8; x < gb; x += 1.55) kit.place(0, 0).barrier(x, P.z0 - 0.1);
   kit.place(gb + 0.6, P.z0 - 0.5).padlockSign();
   void root;
+  return finalize(c, mat);
+}
+
+/**
+ * Area 3 "Youth Stadium" ground: plot, curbs, border hedge, walkway and drill zone floors. Always visible (the locked
+ * look is a separate overlay, see buildArea3Lock); rooms, the kiosk and the stadium pop in when bought.
+ */
+export function buildArea3Base(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { b, kit, props, root, aoBlobs, decals } = c;
+  const A = L.area3;
+  const P = A.plot;
+  const pw = P.x1 - P.x0;
+  const pd = P.z1 - P.z0;
+  const pcx = (P.x0 + P.x1) / 2;
+  const pcz = (P.z0 + P.z1) / 2;
+  b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
+  const curbW = 0.38;
+  for (const [x, z, w, d] of [
+    [pcx, P.z1 - curbW / 2, pw, curbW],
+    [P.x0 + curbW / 2, pcz, curbW, pd],
+    [P.x1 - curbW / 2, pcz, curbW, pd],
+  ] as Array<[number, number, number, number]>) {
+    b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
+  }
+  b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
+  // border hedge between the Training Ground and the Youth Stadium (gate gap stays open)
+  const [ga, gb] = A.gateGap;
+  for (const [x0, x1] of [
+    [P.x0 + 0.4, ga - 0.2],
+    [gb + 0.2, P.x1 - 0.4],
+  ] as Array<[number, number]>) {
+    for (let x = x0 + 0.6; x < x1 - 0.3; x += 1.25) {
+      b.at(G.ico(1), Math.round(x * 3) % 2 ? 0x3fae4f : 0x4cb85a, x, 0.42, P.z0 + 0.05, x, 1.15, 0.8, 0.7);
+    }
+    b.at(G.rbox(0.1), COL.curbSide, (x0 + x1) / 2, 0.08, P.z0 + 0.05, 0, x1 - x0, 0.16, 0.5);
+  }
+  streetSegment(c, P.x1, P.z0, P.z1);
+  root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
+  root.add(floor('curb', A.path, 0.008, 1));
+  root.add(floor('deck', A.kitRoom, 0.012, 2));
+  // crossing zone: turf with a box line and a wing channel either side
+  const cr = A.crossing;
+  root.add(floor('turf', cr, 0.012, 2));
+  const lw = 0.1;
+  const ccx = (cr.x0 + cr.x1) / 2;
+  b.add(flat(cr.x1 - cr.x0 - 0.6, lw), COL.line, trs(ccx, 0.02, cr.z0 + 0.9));
+  b.add(flat(4.2, lw), COL.line, trs(ccx, 0.02, cr.z0 + 3.2));
+  b.add(flat(lw, 2.3), COL.line, trs(ccx - 2.1, 0.02, cr.z0 + 2.05));
+  b.add(flat(lw, 2.3), COL.line, trs(ccx + 2.1, 0.02, cr.z0 + 2.05));
+  for (const sx of [-1, 1]) b.add(flat(lw, cr.z1 - cr.z0 - 3.6), COL.line, trs(ccx + sx * 2.1, 0.02, (cr.z0 + 3.2 + cr.z1 - 0.4) / 2));
+  kit.place(0, 0).railing(cr.x0 + 0.1, cr.z1 - 0.1, cr.x0 + 2.4, cr.z1 - 0.1);
+  // heading: rubber floor; juggling: turf disc with rings; reaction lights: running-track rubber
+  root.add(floor('rubberBlue', A.heading, 0.012, 1));
+  const ju = A.juggling;
+  const disc = new Mesh(new CircleGeometry(ju.r, 40).rotateX(-HALF_PI), new MeshLambertMaterial({ map: pattern('turf') }));
+  disc.position.set(ju.x, 0.012, ju.z);
+  disc.receiveShadow = true;
+  root.add(disc);
+  for (const [r0, r1] of [
+    [ju.r - 0.12, ju.r],
+    [ju.r * 0.45 - 0.05, ju.r * 0.45 + 0.03],
+  ] as Array<[number, number]>) {
+    const ring = new Mesh(new RingGeometry(r0, r1, 44).rotateX(-HALF_PI), new MeshBasicMaterial({ color: COL.line }));
+    ring.position.set(ju.x, 0.02, ju.z);
+    root.add(ring);
+  }
+  const re = A.reaction;
+  root.add(floor('tartan', re, 0.012, 1));
+  b.add(flat(re.x1 - re.x0 - 0.4, 0.08), COL.line, trs((re.x0 + re.x1) / 2, 0.022, (re.z0 + re.z1) / 2));
+  b.add(flat(0.12, re.z1 - re.z0 - 1.6), COL.line, trs(re.x1 - 1.4, 0.022, (re.z0 + re.z1) / 2));
+  root.add(floor('curb', A.shop, 0.008, 1));
+  // the stadium ground: apron already paved so the plot reads as "a stadium goes here"
+  root.add(floor('curb', { x0: A.standWest.x0, z0: A.standMain.z0, x1: A.standEast.x1, z1: P.z1 - curbW }, 0.006, 1));
+  // edge decor: trees, lights, benches, bins, flags at the entrance
+  for (const [x, z] of [
+    [-16.0, 51.0],
+    [16.0, 47.0],
+    [16.0, 57.4],
+    [-16.0, 60.0],
+    [8.6, 50.4],
+  ] as Array<[number, number]>) {
+    kit.place(x, z).planter();
+    aoBlobs.push({ x, z, r: 0.55 });
+  }
+  props.put('bush', -7.4, 50.6, 0, 5);
+  props.put('bush', 16.1, 60.4, 0, 5);
+  props.put('streetlight', 12.2, 46.4, 0, 4, 0, 0.1);
+  props.put('streetlight', 12.2, 58.6, 0, 4, 0, 0.1);
+  kit.place(16.0, 50.2, -HALF_PI).bench(2.2);
+  kit.place(16.0, 52.4).bin();
+  aoBlobs.push({ x: 16.0, z: 52.4, r: 0.35 });
+  for (const [x, z, col] of [
+    [ga - 0.5, P.z0 + 1.0, 0x2f6bff],
+    [gb + 0.25, P.z0 + 1.0, 0xffd23f],
+  ] as Array<[number, number, number]>)
+    kit.place(x, z).flagpole(col);
+  decals.add('banner', 1.0, 1.0, trs(cr.x0 + 1.3, 0.62, cr.z1 - 0.05));
+  c.anchors.area3Gate = { x: (ga + gb) / 2, z: P.z0 };
+  return finalize(c, mat, { castShadow: false });
+}
+
+/** Construction look over the closed Youth Stadium: blueprint tint, barriers across the gate, padlock sign. */
+export function buildArea3Lock(assets: Assets, L: Layout, mat: Material): Diorama {
+  const c = newCtx(assets, L);
+  const { kit, extra } = c;
+  const A = L.area3;
+  const P = A.plot;
+  const fl = floor('blueprint', { x0: P.x0 + 0.4, z0: P.z0 + 0.4, x1: P.x1 - 0.4, z1: P.z1 - 0.4 }, 0.03, 1);
+  const fm = fl.material as MeshLambertMaterial;
+  fm.transparent = true;
+  fm.opacity = 0.55;
+  fm.depthWrite = false;
+  extra.push(fl);
+  const [ga, gb] = A.gateGap;
+  for (let x = ga + 0.8; x < gb; x += 1.55) kit.place(0, 0).barrier(x, P.z0 - 0.1);
+  kit.place(ga - 0.9, P.z0 - 0.5).padlockSign();
   return finalize(c, mat);
 }
 
@@ -826,8 +950,169 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
       kit.place(r.x1 - 4.0, f.z0 - 0.75, 0).dugout(3.0);
       break;
     }
+    // ── Area 3 "Youth Stadium"
+    case 'area3_gate':
+      kit.place(at.x, at.z, 0).archGate(L.area3.gateGap[1] - L.area3.gateGap[0] - 0.4);
+      break;
+    case 'kit_room':
+      kit.place(at.x, at.z, 0).kitStation();
+      aoBlobs.push({ x: at.x, z: at.z, r: 1.4 });
+      props.put('Box_A', at.x - 1.9, at.z - 0.2, 0.3, 0.8);
+      break;
+    case 'crossing': {
+      const cen = geo?.center ?? at;
+      const gz = cen.z - 3.9;
+      kit.place(cen.x, gz).goal(3.6, 1.6, 0.6);
+      const nm = netMaterial();
+      const back = new Mesh(new PlaneGeometry(3.6, 1.6, 12, 6), nm);
+      back.position.set(cen.x, 0.8, gz - 0.6);
+      c.nets.push(back);
+      c.extra.push(back);
+      const top = new Mesh(new PlaneGeometry(3.6, 0.6), nm);
+      top.rotation.x = -HALF_PI;
+      top.position.set(cen.x, 1.6, gz - 0.3);
+      c.extra.push(top);
+      kit.place(0, 0).mannequin(cen.x, cen.z - 2.05, 0);
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) {
+        kit.place(0, 0).cone(l.spot.x, l.spot.z - 0.7, 0.8, 0xffd23f);
+        kit.place(0, 0).cornerFlag(l.spot.x + (l.spot.x < cen.x ? -0.8 : 0.8), l.spot.z - 1.6);
+      }
+      bibCrate(c, geo);
+      break;
+    }
+    case 'heading': {
+      const ls = (geo?.lanes ?? []).slice(0, lanes);
+      for (const l of ls) {
+        kit.place(l.target.x, l.target.z - 0.1, 0).pendulumFrame(1.95);
+        b.add(flat(0.6, 0.6), 0x1f47b8, trs(l.spot.x, 0.02, l.spot.z));
+        aoBlobs.push({ x: l.target.x, z: l.target.z, r: 1.0 });
+      }
+      const hz = L.area3.heading;
+      kit.place(hz.x0 + 0.8, hz.z1 - 0.7, 0.3).ballCart();
+      bibCrate(c, geo);
+      break;
+    }
+    case 'juggling': {
+      const ju = L.area3.juggling;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        kit.place(0, 0).cone(ju.x + Math.cos(a) * (ju.r - 0.35), ju.z + Math.sin(a) * (ju.r - 0.35), 0.7, i % 2 ? 0xffd23f : 0xff7a2e);
+      }
+      for (const l of (geo?.lanes ?? []).slice(0, lanes)) b.add(flat(0.5, 0.5), 0xffd23f, trs(l.spot.x, 0.022, l.spot.z, Math.PI / 4));
+      if (lanes > 1) kit.place(ju.x, ju.z - ju.r - 0.4, 0).stopwatchStand();
+      bibCrate(c, geo);
+      break;
+    }
+    case 'reaction': {
+      const cen = geo?.center ?? at;
+      kit.place(cen.x - 4.5, cen.z, HALF_PI).reactionBoard(3.4);
+      aoBlobs.push({ x: cen.x - 4.4, z: cen.z, r: 1.6 });
+      for (const l of (geo?.lanes ?? []).slice(0, lanes)) {
+        kit.place(0, 0).cone(l.spot.x + 0.3, l.spot.z - 0.35, 0.7);
+        kit.place(0, 0).cone(l.spot.x + 0.3, l.spot.z + 0.35, 0.7);
+      }
+      kit.place(L.area3.reaction.x0 + 1.4, L.area3.reaction.z0 + 0.5, 0).stopwatchStand();
+      bibCrate(c, geo);
+      break;
+    }
+    case 'tactics_room':
+    case 'analysis_lab': {
+      const tac = id === 'tactics_room';
+      const r = tac ? L.area3.tactics : L.area3.analysis;
+      const door = tac ? L.area3.tacticsDoor : L.area3.analysisDoor;
+      const H = 1.3;
+      c.extra.push(floor(tac ? 'wood' : 'tilesTeal', r, 0.014, 1));
+      wall(b, r.x0, r.z0, r.x1, r.z0, H, 1);
+      wall(b, r.x0, r.z0, r.x0, r.z1, H, -1);
+      wall(b, r.x1, r.z0, r.x1, r.z1, H, 1);
+      wall(b, r.x0, r.z1, door[0], r.z1, STUB_H, 1);
+      wall(b, door[1], r.z1, r.x1, r.z1, STUB_H, 1);
+      c.aoStrips.push({ x0: r.x0, z0: r.z0 + WALL_T / 2, x1: r.x1, z1: r.z0 + WALL_T / 2, w: 0.7 });
+      const cx = (r.x0 + r.x1) / 2;
+      const cz = (r.z0 + r.z1) / 2;
+      kit.place(cx, r.z0 + WALL_T / 2 + 0.06, 0).videoWall(tac ? 2.4 : 2.0);
+      if (tac) {
+        props.put('table_medium_long', cx, cz + 0.2, HALF_PI, 1.0);
+        for (const [dx, dz, ry] of [
+          [-0.75, -0.75, 0],
+          [0.75, -0.75, 0],
+          [-0.75, 1.15, Math.PI],
+          [0.75, 1.15, Math.PI],
+        ] as Array<[number, number, number]>)
+          props.put('chair_A', cx + dx, cz + dz, ry, 0.9);
+        kit.place(r.x1 - 1.0, r.z0 + 1.3, -0.5).tacticsBoard();
+        props.put('shelf_A_big', r.x0 + 0.55, cz, HALF_PI, 0.8);
+        props.put('cactus_medium_A', r.x1 - 0.5, r.z1 - 0.7, 0, 0.85);
+        aoBlobs.push({ x: cx, z: cz + 0.2, r: 1.6 });
+      } else {
+        for (const [dx, ry] of [
+          [-1.4, 0],
+          [1.4, 0],
+        ] as Array<[number, number]>) {
+          kit.place(cx + dx, cz - 0.6, ry).screenDesk();
+          props.put('chair_stool', cx + dx, cz + 0.2, 0, 0.9);
+          aoBlobs.push({ x: cx + dx, z: cz - 0.4, r: 1.0 });
+        }
+        props.put('cabinet_medium_decorated', r.x0 + 0.55, cz + 1.4, HALF_PI, 0.8);
+        props.put('lamp_standing', r.x1 - 0.5, r.z1 - 0.7, 0, 0.9);
+        props.put('rug_rectangle_stripes_A', cx, cz + 1.4, 0, 0.9, 0.015, 0);
+      }
+      decals.add(tac ? 'posterA' : 'posterB', 0.6, 0.6, trs(r.x0 + 1.0, 0.85, r.z0 + WALL_T / 2 + 0.02));
+      break;
+    }
+    case 'fan_shop': {
+      const r = L.area3.shop;
+      const cx = (r.x0 + r.x1) / 2;
+      const cz = (r.z0 + r.z1) / 2;
+      kit.place(cx, cz - 0.2, 0).kiosk(r.x1 - r.x0 - 0.4, r.z1 - r.z0 - 0.8);
+      aoBlobs.push({ x: cx, z: cz, r: 2.0 });
+      props.put('Box_A', r.x0 - 0.35, r.z1 - 0.4, 0.2, 0.7);
+      props.put('Box_B', r.x0 - 0.3, r.z1 - 1.05, -0.3, 0.6);
+      kit.place(r.x1 + 0.3, r.z0 + 0.3).flagpole(0x2f6bff);
+      break;
+    }
+    case 'youth_stadium': {
+      const r = L.area3.stadium;
+      c.extra.push(floor('curb', { x0: r.x0 - 0.6, z0: r.z0 - 0.6, x1: r.x1 + 0.6, z1: r.z1 + 0.6 }, 0.008, 1));
+      pitchMarkings(c, r, 3.6);
+      const f = { x0: r.x0 - 0.35, z0: r.z0 - 0.35, x1: r.x1 + 0.35, z1: r.z1 + 0.35 };
+      kit.place(0, 0).fence(f.x0, f.z0, f.x1, f.z0);
+      kit.place(0, 0).fence(f.x0, f.z0, f.x0, f.z1);
+      kit.place(0, 0).fence(f.x1, f.z0, f.x1, f.z1);
+      kit.place(0, 0).fence(f.x0, f.z1, f.x1, f.z1);
+      break;
+    }
+    case 'stand_main': {
+      const sm = L.area3.standMain;
+      stand(c, sm.x0, sm.x1, sm.z1 - 0.15, 3, 'x', 1);
+      kit.place((sm.x0 + sm.x1) / 2, sm.z0 + 0.15, 0, 1, 1.4).scoreboard();
+      for (const dx of [-6.5, 6.5]) decals.add('banner', 1.1, 1.1, trs((sm.x0 + sm.x1) / 2 + dx, 2.25, sm.z0 + 0.32));
+      break;
+    }
+    case 'stand_sides': {
+      const w = L.area3.standWest;
+      const e = L.area3.standEast;
+      stand(c, w.z0 + 0.2, w.z1 - 0.2, w.x1 - 0.5, 3, 'z', 1);
+      stand(c, e.z0 + 0.2, e.z1 - 0.2, e.x0 + 0.5, 3, 'z', -1);
+      break;
+    }
+    case 'stadium_lights':
+      for (const p of L.area3.lights) {
+        kit.place(p.x, p.z, p.z > (L.area3.stadium.z0 + L.area3.stadium.z1) / 2 ? Math.PI : 0).floodlight();
+        aoBlobs.push({ x: p.x, z: p.z, r: 0.7 });
+      }
+      break;
   }
   return finalize(c, mat);
+}
+
+/** Laundry basket at a Youth Stadium drill's basket spot (the bibs themselves are instanced by the view). */
+function bibCrate(c: Ctx, geo?: UnlockGeo): void {
+  const bk = geo?.basket;
+  if (!bk) return;
+  c.kit.place(bk.x, bk.z, 0).bibBasket(0);
+  c.aoBlobs.push({ x: bk.x, z: bk.z, r: 0.6 });
 }
 
 /** Bottle crate at a Training Ground drill's basket spot (bottles themselves are instanced by the view). */
@@ -917,8 +1202,9 @@ function stand(c: Ctx, x0: number, x1: number, zFront: number, tiers: number, ax
       const col = seatCols[(k + i) % 2] as number;
       const sx = axis === 'x' ? t : off + facing * 0.12;
       const sz = axis === 'x' ? off + facing * 0.12 : t;
-      b.at(G.rbox(0.08), col, sx, h + 0.12, sz, 0, axis === 'x' ? 0.46 : 0.36, 0.2, axis === 'x' ? 0.36 : 0.46);
-      b.at(G.rbox(0.08), col, axis === 'x' ? sx : sx - facing * 0.18, h + 0.36, axis === 'x' ? sz - facing * 0.18 : sz, 0, axis === 'x' ? 0.46 : 0.08, 0.34, axis === 'x' ? 0.08 : 0.46);
+      // plain boxes: a stand has hundreds of seats (a rounded box is 300 triangles, a box 12)
+      b.at(G.box(), col, sx, h + 0.12, sz, 0, axis === 'x' ? 0.46 : 0.36, 0.2, axis === 'x' ? 0.36 : 0.46);
+      b.at(G.box(), col, axis === 'x' ? sx : sx - facing * 0.18, h + 0.36, axis === 'x' ? sz - facing * 0.18 : sz, 0, axis === 'x' ? 0.46 : 0.08, 0.34, axis === 'x' ? 0.08 : 0.46);
     }
   }
   // back wall with academy trim

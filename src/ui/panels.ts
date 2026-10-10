@@ -236,7 +236,7 @@ export class SquadPanel extends Panel {
 
   open(rows: SquadRow[], size: number, strength: number, onSell: (id: number) => void): void {
     this.title.textContent = t('squad.title', { n: rows.length, size });
-    this.body.innerHTML = `<div class="squad-sub">${t('squad.strength', { ovr: Math.round(strength) })}</div>`;
+    this.body.innerHTML = `<div class="squad-sub">${t('squad.strength', { ovr: Math.round(strength), n: size })}</div>`;
     if (rows.length === 0) {
       const e = document.createElement('div');
       e.className = 'empty';

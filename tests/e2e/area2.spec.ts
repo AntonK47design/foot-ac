@@ -33,7 +33,7 @@ test.describe('M6 Training Ground', () => {
     await waitForGameplay(page);
     await unlock(page, 'area1');
     await teleport(page, 10.5, 9.0);
-    await expect(page.locator('.lock-sign', { hasText: 'Training Ground' })).toBeVisible();
+    await expect(page.locator('.lock-sign span').filter({ hasText: /^Training Ground$/ })).toBeVisible();
     await page.screenshot({ path: 'screenshots/m6-gate-locked.png' });
     // the fence holds: walking south stops at the border
     await page.keyboard.down('KeyS');
@@ -42,7 +42,7 @@ test.describe('M6 Training Ground', () => {
     expect((await coach(page)).z).toBeLessThan(12);
     await unlock(page, ['p2_gate', 'p2_water', 'p2_gym', 'p2_rondo', 'p2_gym_l2', 'p2_fk', 'p2_rondo_l2', 'p2_agility', 'p2_fk_l2', 'p2_skills']);
     expect(await page.evaluate(() => (window.__wk as unknown as Wk).sim.area2Open())).toBe(true);
-    await expect(page.locator('.lock-sign', { hasText: 'Training Ground' })).toBeHidden();
+    await expect(page.locator('.lock-sign span').filter({ hasText: /^Training Ground$/ })).toBeHidden();
     await page.keyboard.down('KeyS');
     await page.waitForTimeout(1500);
     await page.keyboard.up('KeyS');

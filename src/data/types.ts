@@ -20,9 +20,23 @@ export type Position = 'GK' | 'DF' | 'MF' | 'FW';
 export type Rarity = 'common' | 'rare' | 'epic' | 'wonderkid';
 export const RARITIES: readonly Rarity[] = ['common', 'rare', 'epic', 'wonderkid'];
 
-export type StationKind = 'shoot' | 'dribble' | 'pass' | 'sprint' | 'gym' | 'rondo' | 'freekick' | 'agility' | 'skills';
-/** What a station's basket holds (Area 1 drills: balls; Training Ground drills: water bottles). */
-export type Supply = 'ball' | 'water';
+export type StationKind =
+  | 'shoot'
+  | 'dribble'
+  | 'pass'
+  | 'sprint'
+  | 'gym'
+  | 'rondo'
+  | 'freekick'
+  | 'agility'
+  | 'skills'
+  | 'crossing'
+  | 'heading'
+  | 'juggling'
+  | 'reaction';
+/** What a station's basket holds (Sunday Park: balls; Training Ground: water bottles; Youth Stadium: training bibs). */
+export type Supply = 'ball' | 'water' | 'bib';
+export const SUPPLIES: readonly Supply[] = ['ball', 'water', 'bib'];
 
 export interface LaneDef {
   /** Where the trainee stands to start a rep (local). */
@@ -49,7 +63,7 @@ export interface StationDef {
   footprint: Rect[];
 }
 
-export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter' | 'pitch' | 'gate' | 'water' | 'room';
+export type ObjectKind = 'crate' | 'desk' | 'chairs' | 'decor' | 'shelter' | 'pitch' | 'gate' | 'water' | 'room' | 'kit' | 'shop';
 
 export interface ObjectDef {
   id: string;
@@ -97,7 +111,18 @@ export type IconId =
   | 'freekick'
   | 'agility'
   | 'skills'
-  | 'physio';
+  | 'physio'
+  | 'bib'
+  | 'crossing'
+  | 'heading'
+  | 'juggling'
+  | 'reaction'
+  | 'tactics'
+  | 'analysis'
+  | 'shop'
+  | 'stadium'
+  | 'stand'
+  | 'lights';
 
 export interface PadDef {
   id: string;
@@ -133,11 +158,15 @@ export interface AreaDef {
   crate: { spot: V2 };
   /** Training Ground Hydration Point: where water bottles are picked up. */
   water: { objectId: string; spot: V2 };
+  /** Youth Stadium Kit Room: where training bibs are picked up. */
+  bibs: { objectId: string; spot: V2 };
   /**
-   * Area 2 "Training Ground": a second plot south of Area 1, opened by the gate pad. Until then `lockedObstacles`
-   * (construction fence) keep everyone out; afterwards the coach may roam `bounds` (both plots).
+   * Later plots in order (Area 2 "Training Ground", Area 3 "Youth Stadium"), each opened by its gate pad. Until then
+   * `lockedObstacles` (construction fence) keep everyone out; afterwards the coach may roam `bounds` (all open plots).
    */
-  expansion: { gateObjectId: string; plot: Rect; bounds: Rect; lockedObstacles: Rect[] };
+  expansions: Array<{ area: number; gateObjectId: string; plot: Rect; bounds: Rect; lockedObstacles: Rect[] }>;
+  /** Youth Stadium Fan Shop: passive takings land on this pile. */
+  shop: { objectId: string; pile: V2 };
   stations: StationDef[];
   objects: ObjectDef[];
   pads: PadDef[];

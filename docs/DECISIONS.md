@@ -196,3 +196,41 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 74. **Cash ads are uncapped** (user, for revenue): welcome-back ×2, Office "Get $X" and ×2 match cash have no daily cap. The Office ad also has no cooldown.
     - The Office amount still shrinks with each use that day, down to a floor of 50%, so chained ads can't buy a whole area.
     - Still capped: daily ×2 (1 a day, one calendar claim anyway) and scout skip (3 a day). The interstitial keeps its play-time rules.
+75. **M7: Area 3 "Youth Stadium"** is a third plot south of the Training Ground, behind a $6,000 gate that needs every Training Ground pad.
+    - **New chore: training bibs.** The coach grabs them at the Kit Room and carries them to four new drills:
+      - Crossing Zone (PAS);
+      - Heading Pendulums (SHO);
+      - Juggling Circle (DRI);
+      - Reaction Lights (PAC).
+
+      Two Kit Managers can take the chore over; the first comes as the 5th pad, like the Water Carrier. Each drill also gets an assistant coach and a drill upgrade.
+    - **Facilities:**
+      - Tactics Room: +2 to every stat of each graduate.
+      - Analysis Lab: +4 to the team's match strength.
+      - Fan Shop: $6/s on its own pile, +50% per stand, plus the "Matchday Merch" upgrade.
+      - Youth Stadium: the squad becomes 11-a-side, and match cash goes ×2.5 (was ×1.5 with the 7-a-side pitch).
+      - Main stand and side stands: +0.3 match cash each.
+      - Floodlights: +0.2 match cash.
+    - **Matches stay away games** (bus trip). The Youth Stadium is where the squad trains, and it pays through the match multiplier. Playing home matches there would mean a second match-camera setup; left for later.
+    - **Pacing** (bot, 85 min runs):
+      - The gate opens at about 37–40 min.
+      - Area 3 is complete at about 70–74 min.
+      - Dead air from 40 to 70 min: median about 100 s, worst about 110 s.
+
+      New sim checks cover all three. `npm run sim` now runs 85 minutes (about 3.5 min wall clock).
+    - **Code:** `AreaDef.expansions[]` replaces the single `expansion`. Each supply's runner comes from `RUNNER` / `runnerSupply` (ball → ball boy, water → water carrier, bib → kit manager). Area 3 data lives in `data/areas/area3.ts`.
+76. **The guide sends you to an affordable pad before the office.** "A graduate waits in the office" now ranks after "an affordable pad".
+    - **Why:** in Area 3 the office is about 45 m away. Every new graduate pulled the coach (and the bot) back across the map, and affordable pads went unbought for minutes; distracted-bot dead air was up to 290 s.
+    - **Why it's safe:** graduates wait on the office bench, and when it's full they are auto-sold, so nothing blocks.
+    - **Effect:** dead air dropped in all three areas.
+77. **Performance for a fully built academy.**
+    - **Before:** about 160 draw calls and 400–650k triangles in Area 3.
+    - **After:** about 85–110 draw calls and 160–245k triangles at steady state, with all pads bought and about 20 trainees.
+    - **What changed:**
+      - Each plot builds its own stretch of street. Before, the street sat in Area 1's merged mesh and made it span the whole map, so it was never culled.
+      - Each plot's ground mesh is hidden when the camera focus is more than 30 m south or 20 m north of it. The camera sees about 20 m north even in portrait.
+      - Characters, whose skinned meshes skip frustum culling, are hidden outside the same window and 26 m sideways.
+      - Off-screen characters animate at 8 Hz.
+      - Stand seats and folded bibs are plain boxes (12 triangles) instead of rounded boxes (300).
+      - Area 2 and 3 ground meshes don't cast shadows; their props have AO blobs.
+78. **Squad panel says "the best {n} play"** using the real squad size (it said 5 even with 7- and 11-a-side).

@@ -1,7 +1,8 @@
 import { BALANCE } from '../data/balance';
-import type { IconId, Supply } from '../data/types';
+import { SUPPLIES, type IconId, type Supply } from '../data/types';
 import { dist2 } from './geom';
 import { firstName } from './players';
+import { RUNNER } from './state';
 import type { Sim } from './sim';
 
 export type ObjectiveIcon = IconId | 'cash' | 'sign' | 'move';
@@ -19,7 +20,7 @@ export interface Objective {
 }
 
 /**
- * Picks what the player should do next. Order: tutorial cash → affordable pad → collect cash towards
+ * Picks what the player should do next. Order: tutorial cash → affordable pad → graduate in the office → collect cash towards
  * the next pad → starving station → sign → refill → collect → save up.
  * This also drives the economy bot, so it must always return something sensible.
  */
@@ -32,13 +33,6 @@ export function computeObjective(sim: Sim): Objective | null {
   if (!s.flags.firstCash) {
     const p = sim.pile('starter_a');
     if (p && p.amount > 0) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
-  }
-
-  // 2. a graduate waits in the office: sell or promote at the computer (the big payout moment)
-  const grad = sim.podiumGraduate();
-  if (grad) {
-    const P = area.office.computer;
-    return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
   }
 
   const pads = sim.visiblePads();
@@ -57,6 +51,14 @@ export function computeObjective(sim: Sim): Objective | null {
   }
   if (bestPad) {
     return { key: 'obj.unlock', params: { name: bestPad.nameKey }, icon: bestPad.icon, x: bestPad.pos.x, z: bestPad.pos.z, targetId: bestPad.id, radius: BALANCE.pad.radius };
+  }
+
+  // 4a. a graduate waits in the office: sell or promote at the computer (the big payout moment). After an affordable
+  // pad: in the far areas the office is a long walk, and a full bench sells on its own (never blocks).
+  const grad = sim.podiumGraduate();
+  if (grad) {
+    const P = area.office.computer;
+    return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
   }
 
   // 4b. tutorial: once the bus is coming, wait at the sign-up desk for the first player (never "save up" with no income yet)
@@ -174,19 +176,24 @@ export function computeObjective(sim: Sim): Objective | null {
   return null;
 }
 
-const SUPPLIES: readonly Supply[] = ['ball', 'water'];
-
-/** The coach has to run this supply: its source is built and no runner (ball boy / water carrier) does it. */
+/** The coach has to run this supply: its source is built and no runner (ball boy / water carrier / kit manager) does it. */
 function needsCoach(sim: Sim, supply: Supply): boolean {
   if (!sim.supplySource(supply)) return false;
-  return !sim.hasStaff(supply === 'water' ? 'water_carrier' : 'ball_boy');
+  return !sim.hasStaff(RUNNER[supply]);
 }
+
+/** Objective keys / icon / target per supply. */
+const SUPPLY_OBJ: Record<Supply, { grab: string; bring: string; icon: IconId; target: string }> = {
+  ball: { grab: 'obj.grab_balls', bring: 'obj.bring_balls', icon: 'ball', target: 'crate' },
+  water: { grab: 'obj.grab_water', bring: 'obj.bring_water', icon: 'water', target: 'water' },
+  bib: { grab: 'obj.grab_bibs', bring: 'obj.bring_bibs', icon: 'bib', target: 'bibs' },
+};
 
 export function ballObjective(sim: Sim, stationId: string): Objective {
   const c = sim.state.coach;
   const st = sim.station(stationId);
   const supply: Supply = st.supply ?? 'ball';
-  const water = supply === 'water';
+  const o = SUPPLY_OBJ[supply];
   const src = sim.supplySource(supply) ?? sim.area.crate.spot;
   const cap = sim.carryCap();
   const zr = BALANCE.crate.zoneRadius;
@@ -194,9 +201,9 @@ export function ballObjective(sim: Sim, stationId: string): Objective {
   const holding = c.carry > 0 && sim.coachCarryKind() === supply;
   if ((holding && c.carry >= cap) || (holding && !nearSrc)) {
     const b = st.basket ?? st.pile;
-    return { key: water ? 'obj.bring_water' : 'obj.bring_balls', icon: water ? 'water' : 'ball', x: b.x, z: b.z, targetId: 'basket:' + stationId, radius: BALANCE.basket.zoneRadius };
+    return { key: o.bring, icon: o.icon, x: b.x, z: b.z, targetId: 'basket:' + stationId, radius: BALANCE.basket.zoneRadius };
   }
-  return { key: water ? 'obj.grab_water' : 'obj.grab_balls', icon: water ? 'water' : 'ball', x: src.x, z: src.z, targetId: water ? 'water' : 'crate', radius: BALANCE.crate.zoneRadius };
+  return { key: o.grab, icon: o.icon, x: src.x, z: src.z, targetId: o.target, radius: BALANCE.crate.zoneRadius };
 }
 
 /** "Unlock X" when affordable, else "Save up: X" (tutorial route steps). */

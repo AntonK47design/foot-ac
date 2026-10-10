@@ -158,6 +158,11 @@ export class MatchDirector {
       // 7-a-side: a holding midfielder and a striker
       [cx - 2.4 * sx, cz],
       [cx - 0.5 * sx, cz],
+      // 11-a-side (Youth Stadium): two centre-backs and two wingers
+      [cx - 3.9 * sx, cz - 0.6 * sz],
+      [cx - 3.9 * sx, cz + 0.6 * sz],
+      [cx - 0.9 * sx, cz - 2.2 * sz],
+      [cx - 0.9 * sx, cz + 2.2 * sz],
     ];
     ours.forEach(([x, z], i) => this.target(this.ours[i], x, z));
     ours.forEach(([x, z], i) => this.target(this.theirs[i], 2 * cx - x, z));

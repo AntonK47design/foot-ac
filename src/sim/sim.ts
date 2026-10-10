@@ -1,13 +1,13 @@
 import { BALANCE } from '../data/balance';
 import { AREA1, PREBUILT_OBJECTS } from '../data/areas/area1';
 import { SAVE_VERSION } from '../data/constants';
-import { STATS, type AreaDef, type PadDef, type Rect, type Stat, type Supply } from '../data/types';
+import { STATS, SUPPLIES, type AreaDef, type PadDef, type Rect, type Stat, type Supply } from '../data/types';
 import { Emitter } from '../core/events';
 import { Rng } from '../core/rng';
 import { dist2, pushOutOfRect, yawFor } from './geom';
 import { NavGrid } from './nav';
 import { computeOvr, createTrainee, firstName } from './players';
-import { makeAgent, type Agent, type SimState, type Staff, type Trainee } from './state';
+import { makeAgent, runnerSupply, type Agent, type SimState, type Staff, type Trainee } from './state';
 import { WorldGeo, type StationGeo } from './world';
 import { computeObjective, type Objective } from './objectives';
 import { Guide, type GuideMode } from './guide';
@@ -65,7 +65,6 @@ export interface SimInput {
 
 const EMPTY = {} as Record<string, never>;
 
-const SUPPLIES: readonly Supply[] = ['ball', 'water'];
 
 /** Lowest stat (the gym trains it). */
 function weakest(stats: Record<Stat, number>): { k: Stat; v: number } {
@@ -280,7 +279,7 @@ export class Sim {
     }
     for (const f of s.staff) {
       const spot = this.area.staffSpots[f.id];
-      const h = f.kind === 'ball_boy' || f.kind === 'water_carrier' ? this.staffHome(this.ballBoyIndex(f), f.kind) : (spot ?? this.staffHome(0));
+      const h = runnerSupply(f.kind) ? this.staffHome(this.ballBoyIndex(f), f.kind) : (spot ?? this.staffHome(0));
       f.x = f.px = h.x;
       f.z = f.pz = h.z;
       f.goal = null;
@@ -295,7 +294,7 @@ export class Sim {
   rebuildWorld(): void {
     const s = this.state;
     const obs: Rect[] = [...this.area.obstacles];
-    if (!this.area2Open()) obs.push(...this.area.expansion.lockedObstacles);
+    for (const e of this.area.expansions) if (!this.state.built[e.gateObjectId]) obs.push(...e.lockedObstacles);
     for (const [id, o] of this.world.objects) if (s.built[id]) obs.push(...o.footprint);
     for (const [id, st] of this.world.stations) {
       const ss = s.stations[id];
@@ -360,14 +359,34 @@ export class Sim {
     return this.state.staff.some((f) => f.kind === kind);
   }
 
+  /** Area `n`'s gate has been bought (Area 1 is always open). */
+  areaOpen(n: number): boolean {
+    const e = this.area.expansions.find((x) => x.area === n);
+    return n <= 1 || (!!e && !!this.state.built[e.gateObjectId]);
+  }
+
   /** The Training Ground gate has been bought. */
   area2Open(): boolean {
-    return !!this.state.built[this.area.expansion.gateObjectId];
+    return this.areaOpen(2);
+  }
+
+  /** The Youth Stadium gate has been bought. */
+  area3Open(): boolean {
+    return this.areaOpen(3);
   }
 
   /** Area the star bar tracks: the newest open one. */
   currentArea(): number {
-    return this.area2Open() ? 2 : 1;
+    let a = 1;
+    for (const e of this.area.expansions) if (this.state.built[e.gateObjectId]) a = Math.max(a, e.area);
+    return a;
+  }
+
+  /** Where the coach may walk: every open plot. */
+  coachBounds(): Rect {
+    let b = this.area.bounds;
+    for (const e of this.area.expansions) if (this.state.built[e.gateObjectId] && e.bounds.z1 > b.z1) b = e.bounds;
+    return b;
   }
 
   /** Stars earned / available in the current area (HUD star bar). */
@@ -378,9 +397,28 @@ export class Sim {
     return { have, total: this.world.areaStars[a] ?? 0 };
   }
 
-  /** Squad size: 5-a-side, 7 with the Training Ground pitch. */
+  /** Squad size: 5-a-side, 7 with the Training Ground pitch, 11 with the Youth Stadium. */
   squadSize(): number {
-    return this.state.built.seven_pitch ? BALANCE.squad.sizeSeven : BALANCE.squad.size;
+    const b = this.state.built;
+    return b.youth_stadium ? BALANCE.squad.sizeEleven : b.seven_pitch ? BALANCE.squad.sizeSeven : BALANCE.squad.size;
+  }
+
+  /** Match cash multiplier from the pitches, stands and floodlights. */
+  matchCashMult(): number {
+    const b = this.state.built;
+    const A = BALANCE.area3;
+    if (b.youth_stadium) {
+      return BALANCE.squad.stadiumCashMult + (b.stand_main ? A.standCashMult : 0) + (b.stand_sides ? A.standCashMult : 0) + (b.stadium_lights ? A.lightsCashMult : 0);
+    }
+    return b.seven_pitch ? BALANCE.squad.sevenCashMult : 1;
+  }
+
+  /** Fan Shop takings per second (0 until it is built). */
+  shopRate(): number {
+    const b = this.state.built;
+    if (!b[this.area.shop.objectId]) return 0;
+    const stands = (b.stand_main ? 1 : 0) + (b.stand_sides ? 1 : 0);
+    return BALANCE.area3.shopCashPerSec * (1 + stands * BALANCE.area3.shopPerStand) * this.upMult('academy_shop', 1);
   }
 
   activeTrainees(): number {
@@ -524,6 +562,7 @@ export class Sim {
     this.updateStations();
     this.updateStaff(dt);
     this.updateAccountant(dt);
+    this.updateShop(dt);
     if (this.earnedPrev >= 0) Meta.trackIncome(s.meta, s.earned - this.earnedPrev, dt);
     this.earnedPrev = s.earned;
     this.metaT -= dt;
@@ -578,7 +617,7 @@ export class Sim {
     c.x += c.vx * dt;
     c.z += c.vz * dt;
     for (const r of this.obstacles) pushOutOfRect(c, B.radius, r);
-    const b = this.area2Open() ? this.area.expansion.bounds : this.area.bounds;
+    const b = this.coachBounds();
     c.x = Math.max(b.x0 + B.radius, Math.min(b.x1 - B.radius, c.x));
     c.z = Math.max(b.z0 + B.radius, Math.min(b.z1 - B.radius, c.z));
     const sp = Math.hypot(c.vx, c.vz);
@@ -674,6 +713,7 @@ export class Sim {
     } else if (u.type === 'object') {
       s.built[u.id] = true;
       if (u.id === this.area.matchPitch.objectId) s.matchNextAt = s.time;
+      if (u.id === this.area.shop.objectId && !this.pile('shop')) s.piles.push({ id: 'shop', x: this.area.shop.pile.x, z: this.area.shop.pile.z, amount: 0 });
     } else if (u.type === 'staff') {
       s.built[u.id] = true;
       const kind: Staff['kind'] = u.id.startsWith('assistant:')
@@ -682,7 +722,9 @@ export class Sim {
           ? u.id
           : u.id.startsWith('water_carrier')
             ? 'water_carrier'
-            : 'ball_boy';
+            : u.id.startsWith('kit_manager')
+              ? 'kit_manager'
+              : 'ball_boy';
       const spot = this.area.staffSpots[u.id];
       const f: Staff = { ...makeAgent(spot?.x ?? p.pos.x, spot?.z ?? p.pos.z), id: u.id, kind, state: 'idle', carry: 0, target: null, timer: 0 };
       if (spot) f.yaw = spot.yaw;
@@ -738,7 +780,8 @@ export class Sim {
     let next: PadDef | null = null;
     for (const p of this.visiblePads()) if (!next || this.padRemaining(p) < this.padRemaining(next)) next = p;
     if (!next) return true;
-    const gate = next.unlock.type === 'object' && next.unlock.id === this.area.expansion.gateObjectId;
+    const u = next.unlock;
+    const gate = u.type === 'object' && this.area.expansions.some((e) => e.gateObjectId === u.id);
     return cost <= this.padRemaining(next) * (gate ? BALANCE.objectives.upgradeShareGate : BALANCE.objectives.upgradeShare);
   }
 
@@ -822,14 +865,24 @@ export class Sim {
     }
   }
 
+  /** Fan Shop: takings land on its pile by the walkway (the accountant banks them like any pile). */
+  private updateShop(dt: number): void {
+    const r = this.shopRate();
+    if (r <= 0) return;
+    const p = this.pile('shop');
+    if (p) p.amount += r * dt;
+  }
+
   private staffHome(i = 0, kind: Staff['kind'] = 'ball_boy'): { x: number; z: number } {
-    const sp = kind === 'water_carrier' ? this.area.water.spot : this.area.crate.spot;
+    const sup = runnerSupply(kind);
+    const sp = sup === 'water' ? this.area.water.spot : sup === 'bib' ? this.area.bibs.spot : this.area.crate.spot;
     return { x: sp.x - 1.8 + i * 3.6, z: sp.z + 0.6 };
   }
 
   /** Where `supply` is picked up, if that source is built. */
   supplySource(supply: Supply): { x: number; z: number } | null {
     if (supply === 'water') return this.state.built[this.area.water.objectId] ? this.area.water.spot : null;
+    if (supply === 'bib') return this.state.built[this.area.bibs.objectId] ? this.area.bibs.spot : null;
     return this.state.built.ball_crate ? this.area.crate.spot : null;
   }
 
@@ -883,6 +936,7 @@ export class Sim {
           ss.balls++;
           s.stats.ballsDelivered++;
           if (kind === 'water') s.flags.firstWater = true;
+          else if (kind === 'bib') s.flags.firstBib = true;
           else s.flags.firstDelivery = true;
           this.events.emit('ballDropped', { stationId: id, byStaff: false });
         }
@@ -1054,7 +1108,8 @@ export class Sim {
     );
     if (pro) t.scouted = true;
     // with the Training Ground open, careers run longer (more drills to visit)
-    if (this.area2Open()) t.gradOvr = Math.min(t.cap, t.startOvr + BALANCE.trainee.gradOvrGainArea2);
+    if (this.area3Open()) t.gradOvr = Math.min(t.cap, t.startOvr + BALANCE.trainee.gradOvrGainArea3);
+    else if (this.area2Open()) t.gradOvr = Math.min(t.cap, t.startOvr + BALANCE.trainee.gradOvrGainArea2);
     s.flags.firstTraineeSpawned = true;
     t.seat = seat;
     t.arrivalOrder = ++s.arrivalCounter;
@@ -1228,6 +1283,8 @@ export class Sim {
   private graduate(t: Trainee): void {
     const s = this.state;
     s.stats.graduated++;
+    // Tactics Room: graduates leave a little sharper all round
+    if (s.built.tactics_room) for (const k of STATS) t.stats[k] += BALANCE.area3.tacticsStatBonus;
     this.addXp(BALANCE.xp.perGraduation);
     t.stationId = null;
     Meta.questProgress(s, 'graduate');
@@ -1500,7 +1557,14 @@ export class Sim {
   /** Creates the highlight script. The caller pauses the sim while the match plays. */
   startMatch(): MatchScript {
     this.prompt = null;
-    this.match = createMatch(this.rng, this.state.squad, this.state.league, this.cupAvailable() ? this.cupOpponent() : undefined, this.squadSize());
+    this.match = createMatch(
+      this.rng,
+      this.state.squad,
+      this.state.league,
+      this.cupAvailable() ? this.cupOpponent() : undefined,
+      this.squadSize(),
+      this.state.built.analysis_lab ? BALANCE.area3.analysisStrength : 0,
+    );
     this.state.rng = this.rng.state;
     return this.match;
   }
@@ -1515,7 +1579,7 @@ export class Sim {
     const m = this.match;
     if (!m) return null;
     const r = finishMatch(this.rng, m, s.league, s.squad);
-    r.cash = Math.round(r.cash * this.upMult('academy_matchday', 1) * (s.built.seven_pitch ? BALANCE.squad.sevenCashMult : 1));
+    r.cash = Math.round(r.cash * this.upMult('academy_matchday', 1) * this.matchCashMult());
     this.match = null;
     this.addCash(r.cash);
     this.addXp(r.xp);
@@ -1590,9 +1654,9 @@ export class Sim {
     const s = this.state;
     const B = BALANCE.staff.ballBoy;
     for (const f of s.staff) {
-      if (f.kind !== 'ball_boy' && f.kind !== 'water_carrier') continue;
-      // ball boys run crate → ball baskets; water carriers run Hydration Point → water baskets
-      const supply: Supply = f.kind === 'water_carrier' ? 'water' : 'ball';
+      // ball boys run crate → ball baskets; water carriers the Hydration Point; kit managers the Kit Room
+      const supply = runnerSupply(f.kind);
+      if (!supply) continue;
       const crate = this.supplySource(supply);
       switch (f.state) {
         case 'idle': {

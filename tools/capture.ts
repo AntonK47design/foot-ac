@@ -31,7 +31,7 @@ async function stage(page: Page, area: 1 | 2, warmSec: number, cash = 0): Promis
       type Sim = { world: { padList: Array<{ id: string; area: number }> }; unlockPad(p: unknown): void; tick(dt: number): void; state: { cash: number; flags: Record<string, boolean>; level: number; xp: number } };
       const sim = window.__wk!.sim as Sim;
       // skip the tutorial route (no guide pill in the shots)
-      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'gate', 'water', 'gym', 'bottles']) sim.state.flags['tut:' + k] = true;
+      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'gate', 'water', 'gym', 'bottles', 'gate3', 'kit', 'crossing', 'bibs']) sim.state.flags['tut:' + k] = true;
       for (const p of sim.world.padList) if (p.area <= area) sim.unlockPad(p);
       sim.state.cash = cash;
       for (let i = 0; i < warmSec * 60; i++) sim.tick(1 / 60);

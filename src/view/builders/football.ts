@@ -26,6 +26,8 @@ const C = {
   gold: 0xffc83d,
   goldDark: 0xd99a1a,
   glass: 0xbfe6ff,
+  lime: 0xb6f03c,
+  limeDark: 0x6fae17,
 };
 
 export class PropKit {
@@ -522,6 +524,131 @@ export class PropKit {
       this.add(G.cyl(8), C.blue, x0 + dx * t, 0.62, z0 + dz * t, 0, 0.1, 0.06, 0.1);
     }
     this.add(G.cyl(6), C.yellow, (x0 + x1) / 2, 0.5, (z0 + z1) / 2, ry, 0.035, len, 0.035, 0, Math.PI / 2);
+  }
+
+  // ───────────────────────────── Youth Stadium (Area 3) ─────────────────────────────
+
+  /** Folded training bib: neon body with a darker hem stripe. */
+  bib(x: number, y: number, z: number, color = C.lime, ry = 0): void {
+    this.add(G.box(), color, x, y + 0.03, z, ry, 0.42, 0.06, 0.3);
+    this.add(G.box(), C.limeDark, x, y + 0.061, z + 0.09, ry, 0.4, 0.005, 0.05);
+  }
+
+  /** Laundry basket for bibs at each Youth Stadium drill (the bibs themselves are instanced). Local: front faces +z. */
+  bibBasket(n = 0): void {
+    this.add(G.rbox(0.18), C.white, 0, 0.17, 0, 0, 0.8, 0.34, 0.56);
+    this.add(G.rbox(0.1), C.orange, 0, 0.33, 0, 0, 0.84, 0.05, 0.6);
+    for (const sx of [-0.3, 0, 0.3]) this.add(G.box(), C.offWhite, sx, 0.17, 0.285, 0, 0.12, 0.22, 0.01);
+    for (let i = 0; i < n; i++) this.bib(0, 0.3 + i * 0.06, 0, i % 2 ? C.orange : C.lime);
+  }
+
+  /** Kit Room counter: shelves of folded bibs, a washing machine and a laundry cart. Local: front faces +z. */
+  kitStation(): void {
+    // shelving unit
+    this.add(G.rbox(0.06), C.woodDark, -0.6, 0.9, -0.15, 0, 1.4, 1.8, 0.5);
+    for (const y of [0.35, 0.85, 1.35]) this.add(G.box(), C.wood, -0.6, y, -0.1, 0, 1.3, 0.04, 0.46);
+    const cols = [C.lime, C.orange, C.yellow, C.blue];
+    for (let row = 0; row < 3; row++)
+      for (let k = 0; k < 2; k++)
+        for (let h = 0; h < 3; h++) this.bib(-0.9 + k * 0.6, 0.37 + row * 0.5 + h * 0.06, -0.08, cols[(row + k) % cols.length] as number);
+    // washing machine
+    this.add(G.rbox(0.08), C.white, 0.55, 0.45, -0.1, 0, 0.7, 0.9, 0.62);
+    this.add(G.cyl(18), C.steelDark, 0.55, 0.45, 0.22, 0, 0.44, 0.04, 0.44, Math.PI / 2);
+    this.add(G.cyl(18), C.glass, 0.55, 0.45, 0.24, 0, 0.32, 0.03, 0.32, Math.PI / 2);
+    this.add(G.rbox(0.1), C.blue, 0.4, 0.83, 0.2, 0, 0.3, 0.06, 0.04);
+    // counter with a stack ready to grab
+    this.add(G.rbox(0.06), C.white, 0.0, 0.88, 0.45, 0, 2.2, 0.08, 0.5);
+    this.add(G.rbox(0.08), C.orange, 0.0, 0.44, 0.5, 0, 2.2, 0.86, 0.4);
+    this.add(G.rbox(0.08), C.yellow, 0.0, 0.62, 0.71, 0, 2.0, 0.1, 0.02);
+    for (let h = 0; h < 4; h++) this.bib(-0.5, 0.92 + h * 0.06, 0.45, h % 2 ? C.orange : C.lime);
+    for (let h = 0; h < 3; h++) this.bib(0.5, 0.92 + h * 0.06, 0.45, C.yellow);
+    // sign on a post
+    this.add(G.cyl(8), C.steel, 1.25, 1.0, -0.2, 0, 0.06, 2.0, 0.06);
+    this.add(G.rbox(0.1), C.orange, 1.25, 2.0, -0.15, 0, 0.7, 0.42, 0.06);
+    this.bib(1.25, 1.94, -0.1, C.lime);
+  }
+
+  /** Heading pendulum frame: two posts and a beam with a rope (the ball is drawn by the view). Local: lane along z. */
+  pendulumFrame(w = 1.9): void {
+    for (const sx of [-1, 1]) {
+      this.add(G.rbox(0.1), C.dark, (sx * w) / 2, 0.06, 0, 0, 0.36, 0.12, 0.5);
+      this.add(G.cyl(8), C.steel, (sx * w) / 2, 1.25, 0, 0, 0.1, 2.5, 0.1);
+    }
+    this.add(G.cyl(8), C.steel, 0, 2.5, 0, 0, 0.1, w + 0.1, 0.1, 0, Math.PI / 2);
+    this.add(G.rbox(0.2), C.orange, 0, 2.5, 0, 0, 0.3, 0.16, 0.16);
+    this.add(G.cyl(6), C.offWhite, 0, 2.15, 0, 0, 0.025, 0.7, 0.025);
+  }
+
+  /** Reaction-light board: a padded wall with light pods on two posts. Local: lights face +z. */
+  reactionBoard(w = 3.4): void {
+    for (const sx of [-1, 1]) this.add(G.rbox(0.1), C.steelDark, (sx * w) / 2, 0.9, -0.08, 0, 0.12, 1.8, 0.12);
+    this.add(G.rbox(0.08), C.dark, 0, 1.0, 0, 0, w, 1.3, 0.14);
+    this.add(G.rbox(0.06), C.blue, 0, 1.0, 0.06, 0, w - 0.14, 1.16, 0.04);
+    const pods = [C.lime, C.red, C.yellow, C.lime, C.blue, C.red];
+    pods.forEach((col, i) => {
+      const x = -w / 2 + 0.5 + (i % 3) * ((w - 1) / 2);
+      const y = i < 3 ? 1.3 : 0.72;
+      this.add(G.cyl(14), C.white, x, y, 0.09, 0, 0.36, 0.04, 0.36, Math.PI / 2);
+      this.add(G.cyl(14), col, x, y, 0.11, 0, 0.26, 0.03, 0.26, Math.PI / 2);
+    });
+    this.add(G.rbox(0.1), C.yellow, 0, 1.69, 0.02, 0, w, 0.08, 0.18);
+  }
+
+  /** Fan Shop kiosk: hut with a striped awning, serving counter, scarves and a sign. Local: serving side faces +z. */
+  kiosk(w = 2.8, d = 2.4): void {
+    this.add(G.rbox(0.06), C.blue, 0, 1.2, 0, 0, w, 2.4, d);
+    this.add(G.rbox(0.06), C.blueDark, 0, 0.06, 0, 0, w + 0.1, 0.12, d + 0.1);
+    // serving hatch + counter
+    this.add(G.box(), C.dark, 0, 1.35, d / 2 + 0.005, 0, w - 0.6, 0.9, 0.02);
+    this.add(G.rbox(0.06), C.white, 0, 0.9, d / 2 + 0.18, 0, w - 0.3, 0.08, 0.4);
+    this.add(G.rbox(0.06), C.yellow, 0, 0.45, d / 2 + 0.05, 0, w - 0.3, 0.8, 0.12);
+    // awning stripes
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + (i + 0.5) * (w / n);
+      this.add(G.box(), i % 2 ? C.white : C.red, x, 2.05, d / 2 + 0.4, 0, w / n, 0.06, 0.9, 0.35);
+    }
+    // scarves hanging in the hatch
+    const sc = [C.blue, C.yellow, C.red, C.lime];
+    for (let i = 0; i < 4; i++) {
+      const x = -0.8 + i * 0.53;
+      this.add(G.box(), sc[i] as number, x, 1.45, d / 2 + 0.03, 0, 0.14, 0.6, 0.02);
+      this.add(G.box(), C.white, x, 1.25, d / 2 + 0.035, 0, 0.14, 0.06, 0.02);
+    }
+    // roof + sign
+    this.add(G.rbox(0.06), C.offWhite, 0, 2.45, 0, 0, w + 0.3, 0.12, d + 0.3);
+    this.add(G.rbox(0.1), C.yellow, 0, 2.85, d / 2 - 0.2, 0, w * 0.7, 0.55, 0.12);
+    this.add(G.rbox(0.1), C.blue, 0, 2.85, d / 2 - 0.13, 0, w * 0.62, 0.4, 0.02);
+    this.add(G.sphere(10, 8), C.gold, 0, 2.85, d / 2 - 0.1, 0, 0.26, 0.26, 0.06);
+  }
+
+  /** Analysis desk with two monitors showing match data. Local: viewer sits at +z. */
+  screenDesk(): void {
+    this.add(G.rbox(0.06), C.white, 0, 0.78, 0, 0, 1.6, 0.06, 0.7);
+    for (const sx of [-0.72, 0.72]) this.add(G.rbox(0.08), C.steelDark, sx, 0.38, 0, 0, 0.08, 0.76, 0.62);
+    for (const sx of [-0.38, 0.38]) {
+      this.add(G.rbox(0.08), C.dark, sx, 1.12, -0.2, sx * -0.4, 0.7, 0.44, 0.05);
+      this.add(G.box(), 0x5ec8ff, sx, 1.12, -0.17, sx * -0.4, 0.62, 0.36, 0.01);
+      this.add(G.box(), C.lime, sx - 0.12, 1.08, -0.16, sx * -0.4, 0.2, 0.12, 0.012);
+      this.add(G.cyl(8), C.dark, sx, 0.9, -0.22, 0, 0.05, 0.2, 0.05);
+    }
+    this.add(G.rbox(0.1), C.dark, 0, 0.82, 0.18, 0, 0.5, 0.03, 0.18);
+  }
+
+  /** Wall-mounted video screen. Local: screen faces +z. */
+  videoWall(w = 2.2): void {
+    this.add(G.rbox(0.06), C.dark, 0, 1.55, 0, 0, w, w * 0.56, 0.08);
+    this.add(G.box(), 0x2e9e5b, 0, 1.55, 0.045, 0, w - 0.14, w * 0.56 - 0.14, 0.01);
+    this.add(G.box(), C.white, 0, 1.55, 0.05, 0, 0.04, w * 0.56 - 0.2, 0.01);
+    this.add(G.cyl(16), C.white, 0, 1.55, 0.05, 0, 0.36, 0.01, 0.36, Math.PI / 2);
+    this.add(G.cyl(16), 0x2e9e5b, 0, 1.55, 0.052, 0, 0.3, 0.01, 0.3, Math.PI / 2);
+    for (const [x, y, col] of [
+      [-0.5, 1.75, C.blue],
+      [-0.3, 1.4, C.blue],
+      [0.45, 1.65, C.red],
+      [0.6, 1.35, C.red],
+    ] as Array<[number, number, number]>)
+      this.add(G.cyl(10), col, x * (w / 2.2), y, 0.056, 0, 0.1, 0.01, 0.1, Math.PI / 2);
   }
 
   stopwatchStand(): void {

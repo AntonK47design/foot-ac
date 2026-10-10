@@ -86,6 +86,24 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
 - Locked: blueprint tint over the whole plot, barriers in the gate gap, padlock sign with the star requirement.
 - Supply chips and bubbles show a water bottle for Training Ground drills; the coach and water carriers carry stacks of bottles.
 
+## 3c. Area 3 layout: "Youth Stadium" (south of the Training Ground, ~34 × 36 m)
+
+```
+ Training Ground ── hedge border ─────────────────────[ gate arch ]──
+ [ CROSSING turf: goal + mannequin ] [ HEADING rubber: ( JUGGLING )  KIT ROOM │ path
+ [   wing lanes either side         ]  pendulums      ]   circle    (deck)    │
+ [ REACTION LIGHTS tartan: board ] ┌ TACTICS (wood) ┐┌ ANALYSIS (tiles) ┐ FAN SHOP │
+ [ sprint lanes → light board    ] └────────────────┘└──────────────────┘ kiosk   │
+ ┌─────────── MAIN STAND (scoreboard, banners) ───────────┐  floodlights at the corners
+ SIDE │            11-a-side pitch (fenced)                │ SIDE
+ STAND└────────────────────────────────────────────────────┘ STAND
+```
+
+- Locked: blueprint tint, barriers in the gate gap, padlock sign with the Training Ground star requirement.
+- Bibs: folded neon (lime/orange) bibs; the coach and kit managers carry flat stacks, laundry baskets at the drills.
+- The stadium fills in stages: pitch → main stand → floodlights → side stands. Seats are plain boxes (hundreds of them).
+- No crowd figures: the stands read through seat colours, banners and the scoreboard (characters stay Kenney models only).
+
 ## 4. Characters
 
 - **Source**: rigged CC0 chibi characters (Kenney Mini Characters preferred) with shared AnimationClips; `SkeletonUtils.clone` per instance.

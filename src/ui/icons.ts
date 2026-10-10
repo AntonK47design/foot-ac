@@ -39,6 +39,7 @@ export const ICONS: Record<string, string> = {
   scout: svg('<circle cx="10" cy="10" r="6" fill="#DDEBFF" stroke="#1d2433" stroke-width="2.2"/><path d="M14.5 14.5L20 20" stroke="#1d2433" stroke-width="3" stroke-linecap="round"/><path d="M10 7l.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z" fill="#FFC83D"/>'),
   video: svg('<rect x="2" y="5" width="20" height="14" rx="3" fill="#1d2433"/><path d="M10 9v6l5-3z" fill="#fff"/>'),
   water: svg('<rect x="8" y="2.5" width="8" height="3" rx="1" fill="#fff" stroke="#1d2433" stroke-width="1.2"/><path d="M7 7c0-1 1-1.5 2-1.5h6c1 0 2 .5 2 1.5v13c0 1-1 1.5-2 1.5H9c-1 0-2-.5-2-1.5z" fill="#8fd3ff" stroke="#1d2433" stroke-width="1.4"/><rect x="7" y="11" width="10" height="4" fill="#2F6BFF"/>'),
+  bib: svg('<path d="M8 3h2.5c.3 1.4.8 2 1.5 2s1.2-.6 1.5-2H16l3 4-2 2v11.5H7V9L5 7z" fill="#B6F03C" stroke="#1d2433" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 16h10" stroke="#6FAE17" stroke-width="2.2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/>'),
   ticket: svg('<path d="M3 7h18v3a2 2 0 000 4v3H3v-3a2 2 0 000-4z" fill="#A35CFF"/>'),
 };
 

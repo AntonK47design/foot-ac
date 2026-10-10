@@ -166,7 +166,16 @@ export interface MetaState {
   ads: { day: string; used: Record<string, number>; officeAt: number };
 }
 
-export type StaffKind = 'ball_boy' | 'water_carrier' | 'receptionist' | 'assistant' | 'accountant';
+export type StaffKind = 'ball_boy' | 'water_carrier' | 'kit_manager' | 'receptionist' | 'assistant' | 'accountant';
+
+/** Who runs each supply once hired (ball boys, water carriers, kit managers), and back. */
+export const RUNNER: Record<Supply, StaffKind> = { ball: 'ball_boy', water: 'water_carrier', bib: 'kit_manager' };
+const RUN_SUPPLY: Partial<Record<StaffKind, Supply>> = { ball_boy: 'ball', water_carrier: 'water', kit_manager: 'bib' };
+/** The supply a runner carries, or null for fixed-spot staff. */
+export function runnerSupply(kind: StaffKind): Supply | null {
+  return RUN_SUPPLY[kind] ?? null;
+}
+
 export type StaffState = 'idle' | 'toCrate' | 'loading' | 'toBasket' | 'unloading';
 
 export interface Staff extends Agent {
@@ -187,7 +196,7 @@ export interface Coach {
   vz: number;
   yaw: number;
   carry: number;
-  /** What the carry stack is (balls or water bottles); absent in old saves = balls. */
+  /** What the carry stack is (balls, water bottles or bibs); absent in old saves = balls. */
   carryKind?: Supply;
   pickT: number;
   dropT: number;
