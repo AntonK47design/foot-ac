@@ -22,8 +22,8 @@ interface Layout {
 }
 
 const LAYOUTS: Layout[] = [
-  // landscape: a band through the middle; title in the sky over the left side
-  { name: 'cover-landscape-1920x1080', w: 1920, h: 1080, crop: { x: 0, y: 0.17, s: 1 }, title: 'left:4%;top:5%;font-size:44px;align-items:flex-start' },
+  // landscape: a band through the middle; title in the sky on the right (CrazyGames puts labels over the top-left)
+  { name: 'cover-landscape-1920x1080', w: 1920, h: 1080, crop: { x: 0, y: 0.17, s: 1 }, title: 'right:3.5%;top:5%;font-size:44px' },
   // portrait: a strip through the middle; title in the sky band at the top
   { name: 'cover-portrait-800x1200', w: 800, h: 1200, crop: { x: 0.1665, y: 0, s: 0.667 }, title: 'left:0;right:0;top:3.5%;font-size:25px' },
   { name: 'cover-square-800x800', w: 800, h: 800, crop: { x: 0, y: 0, s: 1 }, title: 'left:0;right:0;top:1.2%;font-size:19px' },
