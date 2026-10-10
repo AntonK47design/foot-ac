@@ -235,7 +235,7 @@ export const BALANCE = {
     /** After the tutorial route the guide hides; it comes back when the coach stands still this long (s)… */
     lostIdleSec: 8,
     /** …or nothing was bought / signed / delivered / collected for this long (s). */
-    lostNoProgressSec: 45,
+    lostNoProgressSec: 20,
     /** While shown that way, the suggestion is re-picked at most this often (no flip-flopping). */
     lostRefreshSec: 8,
   },

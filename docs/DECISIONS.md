@@ -171,6 +171,6 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
       - Sunday Park: collect cash → ball crate → goal → meet/sign Leo → grab balls → bring balls → collect training fees → Dribble Cones.
       - Training Ground, once the gate appears: gate → Hydration Point → Gym → bring water.
       - Steps are stored as `flags['tut:*']`; old saves skip what they've already done.
-    - **When it shows** (`sim/guide.ts`): after a route, the pill and arrow hide. They return when the coach stands still for 8 s, or nothing was bought, signed, delivered or collected for 45 s. The hint then stays put (re-picked at most every 8 s) and hides on the next bit of progress.
+    - **When it shows** (`sim/guide.ts`): after a route, the pill and arrow hide. They return when the coach stands still for 8 s, or nothing was bought, signed, delivered or collected for 20 s (was 45 s; lowered after playtest). The hint then stays put (re-picked at most every 8 s) and hides on the next bit of progress.
     - **Unchanged underneath:** `Sim.objective` (the best action) still exists. The bot uses it, and the "lost" hint shows it.
     - **Pad affordability matches the screen:** whole dollars of cash (rounded down) against the pad's price (rounded up). $44.50 against a $44.40 remainder showed "$44 / $45" but counted as affordable.
