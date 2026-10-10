@@ -1,6 +1,6 @@
 import type { AreaDef } from '../types';
 import { AREA3_LOCKED, AREA3_OBJECTS, AREA3_OBSTACLES, AREA3_PADS, AREA3_STAFF_SPOTS, AREA3_STATIONS } from './area3';
-import { AREA1_LAYOUT } from './area1-layout';
+import { AREA1_LAYOUT, AREA3_OFFSET } from './area1-layout';
 
 /**
  * Area 1 "Sunday Park" on the diorama layout (see area1-layout.ts and docs/ART_BIBLE.md §3).
@@ -13,14 +13,14 @@ export const AREA1: AreaDef = {
   id: 1,
   nameKey: 'area.1',
   bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
-  navBounds: { x0: -17.0, z0: -12.0, x1: 20.0, z1: 76.0 },
+  navBounds: { x0: -51.0, z0: -12.0, x1: 20.0, z1: 40.0 },
   walkable: [
     { x0: -16.6, z0: -11.6, x1: 16.6, z1: 11.6 },
     { x0: 16.0, z0: -0.6, x1: 20.0, z1: 1.4 },
     // Area 2 "Training Ground" (south); the gate and the plot border are obstacles
     { x0: -16.6, z0: 11.6, x1: 16.6, z1: 39.6 },
-    // Area 3 "Youth Stadium"
-    { x0: -16.6, z0: 39.6, x1: 16.6, z1: 75.6 },
+    // Area 3 "Youth Stadium" (west of Sunday Park; the border and its gate are obstacles)
+    { x0: -50.6, z0: -11.6, x1: -16.6, z1: 23.6 },
   ],
   spawn: { x: -6.8, z: -1.6 },
   gate: {
@@ -36,7 +36,7 @@ export const AREA1: AreaDef = {
   },
   crate: { spot: { x: 5.5, z: 1.65 } },
   water: { objectId: 'hydration', spot: { x: 13.8, z: 16.1 } },
-  bibs: { objectId: 'kit_room', spot: { x: 10.1, z: 43.0 } },
+  bibs: { objectId: 'kit_room', spot: { x: 10.1 + AREA3_OFFSET.x, z: 43.0 + AREA3_OFFSET.z } },
   expansions: [
     {
       area: 2,
@@ -46,7 +46,7 @@ export const AREA1: AreaDef = {
       // construction fence across the gate until the Training Ground opens
       lockedObstacles: [{ x0: 8.5, z0: 11.6, x1: 12.5, z1: 12.4 }],
     },
-    { area: 3, gateObjectId: 'area3_gate', plot: AREA1_LAYOUT.area3.plot, bounds: { x0: -16.6, z0: -11.6, x1: 16.6, z1: 75.6 }, lockedObstacles: AREA3_LOCKED },
+    { area: 3, gateObjectId: 'area3_gate', plot: AREA1_LAYOUT.area3.plot, bounds: { x0: -50.6, z0: -11.6, x1: -16.6, z1: 23.6 }, lockedObstacles: AREA3_LOCKED },
   ],
   shop: { objectId: 'fan_shop', pile: AREA1_LAYOUT.area3.shopPile },
   stations: [

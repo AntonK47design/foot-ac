@@ -19,7 +19,7 @@ import {
 } from 'three';
 import { BALANCE } from '../data/balance';
 import { AREA1_LAYOUT } from '../data/areas/area1-layout';
-import type { IconId, PadDef, Rarity, Supply } from '../data/types';
+import type { IconId, PadDef, Rarity, Rect, Supply } from '../data/types';
 import { formatCash, hasKey, t } from '../core/i18n';
 import type { Sim } from '../sim/sim';
 import { runnerSupply, type Trainee } from '../sim/state';
@@ -60,6 +60,8 @@ const PLOT_SEE_NORTH = 30;
 const PLOT_SEE_SOUTH = 20;
 /** Characters further than this sideways from the focus are off-screen even in wide landscape. */
 const CHAR_SEE_X = 26;
+/** Plots further than this sideways (m) are off-screen even in wide landscape at full zoom-out. */
+const PLOT_SEE_X = 30;
 /** Staff looks: model + kit per staff id (ball boys) or kind. */
 const STAFF_LOOK: Record<string, { model: CharacterKey; kit: Kit }> = {
   ball_boy: { model: 'male-b', kit: KITS.staff },
@@ -309,7 +311,7 @@ export class GameView {
   /** Training Ground construction overlay (removed when the gate opens). */
   private area2Lock: Group | null = null;
   /** Each plot's ground (one merged batch each): hidden when the camera is far from it (a plot-sized bounding sphere never frustum-culls). */
-  private readonly plotRoots: Array<{ root: Group; z0: number; z1: number }>;
+  private readonly plotRoots: Array<{ root: Group; r: Rect }>;
   /** Youth Stadium construction overlay. */
   private area3Lock: Group | null = null;
   private readonly bottles: InstancedMesh;
@@ -354,10 +356,11 @@ export class GameView {
     scene.add(a2);
     const a3 = buildArea3Base(assets, AREA1_LAYOUT, core.mat).root;
     scene.add(a3);
+    // Sunday Park's batch also holds the street east of it
     this.plotRoots = [
-      { root: base.root, z0: AREA1_LAYOUT.plot.z0, z1: AREA1_LAYOUT.plot.z1 },
-      { root: a2, z0: AREA1_LAYOUT.area2.plot.z0, z1: AREA1_LAYOUT.area2.plot.z1 },
-      { root: a3, z0: AREA1_LAYOUT.area3.plot.z0, z1: AREA1_LAYOUT.area3.plot.z1 },
+      { root: base.root, r: { ...AREA1_LAYOUT.plot, x1: AREA1_LAYOUT.plot.x1 + 6 } },
+      { root: a2, r: { ...AREA1_LAYOUT.area2.plot, x1: AREA1_LAYOUT.area2.plot.x1 + 6 } },
+      { root: a3, r: AREA1_LAYOUT.area3.plot },
     ];
     if (!sim.area2Open()) {
       this.area2Lock = buildArea2Lock(assets, AREA1_LAYOUT, core.mat).root;
@@ -837,7 +840,8 @@ export class GameView {
     if (this.core.sun.castShadow) this.core.followSun(this.rig.focus.x, this.rig.focus.z);
     // the camera sees ~20 m north (screen top) and ~10 m south of its focus; keep generous margins
     const fz = this.rig.focus.z;
-    for (const pr of this.plotRoots) pr.root.visible = pr.z1 > fz - PLOT_SEE_NORTH && pr.z0 < fz + PLOT_SEE_SOUTH;
+    const fx = this.rig.focus.x;
+    for (const pr of this.plotRoots) pr.root.visible = pr.r.z1 > fz - PLOT_SEE_NORTH && pr.r.z0 < fz + PLOT_SEE_SOUTH && pr.r.x1 > fx - PLOT_SEE_X && pr.r.x0 < fx + PLOT_SEE_X;
 
     for (let i = this.pops.length - 1; i >= 0; i--) {
       const p = this.pops[i] as Pop;
@@ -1106,9 +1110,9 @@ export class GameView {
       const have = sim.areaStars().have;
       this.labels.place(
         'gh:area3',
-        G3.gateGap[0] - 0.9,
+        G3.plot.x1 + 0.5,
         2.3,
-        G3.plot.z0 - 0.5,
+        G3.gateGap[0] - 0.6,
         '',
         `<div class="lock-sign">${icon('lock')}<span>${t('area.3.sign')}</span><b>${have >= total ? t('area.2.open') : t('area.3.req', { have, stars: total })}</b></div>`,
       );

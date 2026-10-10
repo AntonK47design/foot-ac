@@ -49,17 +49,18 @@ describe('M7: Youth Stadium', () => {
     expect(sim.isPadVisible(gate)).toBe(false);
     unlock(sim, ...padsOf(2));
     expect(sim.isPadVisible(gate)).toBe(true);
-    // fenced off until bought
-    const gx = (AREA1.pads.find((p) => p.id === 'p3_gate')?.pos.x ?? 14.5) as number;
-    sim.state.coach.x = gx;
-    sim.state.coach.z = 38.0;
-    walkTo(sim, gx, 44, 4);
-    expect(sim.state.coach.z).toBeLessThan(40);
+    // fenced off until bought: the gate is in Sunday Park's west edge, beside the office
+    const gp = gate.pos;
+    const edge = AREA1.expansions.find((e) => e.area === 3)!.plot.x1;
+    sim.state.coach.x = gp.x;
+    sim.state.coach.z = gp.z;
+    walkTo(sim, edge - 5, gp.z, 4);
+    expect(sim.state.coach.x).toBeGreaterThan(edge);
     expect(sim.currentArea()).toBe(2);
     unlock(sim, 'p3_gate');
     expect(sim.area3Open()).toBe(true);
-    walkTo(sim, gx, 44, 6);
-    expect(sim.state.coach.z).toBeGreaterThan(42);
+    walkTo(sim, edge - 5, gp.z, 6);
+    expect(sim.state.coach.x).toBeLessThan(edge - 3);
     expect(sim.currentArea()).toBe(3);
     expect(sim.areaStars()).toEqual({ have: gate.stars, total: sim.world.areaStars[3] });
   });

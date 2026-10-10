@@ -86,10 +86,10 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
 - Locked: blueprint tint over the whole plot, barriers in the gate gap, padlock sign with the star requirement.
 - Supply chips and bubbles show a water bottle for Training Ground drills; the coach and water carriers carry stacks of bottles.
 
-## 3c. Area 3 layout: "Youth Stadium" (south of the Training Ground, ~34 × 36 m)
+## 3c. Area 3 layout: "Youth Stadium" (west of Sunday Park, ~34 × 36 m; gate beside the Manager's Office)
 
 ```
- Training Ground ── hedge border ─────────────────────[ gate arch ]──
+ (north up; Sunday Park is to the east, through the gate arch beside the office)
  [ CROSSING turf: goal + mannequin ] [ HEADING rubber: ( JUGGLING )  KIT ROOM │ path
  [   wing lanes either side         ]  pendulums      ]   circle    (deck)    │
  [ REACTION LIGHTS tartan: board ] ┌ TACTICS (wood) ┐┌ ANALYSIS (tiles) ┐ FAN SHOP │
@@ -99,6 +99,7 @@ No mid-value green-on-green: green surfaces are always framed by a light curb, f
  STAND└────────────────────────────────────────────────────┘ STAND
 ```
 
+- Drawn in its own design frame (x −17…17, z 40…76) and placed by `AREA3_OFFSET` (−34, −52); the walkway runs along the east hedge.
 - Locked: blueprint tint, barriers in the gate gap, padlock sign with the Training Ground star requirement.
 - Bibs: folded neon (lime/orange) bibs; the coach and kit managers carry flat stacks, laundry baskets at the drills.
 - The stadium fills in stages: pitch → main stand → floodlights → side stands. Seats are plain boxes (hundreds of them).

@@ -162,7 +162,7 @@ export interface AreaDef {
   bibs: { objectId: string; spot: V2 };
   /**
    * Later plots in order (Area 2 "Training Ground", Area 3 "Youth Stadium"), each opened by its gate pad. Until then
-   * `lockedObstacles` (construction fence) keep everyone out; afterwards the coach may roam `bounds` (all open plots).
+   * `lockedObstacles` (construction fence) keep everyone out; afterwards the coach may also roam `bounds`.
    */
   expansions: Array<{ area: number; gateObjectId: string; plot: Rect; bounds: Rect; lockedObstacles: Rect[] }>;
   /** Youth Stadium Fan Shop: passive takings land on this pile. */

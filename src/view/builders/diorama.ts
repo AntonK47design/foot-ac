@@ -15,7 +15,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Rect } from '../../data/types';
-import type { Layout } from '../../data/areas/area1-layout';
+import { AREA3_OFFSET, type Layout } from '../../data/areas/area1-layout';
 import { AREA1 } from '../../data/areas/area1';
 import { Batch, trs } from '../batch';
 import { G } from '../geo';
@@ -249,13 +249,15 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   const pcz = (P.z0 + P.z1) / 2;
   b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
   const curbW = 0.38;
-  // the south curb leaves a gap for the Training Ground gate
+  // the south curb leaves a gap for the Training Ground gate, the west curb one for the Youth Stadium gate
   const [ga, gb] = L.area2.gateGap;
+  const [wa, wb] = L.area3.gateGap;
   for (const [x, z, w, d] of [
     [pcx, P.z0 + curbW / 2, pw, curbW],
     [(P.x0 + ga) / 2, P.z1 - curbW / 2, ga - P.x0, curbW],
     [(gb + P.x1) / 2, P.z1 - curbW / 2, P.x1 - gb, curbW],
-    [P.x0 + curbW / 2, pcz, curbW, pd],
+    [P.x0 + curbW / 2, (P.z0 + wa) / 2, curbW, wa - P.z0],
+    [P.x0 + curbW / 2, (wb + P.z1) / 2, curbW, P.z1 - wb],
     [P.x1 - curbW / 2, pcz, curbW, pd],
   ] as Array<[number, number, number, number]>) {
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
@@ -477,16 +479,14 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
   const pcz = (P.z0 + P.z1) / 2;
   b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
   const curbW = 0.38;
-  // the south curb leaves a gap for the Youth Stadium gate
-  const [ya, yb] = L.area3.gateGap;
   for (const [x, z, w, d] of [
-    [(P.x0 + ya) / 2, P.z1 - curbW / 2, ya - P.x0, curbW],
-    [(yb + P.x1) / 2, P.z1 - curbW / 2, P.x1 - yb, curbW],
+    [pcx, P.z1 - curbW / 2, pw, curbW],
     [P.x0 + curbW / 2, pcz, curbW, pd],
     [P.x1 - curbW / 2, pcz, curbW, pd],
   ] as Array<[number, number, number, number]>) {
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
   }
+  b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
   // border hedge between the two plots (gate gap stays open)
   const [ga, gb] = A.gateGap;
   for (const [x0, x1] of [
@@ -537,12 +537,14 @@ export function buildArea2Base(assets: Assets, L: Layout, mat: Material): Dioram
     [-16.0, 27.6],
     [16.0, 28.8],
     [-16.0, 38.8],
+    [16.0, 38.8],
     [7.8, 19.9],
   ] as Array<[number, number]>) {
     kit.place(x, z).planter();
     aoBlobs.push({ x, z, r: 0.55 });
   }
   props.put('bush', -13.6, 27.4, 0, 5);
+  props.put('bush', 14.6, 39.0, 0, 5);
   props.put('bush', -14.6, 39.0, 0, 5);
   props.put('streetlight', 8.2, 13.2, 0, 4, 0, 0.1);
   props.put('streetlight', 8.2, 27.0, 0, 4, 0, 0.1);
@@ -597,26 +599,25 @@ export function buildArea3Base(assets: Assets, L: Layout, mat: Material): Dioram
   b.at(G.box(), COL.plotSide, pcx, -0.47, pcz, 0, pw, 0.9, pd);
   const curbW = 0.38;
   for (const [x, z, w, d] of [
+    [pcx, P.z0 + curbW / 2, pw, curbW],
     [pcx, P.z1 - curbW / 2, pw, curbW],
     [P.x0 + curbW / 2, pcz, curbW, pd],
-    [P.x1 - curbW / 2, pcz, curbW, pd],
   ] as Array<[number, number, number, number]>) {
     b.at(G.rbox(0.06), COL.curbTop, x, 0.06, z, 0, w, 0.16, d);
   }
   b.at(G.box(), COL.curbSide, pcx, -0.12, P.z1 + 0.01, 0, pw, 0.3, 0.02);
-  // border hedge between the Training Ground and the Youth Stadium (gate gap stays open)
+  // border hedge along the east edge (Sunday Park / Training Ground side); the gate gap beside the office stays open
   const [ga, gb] = A.gateGap;
-  for (const [x0, x1] of [
-    [P.x0 + 0.4, ga - 0.2],
-    [gb + 0.2, P.x1 - 0.4],
+  for (const [z0, z1] of [
+    [P.z0 + 0.4, ga - 0.2],
+    [gb + 0.2, P.z1 - 0.4],
   ] as Array<[number, number]>) {
-    for (let x = x0 + 0.6; x < x1 - 0.3; x += 1.25) {
-      b.at(G.ico(1), Math.round(x * 3) % 2 ? 0x3fae4f : 0x4cb85a, x, 0.42, P.z0 + 0.05, x, 1.15, 0.8, 0.7);
+    for (let z = z0 + 0.6; z < z1 - 0.3; z += 1.25) {
+      b.at(G.ico(1), Math.round(z * 3) % 2 ? 0x3fae4f : 0x4cb85a, P.x1 - 0.05, 0.42, z, z, 0.7, 0.8, 1.15);
     }
-    b.at(G.rbox(0.1), COL.curbSide, (x0 + x1) / 2, 0.08, P.z0 + 0.05, 0, x1 - x0, 0.16, 0.5);
+    b.at(G.rbox(0.1), COL.curbSide, P.x1 - 0.05, 0.08, (z0 + z1) / 2, 0, 0.5, 0.16, z1 - z0);
   }
-  streetSegment(c, P.x1, P.z0, P.z1);
-  root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0, x1: P.x1 - curbW, z1: P.z1 - curbW }, 0.004, 1));
+  root.add(floor('paving', { x0: P.x0 + curbW, z0: P.z0 + curbW, x1: P.x1, z1: P.z1 - curbW }, 0.004, 1));
   root.add(floor('curb', A.path, 0.008, 1));
   root.add(floor('deck', A.kitRoom, 0.012, 2));
   // crossing zone: turf with a box line and a wing channel either side
@@ -653,30 +654,34 @@ export function buildArea3Base(assets: Assets, L: Layout, mat: Material): Dioram
   // the stadium ground: apron already paved so the plot reads as "a stadium goes here"
   root.add(floor('curb', { x0: A.standWest.x0, z0: A.standMain.z0, x1: A.standEast.x1, z1: P.z1 - curbW }, 0.006, 1));
   // edge decor: trees, lights, benches, bins, flags at the entrance
+  // (decor is written in the plot's design frame, x −17…17, z 40…76, like area3.ts)
+  const dx = AREA3_OFFSET.x;
+  const dz = AREA3_OFFSET.z;
   for (const [x, z] of [
     [-16.0, 51.0],
-    [16.0, 47.0],
+    [16.0, 46.0],
     [16.0, 57.4],
     [-16.0, 60.0],
     [8.6, 50.4],
   ] as Array<[number, number]>) {
-    kit.place(x, z).planter();
-    aoBlobs.push({ x, z, r: 0.55 });
+    kit.place(x + dx, z + dz).planter();
+    aoBlobs.push({ x: x + dx, z: z + dz, r: 0.55 });
   }
-  props.put('bush', -7.4, 50.6, 0, 5);
-  props.put('bush', 16.1, 60.4, 0, 5);
-  props.put('streetlight', 12.2, 46.4, 0, 4, 0, 0.1);
-  props.put('streetlight', 12.2, 58.6, 0, 4, 0, 0.1);
-  kit.place(16.0, 50.2, -HALF_PI).bench(2.2);
-  kit.place(16.0, 52.4).bin();
-  aoBlobs.push({ x: 16.0, z: 52.4, r: 0.35 });
-  for (const [x, z, col] of [
-    [ga - 0.5, P.z0 + 1.0, 0x2f6bff],
-    [gb + 0.25, P.z0 + 1.0, 0xffd23f],
-  ] as Array<[number, number, number]>)
-    kit.place(x, z).flagpole(col);
+  props.put('bush', -7.4 + dx, 50.6 + dz, 0, 5);
+  props.put('bush', 16.1 + dx, 60.4 + dz, 0, 5);
+  props.put('streetlight', 12.2 + dx, 44.6 + dz, 0, 4, 0, 0.1);
+  props.put('streetlight', 12.2 + dx, 58.6 + dz, 0, 4, 0, 0.1);
+  kit.place(16.0 + dx, 43.0 + dz, -HALF_PI).bench(2.2);
+  kit.place(16.0 + dx, 44.8 + dz).bin();
+  aoBlobs.push({ x: 16.0 + dx, z: 44.8 + dz, r: 0.35 });
+  // flags either side of the gate, inside the plot
+  for (const [z, col] of [
+    [ga - 0.6, 0x2f6bff],
+    [gb + 0.6, 0xffd23f],
+  ] as Array<[number, number]>)
+    kit.place(P.x1 - 0.9, z).flagpole(col);
   decals.add('banner', 1.0, 1.0, trs(cr.x0 + 1.3, 0.62, cr.z1 - 0.05));
-  c.anchors.area3Gate = { x: (ga + gb) / 2, z: P.z0 };
+  c.anchors.area3Gate = { x: P.x1, z: (ga + gb) / 2 };
   return finalize(c, mat, { castShadow: false });
 }
 
@@ -693,8 +698,8 @@ export function buildArea3Lock(assets: Assets, L: Layout, mat: Material): Dioram
   fm.depthWrite = false;
   extra.push(fl);
   const [ga, gb] = A.gateGap;
-  for (let x = ga + 0.8; x < gb; x += 1.55) kit.place(0, 0).barrier(x, P.z0 - 0.1);
-  kit.place(ga - 0.9, P.z0 - 0.5).padlockSign();
+  for (let z = ga + 0.8; z < gb; z += 1.55) kit.place(0, 0).barrier(P.x1 + 0.1, z, HALF_PI);
+  kit.place(P.x1 + 0.5, ga - 0.6).padlockSign();
   return finalize(c, mat);
 }
 
@@ -952,7 +957,8 @@ export function buildUnlockable(id: string, lanes: number, assets: Assets, L: La
     }
     // ── Area 3 "Youth Stadium"
     case 'area3_gate':
-      kit.place(at.x, at.z, 0).archGate(L.area3.gateGap[1] - L.area3.gateGap[0] - 0.4);
+      // walk-through along x (the gate is in the plot's east edge)
+      kit.place(at.x, at.z, HALF_PI).archGate(L.area3.gateGap[1] - L.area3.gateGap[0] - 0.4);
       break;
     case 'kit_room':
       kit.place(at.x, at.z, 0).kitStation();

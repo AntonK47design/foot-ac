@@ -196,7 +196,7 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 74. **Cash ads are uncapped** (user, for revenue): welcome-back ×2, Office "Get $X" and ×2 match cash have no daily cap. The Office ad also has no cooldown.
     - The Office amount still shrinks with each use that day, down to a floor of 50%, so chained ads can't buy a whole area.
     - Still capped: daily ×2 (1 a day, one calendar claim anyway) and scout skip (3 a day). The interstitial keeps its play-time rules.
-75. **M7: Area 3 "Youth Stadium"** is a third plot south of the Training Ground, behind a $6,000 gate that needs every Training Ground pad.
+75. **M7: Area 3 "Youth Stadium"** is a third plot (moved west of Sunday Park, see 79), behind a $6,000 gate that needs every Training Ground pad.
     - **New chore: training bibs.** The coach grabs them at the Kit Room and carries them to four new drills:
       - Crossing Zone (PAS);
       - Heading Pendulums (SHO);
@@ -234,3 +234,8 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
       - Stand seats and folded bibs are plain boxes (12 triangles) instead of rounded boxes (300).
       - Area 2 and 3 ground meshes don't cast shadows; their props have AO blobs.
 78. **Squad panel says "the best {n} play"** using the real squad size (it said 5 even with 7- and 11-a-side).
+79. **The Youth Stadium is west of Sunday Park; its gate is a few metres from the Manager's Office** (playtest: "you have to walk a long way to get to the area").
+    - **Before:** the walk from the office to the old gate south of the Training Ground was about 45 m. **Now:** about 6 m.
+    - **Layout:** the plot is still drawn in its design frame and placed by `AREA3_OFFSET`. Its walkway runs along the east hedge, which is now the shared border, and the gate is a gap in Sunday Park's west curb.
+    - **Bounds:** the coach's bounds are the box around all open plots. The empty corner south of the Youth Stadium is an obstacle.
+    - **Pacing:** Area 3 is done at about 68–72 min (was 70–74). Dead air from 40 to 70 min is about 85–95 s median.

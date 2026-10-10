@@ -46,9 +46,10 @@ export interface Layout {
     /** Main walkway from the gate down the east side. */
     path: Rect;
   };
-  /** Area 3 "Youth Stadium" (third plot, south of the Training Ground). */
+  /** Area 3 "Youth Stadium" (third plot, west of Sunday Park; its gate is beside the Manager's Office). */
   area3: {
     plot: Rect;
+    /** Gate gap in the shared border with Sunday Park (the plot's east edge, x = plot.x1): a z range. */
     gateGap: [number, number];
     path: Rect;
     kitRoom: Rect;
@@ -71,6 +72,46 @@ export interface Layout {
     lights: V2[];
   };
 }
+
+/**
+ * Area 3 is designed in its own frame (a 34 × 36 m plot at x −17…17, z 40…76, walkway down the east side) and placed
+ * west of Sunday Park by a fixed offset, so the walk from the office to the gate is a few metres.
+ */
+export const AREA3_OFFSET = { x: -34, z: -52 };
+const sx = (x: number): number => x + AREA3_OFFSET.x;
+const sz = (z: number): number => z + AREA3_OFFSET.z;
+const sr = (r: Rect): Rect => ({ x0: sx(r.x0), z0: sz(r.z0), x1: sx(r.x1), z1: sz(r.z1) });
+const sv = (v: V2): V2 => ({ x: sx(v.x), z: sz(v.z) });
+
+function placeArea3(): Layout['area3'] {
+  return {
+    plot: sr({ x0: -17, z0: 40, x1: 17, z1: 76 }),
+    gateGap: [-1.2, 1.8],
+    path: sr({ x0: 12.6, z0: 40.4, x1: 16.4, z1: 60.2 }),
+    kitRoom: sr({ x0: 7.9, z0: 40.6, x1: 12.3, z1: 44.2 }),
+    crossing: sr({ x0: -16.4, z0: 40.8, x1: -8.8, z1: 50.2 }),
+    heading: sr({ x0: -7.6, z0: 40.8, x1: -1.4, z1: 48.4 }),
+    juggling: { ...sv({ x: 2.6, z: 45.0 }), r: 3.0 },
+    reaction: sr({ x0: -16.4, z0: 52.0, x1: -6.8, z1: 58.8 }),
+    tactics: sr({ x0: -4.6, z0: 51.6, x1: 1.8, z1: 58.6 }),
+    tacticsDoor: [sx(-2.2), sx(-0.6)],
+    analysis: sr({ x0: 1.8, z0: 51.6, x1: 8.2, z1: 58.6 }),
+    analysisDoor: [sx(4.2), sx(5.8)],
+    shop: sr({ x0: 9.0, z0: 52.0, x1: 12.4, z1: 55.4 }),
+    shopPile: sv({ x: 10.7, z: 57.0 }),
+    stadium: sr({ x0: -11.0, z0: 63.6, x1: 11.0, z1: 74.6 }),
+    standMain: sr({ x0: -11.0, z0: 60.4, x1: 11.0, z1: 62.9 }),
+    standWest: sr({ x0: -16.0, z0: 63.6, x1: -12.0, z1: 74.6 }),
+    standEast: sr({ x0: 12.0, z0: 63.6, x1: 16.0, z1: 74.6 }),
+    lights: [
+      { x: -11.9, z: 62.9 },
+      { x: 11.9, z: 62.9 },
+      { x: -11.9, z: 75.3 },
+      { x: 11.9, z: 75.3 },
+    ].map(sv),
+  };
+}
+const AREA3_PLACED = placeArea3();
 
 export const AREA1_LAYOUT: Layout = {
   plot: { x0: -17, z0: -12, x1: 17, z1: 12 },
@@ -105,30 +146,5 @@ export const AREA1_LAYOUT: Layout = {
     seven: { x0: -11.6, z0: 29.4, x1: 11.6, z1: 39.0 },
     path: { x0: 8.5, z0: 12.0, x1: 12.5, z1: 28.6 },
   },
-  area3: {
-    plot: { x0: -17, z0: 40, x1: 17, z1: 76 },
-    gateGap: [12.6, 16.4],
-    path: { x0: 12.6, z0: 40, x1: 16.4, z1: 60.2 },
-    kitRoom: { x0: 7.9, z0: 40.6, x1: 12.3, z1: 44.2 },
-    crossing: { x0: -16.4, z0: 40.8, x1: -8.8, z1: 50.2 },
-    heading: { x0: -7.6, z0: 40.8, x1: -1.4, z1: 48.4 },
-    juggling: { x: 2.6, z: 45.0, r: 3.0 },
-    reaction: { x0: -16.4, z0: 52.0, x1: -6.8, z1: 58.8 },
-    tactics: { x0: -4.6, z0: 51.6, x1: 1.8, z1: 58.6 },
-    tacticsDoor: [-2.2, -0.6],
-    analysis: { x0: 1.8, z0: 51.6, x1: 8.2, z1: 58.6 },
-    analysisDoor: [4.2, 5.8],
-    shop: { x0: 9.0, z0: 52.0, x1: 12.4, z1: 55.4 },
-    shopPile: { x: 10.7, z: 57.0 },
-    stadium: { x0: -11.0, z0: 63.6, x1: 11.0, z1: 74.6 },
-    standMain: { x0: -11.0, z0: 60.4, x1: 11.0, z1: 62.9 },
-    standWest: { x0: -16.0, z0: 63.6, x1: -12.0, z1: 74.6 },
-    standEast: { x0: 12.0, z0: 63.6, x1: 16.0, z1: 74.6 },
-    lights: [
-      { x: -11.9, z: 62.9 },
-      { x: 11.9, z: 62.9 },
-      { x: -11.9, z: 75.3 },
-      { x: 11.9, z: 75.3 },
-    ],
-  },
+  area3: AREA3_PLACED,
 };

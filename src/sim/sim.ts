@@ -382,10 +382,22 @@ export class Sim {
     return a;
   }
 
-  /** Where the coach may walk: every open plot. */
+  private readonly boundsTmp: Rect = { x0: 0, z0: 0, x1: 0, z1: 0 };
+
+  /** Where the coach may walk: the box around every open plot (borders and empty corners are obstacles). */
   coachBounds(): Rect {
-    let b = this.area.bounds;
-    for (const e of this.area.expansions) if (this.state.built[e.gateObjectId] && e.bounds.z1 > b.z1) b = e.bounds;
+    const b = this.boundsTmp;
+    b.x0 = this.area.bounds.x0;
+    b.z0 = this.area.bounds.z0;
+    b.x1 = this.area.bounds.x1;
+    b.z1 = this.area.bounds.z1;
+    for (const e of this.area.expansions) {
+      if (!this.state.built[e.gateObjectId]) continue;
+      b.x0 = Math.min(b.x0, e.bounds.x0);
+      b.z0 = Math.min(b.z0, e.bounds.z0);
+      b.x1 = Math.max(b.x1, e.bounds.x1);
+      b.z1 = Math.max(b.z1, e.bounds.z1);
+    }
     return b;
   }
 
