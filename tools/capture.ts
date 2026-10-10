@@ -16,6 +16,8 @@ type V = { x: number; z: number; w: number };
 
 async function boot(page: Page, w: number, h: number): Promise<void> {
   await page.setViewportSize({ width: w, height: h });
+  // tsx/esbuild wraps named functions in __name(); evaluated callbacks need it in the page too
+  await page.addInitScript('window.__name = (f) => f;');
   await page.goto(`http://localhost:${PORT}/`);
   await page.waitForFunction(() => (window.__wk?.platform as { log: Array<{ msg: string }> } | undefined)?.log.some((e) => e.msg === 'gameplayStart'), null, { timeout: 30_000 });
   // drive frames by hand from here on
@@ -55,7 +57,7 @@ async function dress(page: Page, mode: 'cover' | 'video', layout?: 'landscape' |
     content:
       mode === 'cover'
         ? '#game > *:not(canvas):not(.vignette):not(.store-title){display:none!important}'
-        : '.hint,.toasts,#boot{display:none!important}',
+        : '.hint,#boot,.overlay{display:none!important}',
   });
   if (mode !== 'cover') return;
   await page.evaluate((layout) => {
@@ -101,26 +103,55 @@ async function video(name: string, w: number, h: number, seconds = 20): Promise<
   const browser = await chromium.launch({ args: ARGS });
   const page = await browser.newPage({ deviceScaleFactor: 1 });
   await boot(page, w, h);
-  await stage(page, 1, 60, 4000);
+  // mid-way through Sunday Park with cash in hand: the clip shows pads being bought, drills running, cash collected
   await page.evaluate(() => {
-    // re-lock the last few Sunday Park pads so the clip shows them being bought
-    const sim = window.__wk!.sim as { state: { pads: Record<string, { done: boolean; paid: number }>; built: Record<string, boolean>; stations: Record<string, { lanes: number; occupants: number[] }>; stars: number } };
-    void sim;
+    type Pad = { id: string; area: number; cost: number };
+    const sim = window.__wk!.sim as { world: { padList: Pad[] }; isPadVisible(p: Pad): boolean; unlockPad(p: Pad): void; tick(dt: number): void; state: { cash: number; flags: Record<string, boolean> } };
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones']) sim.state.flags['tut:' + k] = true;
+    for (let n = 0; n < 13; n++) {
+      const next = sim.world.padList.filter((p) => p.area === 1 && sim.isPadVisible(p)).sort((a, b) => a.cost - b.cost)[0];
+      if (next) sim.unlockPad(next);
+    }
+    for (let i = 0; i < 45 * 60; i++) sim.tick(1 / 60);
+    sim.state.cash = 700;
   });
   await dress(page, 'video');
-  // steer like a player: hook the input layer the game already reads every step
+  // steer like a player (hooked into the input layer the game reads every step), but never into menus:
+  // graduates are sold in the background and the office / Team Bus stop are skipped
   await page.evaluate(() => {
     const wk = window.__wk!;
-    const sim = wk.sim as { objective: { x: number; z: number } | null; state: { coach: { x: number; z: number } }; nav: { findPath(a: number, b: number, c: number, d: number): number[] } };
+    type O = { x: number; z: number; targetId: string };
+    type Pad = { id: string; pos: { x: number; z: number } };
+    const sim = wk.sim as {
+      objective: O | null;
+      state: { coach: { x: number; z: number }; piles: Array<{ x: number; z: number; amount: number }> };
+      nav: { findPath(a: number, b: number, c: number, d: number): number[] };
+      visiblePads(): Pad[];
+      canAfford(p: Pad): boolean;
+      podiumGraduate(): unknown;
+      decideGraduate(c: 'sell' | 'promote'): void;
+      area: { crate: { spot: { x: number; z: number } } };
+    };
+    const target = (): { x: number; z: number } => {
+      const ob = sim.objective;
+      if (ob && !['podium', 'office', 'kickoff'].includes(ob.targetId)) return ob;
+      const pad = sim.visiblePads().find((p) => sim.canAfford(p));
+      if (pad) return pad.pos;
+      const c = sim.state.coach;
+      let best: { x: number; z: number } | null = null;
+      for (const p of sim.state.piles) if (p.amount >= 5 && (!best || Math.hypot(p.x - c.x, p.z - c.z) < Math.hypot(best.x - c.x, best.z - c.z))) best = p;
+      return best ?? sim.area.crate.spot;
+    };
     (wk.input as { screenMove(o: { x: number; y: number }): void }).screenMove = (o) => {
       o.x = 0;
       o.y = 0;
-      const ob = sim.objective;
+      if (sim.podiumGraduate()) sim.decideGraduate('sell');
+      const t = target();
       const c = sim.state.coach;
-      if (!ob || Math.hypot(ob.x - c.x, ob.z - c.z) < 0.4) return;
-      const p = sim.nav.findPath(c.x, c.z, ob.x, ob.z);
-      const wx = p[2] ?? ob.x;
-      const wz = p[3] ?? ob.z;
+      if (Math.hypot(t.x - c.x, t.z - c.z) < 0.4) return;
+      const p = sim.nav.findPath(c.x, c.z, t.x, t.z);
+      const wx = p[2] ?? t.x;
+      const wz = p[3] ?? t.z;
       const d = Math.hypot(wx - c.x, wz - c.z) || 1;
       o.x = (wx - c.x) / d;
       o.y = (wz - c.z) / d;
@@ -155,6 +186,7 @@ async function main(): Promise<void> {
       await cover('cover-portrait-800x1200', 800, 1200, { x: 4.0, z: -5.0, w: 16 }, 'portrait');
       await cover('cover-square-800x800', 800, 800, { x: 3.5, z: -3.5, w: 14 }, 'square');
     }
+    if (what === 'preview') await video('video-preview', 960, 540, 20);
     if (what === 'all' || what === 'videos') {
       await video('video-landscape-1920x1080', 1920, 1080);
       await video('video-portrait-1080x1920', 1080, 1920);
