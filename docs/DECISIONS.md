@@ -188,9 +188,8 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
       - no Bridge analytics;
       - no built-in ad-error popup (we show our own toast);
       - no cross-promo.
-    - **Ads on, limited to an allow-list.** `VITE_AD_PLACEMENTS=results,scout,midgame` gives:
-      - rewarded ×2 match cash;
-      - rewarded "finish scouting now" (missions ≤ 30 min);
-      - an interstitial at the match break, after 5 min of play and never after the first match.
+    - **Ads on, every planned placement:**
+      - rewarded: Office "Get $X", daily ×2, welcome-back ×2, ×2 match cash, "finish scouting now" (missions ≤ 30 min);
+      - interstitial: at the match break, after 5 min of play and never after the first match.
 
-      Office cash, daily ×2 and welcome-back ×2 stay off there. Unset = every placement; the CrazyGames build is unchanged (ads off for Basic Launch).
+      The caps and cooldowns from GDD §7 / `BALANCE.ads` apply. `VITE_AD_PLACEMENTS` (comma list) can narrow this per build; unset means every placement. The first cut allowed only results, scout and midgame; the user then asked for all of them. The CrazyGames build is unchanged (ads off for Basic Launch).
