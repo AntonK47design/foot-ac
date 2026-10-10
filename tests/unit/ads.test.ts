@@ -51,15 +51,18 @@ describe('M5: ads policy', () => {
     expect(log.some((l) => l.startsWith('toast'))).toBe(false);
   });
 
-  it('caps per day and puts the Office cash ad on a cooldown with shrinking amounts', async () => {
+  it('leaves the cash ads uncapped, shrinks Office amounts to a floor, caps scout per day', async () => {
     const { ads, advance } = setup();
     const a0 = ads.officeAmount(1000);
     expect(a0).toBe(1000 * BALANCE.ads.officeShare);
-    expect(await ads.rewarded('office')).toBe(true);
-    expect(ads.canOffer('office')).toBe(false); // cooldown
-    advance(BALANCE.ads.officeCooldownSec * 1000);
+    for (let i = 0; i < 20; i++) {
+      advance(BALANCE.ads.officeCooldownSec * 1000);
+      expect(await ads.rewarded('office')).toBe(true);
+      expect(await ads.rewarded('results')).toBe(true);
+      expect(await ads.rewarded('welcome')).toBe(true);
+    }
     expect(ads.canOffer('office')).toBe(true);
-    expect(ads.officeAmount(1000)).toBeLessThan(a0);
+    expect(ads.officeAmount(1000)).toBe(Math.round((1000 * BALANCE.ads.officeShare * BALANCE.ads.officeMinMult) / 10) * 10);
     for (let i = 0; i < BALANCE.ads.caps.scout!; i++) await ads.rewarded('scout');
     expect(ads.canOffer('scout')).toBe(false);
   });

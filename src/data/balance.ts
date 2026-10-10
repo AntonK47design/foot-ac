@@ -150,13 +150,14 @@ export const BALANCE = {
   },
   /** Rewarded / midgame ads (GDD §7). Only active with VITE_ADS=on. */
   ads: {
-    /** Daily caps per rewarded placement. */
-    caps: { welcome: 3, daily: 1, office: 5, results: 5, scout: 3 } as Record<string, number>,
+    /** Daily caps per rewarded placement. Cash ads (welcome-back ×2, Office "Get $X", match ×2) are uncapped: they're the revenue placements. */
+    caps: { welcome: Infinity, daily: 1, office: Infinity, results: Infinity, scout: 3 } as Record<string, number>,
     /** Office "Get $X": share of the cheapest item the player can't afford, shrinking per use today. */
     officeShare: 0.35,
     officeDecay: 0.15,
     officeMinMult: 0.5,
-    officeCooldownSec: 180,
+    /** Seconds between Office cash ads (0 = offered again right away). */
+    officeCooldownSec: 0,
     /** Scout "finish now" only for missions up to this long. */
     scoutMaxSec: 1800,
     /** No midgame before this much cumulative play. */

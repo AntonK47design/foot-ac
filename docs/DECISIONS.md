@@ -193,3 +193,6 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
       - interstitial: at the match break, after 5 min of play and never after the first match.
 
       The caps and cooldowns from GDD §7 / `BALANCE.ads` apply. `VITE_AD_PLACEMENTS` (comma list) can narrow this per build; unset means every placement. The first cut allowed only results, scout and midgame; the user then asked for all of them. The CrazyGames build is unchanged (ads off for Basic Launch).
+74. **Cash ads are uncapped** (user, for revenue): welcome-back ×2, Office "Get $X" and ×2 match cash have no daily cap. The Office ad also has no cooldown.
+    - The Office amount still shrinks with each use that day, down to a floor of 50%, so chained ads can't buy a whole area.
+    - Still capped: daily ×2 (1 a day, one calendar claim anyway) and scout skip (3 a day). The interstitial keeps its play-time rules.
