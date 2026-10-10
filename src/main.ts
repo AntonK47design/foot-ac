@@ -131,7 +131,7 @@ async function boot(): Promise<void> {
     if (blockers.size > 0) input.clear();
     if (started) {
       // the match cinematic pauses the sim but is still gameplay (Power Shot); panels and ads stop it
-      if (blockers.has('panel') || blockers.has('ad')) platform.gameplayStop();
+      if (blockers.has('panel') || blockers.has('ad') || blockers.has('platform')) platform.gameplayStop();
       else platform.gameplayStart();
     }
   };
@@ -665,6 +665,15 @@ async function boot(): Promise<void> {
   // returning player: offline earnings + daily reward before the first controllable frame
   if (loaded) welcomeBack(Math.max(0, (clock.now() - loaded.lastSeen) / 1000));
   loop.start();
+
+  // ── portal pause (Playgama `pause_state_changed`, e.g. its own overlays): same as an open panel, minus the UI
+  platform.onPauseChange((paused) => {
+    if (paused) blockers.add('platform');
+    else blockers.delete('platform');
+    audio.portalPaused = paused;
+    audio.applyVolume();
+    refreshPause();
+  });
 
   // ── visibility: pause sim + render when hidden, save immediately (iOS may kill the tab)
   let hiddenAt = 0;

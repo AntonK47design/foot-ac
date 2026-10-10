@@ -14,7 +14,7 @@ export interface GameContext {
 
 /** Low-level adapter: one per backend (real SDK or mock). All methods must never throw. */
 export interface PlatformAdapter {
-  readonly kind: 'crazygames' | 'local' | 'mock';
+  readonly kind: 'crazygames' | 'local' | 'playgama' | 'mock';
   loadingStart(): void;
   loadingStop(): void;
   gameplayStart(): void;
@@ -24,6 +24,8 @@ export interface PlatformAdapter {
   setContext(ctx: GameContext): void;
   isMuted(): boolean;
   onSettingsChange(fn: (muted: boolean) => void): void;
+  /** The platform asks the game to pause / resume (e.g. its own overlays). Optional. */
+  onPauseChange?(fn: (paused: boolean) => void): void;
   dataGet(key: string): string | null;
   dataSet(key: string, value: string): void;
   dataRemove(key: string): void;

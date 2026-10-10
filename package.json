@@ -15,6 +15,8 @@
     "size": "vite build && tsx tools/size-check.ts",
     "e2e": "npm run build:e2e && playwright test",
     "zip": "vite build && tsx tools/size-check.ts && tsx tools/zip.ts",
+    "build:playgama": "tsc --noEmit && vite build --mode playgama --outDir dist-playgama",
+    "zip:playgama": "vite build --mode playgama --outDir dist-playgama && tsx tools/size-check.ts dist-playgama && tsx tools/zip.ts dist-playgama kickoff-academy-playgama.zip",
     "assets": "tsx tools/assets.ts",
     "capture": "npm run build:e2e && tsx tools/capture.ts"
   },

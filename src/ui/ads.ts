@@ -6,6 +6,16 @@ import { icon } from './icons';
 /** Rewarded placements (GDD §7). */
 export type Placement = 'welcome' | 'daily' | 'office' | 'results' | 'scout';
 
+/**
+ * Per-build placement allow-list (VITE_AD_PLACEMENTS, comma-separated, e.g. `results,scout,midgame`).
+ * Unset or empty = every placement. `midgame` names the interstitial at the match break.
+ */
+export function parsePlacements(list: string | undefined): Set<string> | null {
+  const names = (list ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return names.length ? new Set(names) : null;
+}
+const PLACEMENTS_ENV = import.meta.env?.VITE_AD_PLACEMENTS as string | undefined;
+
 /** What a panel needs to show a rewarded button. `blocked` = adblock → inline note instead. */
 export interface AdOffer {
   label: string;
@@ -37,6 +47,7 @@ export class Ads {
   constructor(
     private readonly platform: Platform,
     private readonly host: AdsHost,
+    private readonly allowed: Set<string> | null = parsePlacements(PLACEMENTS_ENV),
   ) {
     if (platform.adsAvailable)
       void platform
@@ -65,7 +76,7 @@ export class Ads {
 
   /** Whether a rewarded button for `p` should exist right now (also true under adblock, for the note). */
   canOffer(p: Placement): boolean {
-    if (!this.enabled) return false;
+    if (!this.enabled || (this.allowed && !this.allowed.has(p))) return false;
     if (this.used(p) >= (BALANCE.ads.caps[p] ?? 0)) return false;
     if (p === 'office' && this.host.now() - this.usage().officeAt < BALANCE.ads.officeCooldownSec * 1000) return false;
     return true;
@@ -116,7 +127,7 @@ export class Ads {
 
   /** Midgame at a natural break. The SDK enforces its own spacing; we only gate on playtime. */
   async midgame(): Promise<void> {
-    if (!this.enabled || this.adblock || this.host.playSec() < BALANCE.ads.midgameMinPlaySec) return;
+    if (!this.enabled || (this.allowed && !this.allowed.has('midgame')) || this.adblock || this.host.playSec() < BALANCE.ads.midgameMinPlaySec) return;
     this.host.setBlocked(true);
     try {
       await this.platform.requestAd('midgame', () => this.host.setMuted(true));

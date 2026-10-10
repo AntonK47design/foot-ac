@@ -34,6 +34,8 @@ export class AudioSystem {
   music = true;
   platformMuted = false;
   adMuted = false;
+  /** Portal asked the game to pause (Playgama pause_state_changed). */
+  portalPaused = false;
   private readonly lastPlayed = new Map<Sfx, number>();
   private duck = 1;
 
@@ -79,7 +81,7 @@ export class AudioSystem {
   }
 
   get audible(): boolean {
-    return this.unlocked && !this.platformMuted && !this.adMuted;
+    return this.unlocked && !this.platformMuted && !this.adMuted && !this.portalPaused;
   }
 
   applyVolume(fade = 0.15): void {

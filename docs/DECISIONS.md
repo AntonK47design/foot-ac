@@ -174,3 +174,23 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **When it shows** (`sim/guide.ts`): after a route, the pill and arrow hide. They return when the coach stands still for 8 s, or nothing was bought, signed, delivered or collected for 20 s (was 45 s; lowered after playtest). The hint then stays put (re-picked at most every 8 s) and hides on the next bit of progress.
     - **Unchanged underneath:** `Sim.objective` (the best action) still exists. The bot uses it, and the "lost" hint shows it.
     - **Pad affordability matches the screen:** whole dollars of cash (rounded down) against the pad's price (rounded up). $44.50 against a $44.40 remainder showed "$44 / $45" but counted as affordable.
+73. **Playgama build = the same game with a different portal adapter, chosen at build time** (`VITE_PLATFORM=playgama`, `.env.playgama`, `npm run zip:playgama` → `kickoff-academy-playgama.zip`).
+    - **SDK tag:** `index.html` has a `%PLATFORM_SDK%` placeholder. The Vite plugin puts in the CrazyGames v3 script (default) or Playgama Bridge v2 (`bridge.playgama.com/v2/stable`). Each build loads only its own portal's script, so the "no runtime network except the SDK" rule still holds.
+    - **Adapter** (`platform/playgama.ts`), wrapping `window.bridge`:
+      - **Loading:** progress 0→100, then `game_ready` on the first controllable frame.
+      - **Gameplay:** `gameplay_started` / `gameplay_stopped` from the same idempotent state machine.
+      - **Saves:** Bridge storage, preloaded once at boot because saves are read synchronously. Every write is also mirrored to localStorage.
+      - **Audio and pause:** `audio_state_changed` → mute. `pause_state_changed` → a `platform` blocker: sim paused, input off, gameplay stopped, audio muted.
+      - **Ads:** the ad state events. A rewarded ad pays only after `rewarded` + `closed`. `failed` counts as unfilled, and an ad that hangs for 90 s counts as failed.
+    - **Fallback:** if the Bridge is missing, blocked, or doesn't initialise in time, the game runs on the mock (local saves, no ads). No soft-lock.
+    - **`playgama-bridge-config.json`** is emitted only into the Playgama build:
+      - no Bridge loading logo (no splash, §2);
+      - no Bridge analytics;
+      - no built-in ad-error popup (we show our own toast);
+      - no cross-promo.
+    - **Ads on, limited to an allow-list.** `VITE_AD_PLACEMENTS=results,scout,midgame` gives:
+      - rewarded ×2 match cash;
+      - rewarded "finish scouting now" (missions ≤ 30 min);
+      - an interstitial at the match break, after 5 min of play and never after the first match.
+
+      Office cash, daily ×2 and welcome-back ×2 stay off there. Unset = every placement; the CrazyGames build is unchanged (ads off for Basic Launch).

@@ -1,6 +1,8 @@
 import type { AdResult, AdType, DeviceType, GameContext, PlatformAdapter, PlatformUser } from './types';
 import { MockAdapter } from './mock';
 import { CrazyGamesAdapter, getSdk } from './crazygames';
+import { PlaygamaAdapter, getBridge } from './playgama';
+import { SAVE_BACKUP_KEY, SAVE_KEY } from '../data/constants';
 
 export type { AdResult, AdType, DeviceType, PlatformUser } from './types';
 
@@ -10,6 +12,8 @@ export interface PlatformLogEntry {
 }
 
 const ADS_FLAG = (import.meta.env?.VITE_ADS ?? 'off') === 'on';
+/** Which portal this build is for (VITE_PLATFORM): 'crazygames' (default) or 'playgama'. */
+const PLATFORM = (import.meta.env?.VITE_PLATFORM ?? 'crazygames') as 'crazygames' | 'playgama';
 
 /**
  * Typed platform facade. Holds the idempotent gameplay/loading state machine,
@@ -89,6 +93,10 @@ export class Platform {
 
   isMuted(): boolean {
     return this.adapter.isMuted();
+  }
+
+  onPauseChange(fn: (paused: boolean) => void): void {
+    this.adapter.onPauseChange?.(fn);
   }
 
   onMuteChange(fn: (muted: boolean) => void): void {
@@ -177,8 +185,31 @@ export async function createPlatform(initTimeoutMs = 2500): Promise<Platform> {
     if (holder.p) holder.p.record(m);
     else pending.push(m);
   };
-  const sdk = getSdk();
   let adapter: PlatformAdapter;
+  if (PLATFORM === 'playgama') {
+    const bridge = getBridge();
+    if (!bridge) {
+      pending.push('bridge script missing → mock');
+      adapter = new MockAdapter(logFn);
+    } else {
+      try {
+        // no Playgama splash: the game shows its own world within a few seconds (GDD §2)
+        await timeout(bridge.initialize({ disableLoadingLogo: true }), initTimeoutMs);
+        const pg = new PlaygamaAdapter(bridge, logFn);
+        await timeout(pg.preload([SAVE_KEY, SAVE_BACKUP_KEY]), initTimeoutMs);
+        pending.push(`bridge ready (${bridge.platform.id})`);
+        adapter = pg;
+      } catch (e) {
+        pending.push(`bridge init failed (${String(e)}) → mock`);
+        adapter = new MockAdapter(logFn);
+      }
+    }
+    const platform = new Platform(adapter);
+    holder.p = platform;
+    for (const m of pending) platform.record(m);
+    return platform;
+  }
+  const sdk = getSdk();
   if (!sdk) {
     pending.push('sdk script missing → mock');
     adapter = new MockAdapter(logFn);

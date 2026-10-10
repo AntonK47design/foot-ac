@@ -1,10 +1,10 @@
-/* npm run zip: dist/ → kickoff-academy.zip (deflate), relative paths only, file-count check. */
+/* npm run zip [dir] [out]: dist/ → kickoff-academy.zip (deflate), relative paths only, file-count check. */
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 
-const DIST = 'dist';
-const OUT = 'kickoff-academy.zip';
+const DIST = process.argv[2] ?? 'dist';
+const OUT = process.argv[3] ?? 'kickoff-academy.zip';
 const files: string[] = [];
 const walk = (d: string): void => {
   for (const n of readdirSync(d)) {
