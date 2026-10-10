@@ -1,4 +1,4 @@
-# Wonderkid Academy — Art Bible
+# Kickoff Academy 2 — Art Bible
 
 Source of truth for how the game looks. Overrides GDD §8 where they conflict.
 Reference frames: `docs/art/reference/` (principles only — never copy assets, layout or UI).

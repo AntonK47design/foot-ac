@@ -1,4 +1,4 @@
-export const GAME_TITLE = 'Wonderkid Academy';
+export const GAME_TITLE = 'Kickoff Academy 2';
 export const BUILD = '0.6.0-m6';
 export const SAVE_KEY = 'save';
 export const SAVE_BACKUP_KEY = 'save_backup';

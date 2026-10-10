@@ -1,10 +1,10 @@
-/* npm run zip: dist/ → wonderkid-academy.zip (deflate), relative paths only, file-count check. */
+/* npm run zip: dist/ → kickoff-academy-2.zip (deflate), relative paths only, file-count check. */
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 
 const DIST = 'dist';
-const OUT = 'wonderkid-academy.zip';
+const OUT = 'kickoff-academy-2.zip';
 const files: string[] = [];
 const walk = (d: string): void => {
   for (const n of readdirSync(d)) {
