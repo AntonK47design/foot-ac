@@ -48,7 +48,7 @@ export function computeObjective(sim: Sim): Objective | null {
   // 4. an affordable pad
   let bestPad = null as (typeof pads)[number] | null;
   for (const p of pads) {
-    if (s.cash + 1e-6 >= sim.padRemaining(p) && (!bestPad || sim.padRemaining(p) < sim.padRemaining(bestPad))) bestPad = p;
+    if (sim.canAfford(p) && (!bestPad || sim.padRemaining(p) < sim.padRemaining(bestPad))) bestPad = p;
   }
   // keep paying the pad we're standing on
   if (c.padId && sim.paying) {
@@ -67,12 +67,6 @@ export function computeObjective(sim: Sim): Objective | null {
     return first
       ? { key: 'obj.sign', params: { name: firstName(first) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius }
       : { key: 'obj.meet_first', icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
-  }
-
-  // 4c. tutorial: after the first signing, stock the goal before the player gets there (grab → bring balls)
-  if (s.stats.signed > 0 && !s.flags.firstDelivery && s.built.ball_crate && !sim.hasStaff('ball_boy')) {
-    const need = sim.neediestStation(1, undefined, 'ball');
-    if (need) return ballObjective(sim, need);
   }
 
   // 5. collect cash if the piles would make the next pad affordable
@@ -188,7 +182,7 @@ function needsCoach(sim: Sim, supply: Supply): boolean {
   return !sim.hasStaff(supply === 'water' ? 'water_carrier' : 'ball_boy');
 }
 
-function ballObjective(sim: Sim, stationId: string): Objective {
+export function ballObjective(sim: Sim, stationId: string): Objective {
   const c = sim.state.coach;
   const st = sim.station(stationId);
   const supply: Supply = st.supply ?? 'ball';
@@ -203,4 +197,29 @@ function ballObjective(sim: Sim, stationId: string): Objective {
     return { key: water ? 'obj.bring_water' : 'obj.bring_balls', icon: water ? 'water' : 'ball', x: b.x, z: b.z, targetId: 'basket:' + stationId, radius: BALANCE.basket.zoneRadius };
   }
   return { key: water ? 'obj.grab_water' : 'obj.grab_balls', icon: water ? 'water' : 'ball', x: src.x, z: src.z, targetId: water ? 'water' : 'crate', radius: BALANCE.crate.zoneRadius };
+}
+
+/** "Unlock X" when affordable, else "Save up: X" (tutorial route steps). */
+export function padObjective(sim: Sim, padId: string): Objective | null {
+  const p = sim.world.pads.get(padId);
+  if (!p || !sim.isPadVisible(p)) return null;
+  const afford = sim.canAfford(p) || (sim.state.coach.padId === p.id && sim.paying);
+  return afford
+    ? { key: 'obj.unlock', params: { name: p.nameKey }, icon: p.icon, x: p.pos.x, z: p.pos.z, targetId: p.id, radius: BALANCE.pad.radius }
+    : { key: 'obj.save_for', params: { name: p.nameKey, cost: Math.ceil(sim.padRemaining(p)) }, icon: p.icon, x: p.pos.x, z: p.pos.z, targetId: p.id, radius: BALANCE.pad.radius };
+}
+
+export function pileObjective(sim: Sim, pileId: string, key = 'obj.collect_cash'): Objective | null {
+  const p = sim.pile(pileId);
+  return p ? { key, icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius } : null;
+}
+
+export function deskObjective(sim: Sim): Objective {
+  const s = sim.state;
+  const sp = sim.area.desk.coachSpot;
+  let first = null as (typeof s.trainees)[number] | null;
+  for (const t of s.trainees) if (t.state !== 'leaving' && (!first || t.arrivalOrder < first.arrivalOrder)) first = t;
+  return first && s.stats.signed === 0
+    ? { key: 'obj.sign', params: { name: firstName(first) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius }
+    : { key: 'obj.meet_first', icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
 }

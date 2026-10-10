@@ -1236,7 +1236,7 @@ export class GameView {
       const u = pv.pad.material.uniforms;
       u.uProgress!.value = paid / p.cost;
       u.uTime!.value = this.time;
-      const afford = s.cash + 1e-6 >= sim.padRemaining(p);
+      const afford = sim.canAfford(p);
       u.uGlow!.value = afford ? 1 : 0;
       pv.ghost.position.y = 0.45 + Math.sin(this.time * 2.2 + p.pos.x) * 0.08;
       pv.ghost.rotation.y = Math.sin(this.time * 0.8 + p.pos.z) * 0.35;
@@ -1279,18 +1279,9 @@ export class GameView {
     });
   }
 
-  /** A new area just opened: guide the first few purchases there, like the tutorial did in Sunday Park. */
-  private freshArea(): boolean {
-    const sim = this.sim;
-    // the gate itself (once Sunday Park is done) is easy to miss at the south edge
-    if (!sim.area2Open()) return sim.objective?.targetId === 'p2_gate';
-    let done = 0;
-    for (const p of sim.world.padList) if (p.area === 2 && p.id !== 'p2_gate' && sim.state.pads[p.id]?.done) done++;
-    return done < BALANCE.objectives.guideUnlocksNewArea;
-  }
-
   private updateArrow(cx: number, cz: number): void {
-    const o = this.sim.objective;
+    // the guide decides what's shown: the tutorial route, or a hint when the player looks lost
+    const o = this.sim.guide.objective;
     const edge = this.hud.edge;
     if (!o) {
       this.arrow.visible = false;
@@ -1298,14 +1289,6 @@ export class GameView {
       return;
     }
     const near = Math.hypot(o.x - cx, o.z - cz) < o.radius * 0.8;
-    // guided only during the tutorial; afterwards the player plans their own route (arrow returns when idle)
-    const OB = BALANCE.objectives;
-    const guided = this.sim.state.stats.unlocks < OB.guideUnlocks || this.coachIdle >= OB.hintIdleSec || this.freshArea();
-    if (!guided) {
-      this.arrow.visible = false;
-      edge.classList.add('hidden');
-      return;
-    }
     this.arrow.visible = !near;
     this.arrow.position.set(o.x, 1.9 + Math.abs(Math.sin(this.time * 4)) * 0.4, o.z);
     // face the camera (camera never rotates); tilt back so it reads from the 52° view

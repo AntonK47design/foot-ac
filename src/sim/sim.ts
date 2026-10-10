@@ -10,6 +10,7 @@ import { computeOvr, createTrainee, firstName } from './players';
 import { makeAgent, type Agent, type SimState, type Staff, type Trainee } from './state';
 import { WorldGeo, type StationGeo } from './world';
 import { computeObjective, type Objective } from './objectives';
+import { Guide, type GuideMode } from './guide';
 import { BUYERS } from '../data/clubs';
 import { createMatch, finishMatch, newLeague, resolveChance, type MatchResult, type MatchScript } from './match';
 import type { Player } from './state';
@@ -53,6 +54,7 @@ export interface SimEvents {
   cashToSafe: { pileId: string; amount: number };
   staffHired: { id: string };
   objectiveChanged: { objective: Objective | null };
+  guideChanged: { objective: Objective | null; mode: GuideMode };
   saveNeeded: { reason: string };
 }
 
@@ -148,6 +150,8 @@ export class Sim {
   readonly input: SimInput = { x: 0, z: 0 };
   obstacles: Rect[] = [];
   objective: Objective | null = null;
+  /** What the HUD tells the player (tutorial route, or a hint when lost); `objective` is the always-on best action (bot). */
+  readonly guide: Guide;
   /** True while the coach is standing on a pad and cash is draining. */
   paying = false;
   private objT = 0;
@@ -174,6 +178,7 @@ export class Sim {
     readonly area: AreaDef = AREA1,
   ) {
     this.world = new WorldGeo(area);
+    this.guide = new Guide(this);
     this.rng = new Rng(state.rng);
     this.nav = new NavGrid(area.navBounds, 0.5, this.world.walkable());
     this.rebuildWorld();
@@ -321,6 +326,14 @@ export class Sim {
 
   padRemaining(p: PadDef): number {
     return p.cost - (this.state.pads[p.id]?.paid ?? 0);
+  }
+
+  /**
+   * Whether the player can afford a pad by the numbers on screen: the HUD shows whole dollars (rounded down) and
+   * the pad its remaining price rounded up, so $44.50 against a $44.40 remainder reads "$44 / $45" and doesn't count.
+   */
+  canAfford(p: PadDef): boolean {
+    return Math.floor(this.state.cash + 1e-6) >= Math.ceil(this.padRemaining(p) - 1e-6);
   }
 
   station(id: string): StationGeo {
@@ -526,6 +539,7 @@ export class Sim {
       this.objT = BALANCE.objectives.interval;
       this.refreshObjective();
     }
+    this.guide.update(dt);
   }
 
   refreshObjective(): void {
@@ -868,7 +882,8 @@ export class Sim {
           c.carry--;
           ss.balls++;
           s.stats.ballsDelivered++;
-          s.flags.firstDelivery = true;
+          if (kind === 'water') s.flags.firstWater = true;
+          else s.flags.firstDelivery = true;
           this.events.emit('ballDropped', { stationId: id, byStaff: false });
         }
         break;

@@ -151,7 +151,7 @@ async function boot(): Promise<void> {
       audio.applyVolume();
       if (langChanged) {
         applyLocale();
-        setObjective(sim.objective);
+        setObjective(sim.guide.objective);
       }
       if (gfxChanged) {
         core.applyTier(pickTier());
@@ -167,7 +167,7 @@ async function boot(): Promise<void> {
       sim.loadState(createInitialState(AREA1, newSeed()));
       view.resetVisuals();
       hud.setCash(sim.state.cash, true);
-      setObjective(sim.objective);
+      setObjective(sim.guide.objective);
       hintDone = false;
       persist('reset');
       hud.toast(t('toast.reset_done'));
@@ -554,7 +554,7 @@ async function boot(): Promise<void> {
   };
 
   // ── sim → platform / analytics / save hooks
-  sim.events.on('objectiveChanged', (e) => setObjective(e.objective));
+  sim.events.on('guideChanged', (e) => setObjective(e.objective));
   sim.events.on('saveNeeded', (e) => persist(e.reason));
   sim.events.on('unlocked', () => {
     platform.reportCompletion(sim.completionPct());
@@ -570,7 +570,7 @@ async function boot(): Promise<void> {
     }
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
-  setObjective(sim.objective);
+  setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());
   platform.setContext({ area: 1, academyLevel: sim.state.level, saveVersion: SAVE_VERSION, build: BUILD });
