@@ -58,7 +58,11 @@ export class FixedLoop {
       dt = Math.min(this.sinceRender, MAX_FRAME);
       this.sinceRender = 0;
     }
+    this.advance(dt);
+  };
 
+  /** One frame of `dt` seconds: fixed sim steps + an interpolated render (also used for frame-by-frame capture). */
+  advance(dt: number): void {
     if (!this.simPaused) {
       this.acc += dt;
       let steps = 0;
@@ -70,5 +74,5 @@ export class FixedLoop {
       if (steps >= 20) this.acc = 0;
     }
     this.hooks.render(this.simPaused ? 1 : this.acc / STEP, dt);
-  };
+  }
 }

@@ -15,7 +15,8 @@
     "size": "vite build && tsx tools/size-check.ts",
     "e2e": "npm run build:e2e && playwright test",
     "zip": "vite build && tsx tools/size-check.ts && tsx tools/zip.ts",
-    "assets": "tsx tools/assets.ts"
+    "assets": "tsx tools/assets.ts",
+    "capture": "npm run build:e2e && tsx tools/capture.ts"
   },
   "dependencies": {
     "three": "^0.186.1"
