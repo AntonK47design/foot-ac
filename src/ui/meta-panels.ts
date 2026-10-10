@@ -294,27 +294,3 @@ export class AlbumPanel extends Panel {
   }
 }
 
-// ───────────────────────────── account nudge ─────────────────────────────
-
-/** One-time nudge for guests with real progress (GDD §6: progress lives in the account). */
-export class AccountPanel extends Panel {
-  constructor(parent: HTMLElement, hooks: PanelHooks) {
-    super(parent, hooks, 'account-panel');
-  }
-
-  open(onLogin: () => void): void {
-    this.title.textContent = t('game.title');
-    this.body.innerHTML = `<div class="empty">${t('account.text')}</div>`;
-    const row = document.createElement('div');
-    row.className = 'choice-row';
-    row.appendChild(btn(t('account.later'), 'neutral', () => this.close()));
-    row.appendChild(
-      btn(t('account.login'), 'promote', () => {
-        this.close();
-        onLogin();
-      }),
-    );
-    this.body.appendChild(row);
-    this.show();
-  }
-}

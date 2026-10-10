@@ -144,3 +144,5 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **"Unaffordable" metric:** it now counts an affordable Office upgrade as a purchase (GDD §4.9 points at upgrades when no pad is affordable).
     - **Prices:** Area 2 pads cost $600–6,400.
     - **Level table:** extended to level 20.
+67. **No login prompt** (user request). The one-time "log in to keep your academy safe across devices" card is gone. The game never asks players to log in.
+    - **What stays:** the SDK auth listener. If a player logs in through the CrazyGames site anyway, the platform swaps in their account's save, and the game must reload it.

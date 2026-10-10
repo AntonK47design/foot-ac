@@ -28,7 +28,7 @@ import type { Position, Rarity, Stat } from './data/types';
 import * as Meta from './sim/meta';
 import type { ScoutTier } from './sim/state';
 import { Ads } from './ui/ads';
-import { AccountPanel, AlbumPanel, DailyPanel, QuestsPanel, ScoutPanel, WelcomePanel, hms, type DailyView, type RewardView } from './ui/meta-panels';
+import { AlbumPanel, DailyPanel, QuestsPanel, ScoutPanel, WelcomePanel, hms, type DailyView, type RewardView } from './ui/meta-panels';
 
 declare global {
   interface Window {
@@ -414,7 +414,6 @@ async function boot(): Promise<void> {
   const questsPanel = new QuestsPanel(gameEl, panelHooks);
   const scoutPanel = new ScoutPanel(gameEl, panelHooks);
   const albumPanel = new AlbumPanel(gameEl, panelHooks);
-  const accountPanel = new AccountPanel(gameEl, panelHooks);
   const rewardToast = (r: RewardView | null): void => {
     if (!r) return;
     hud.setCash(sim.state.cash);
@@ -536,9 +535,8 @@ async function boot(): Promise<void> {
     return true;
   };
 
-  // HUD badges and timers (4 Hz) + the one-time account nudge
+  // HUD badges and timers (4 Hz)
   let metaHudT = 0;
-  let accountT = 0;
   const updateMetaHud = (dt: number): void => {
     metaHudT -= dt;
     if (metaHudT > 0) return;
@@ -553,25 +551,6 @@ async function boot(): Promise<void> {
     hud.setButton('scout', Meta.unlocked(st, 'scout'), !sc.tier && st.tickets > 0 ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
     const cupOk = Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
     hud.setButton('cup', cupOk, sim.cupAvailable() ? '!' : null, sim.cupAvailable() ? t('hud.cup_today') : hms(Meta.msToMidnight(sim.now, sim.tz)));
-    accountT -= 0.25;
-    if (accountT <= 0) {
-      accountT = 5;
-      if (
-        !st.meta.accountPrompted &&
-        blockers.size === 0 &&
-        saves.stats.playSec >= BALANCE.meta.accountPrompt.minPlaySec &&
-        st.stars >= (sim.world.areaStars[1] ?? 0) * BALANCE.meta.accountPrompt.starShare &&
-        platform.isAccountAvailable()
-      ) {
-        st.meta.accountPrompted = true;
-        void platform
-          .getUser()
-          .then((u) => {
-            if (!u && blockers.size === 0) accountPanel.open(() => void platform.showAuthPrompt().catch(() => null));
-          })
-          .catch(() => undefined);
-      }
-    }
   };
 
   // ── sim → platform / analytics / save hooks

@@ -160,7 +160,6 @@ export interface MetaState {
   cupDay: string;
   album: Record<string, number>;
   albumClaimed: number;
-  accountPrompted: boolean;
   /** Recent income ($/s, EMA) for offline earnings. */
   incomeRate: number;
   /** Rewarded-ad use per local day (daily caps / diminishing returns) and the Office cash-ad cooldown. */

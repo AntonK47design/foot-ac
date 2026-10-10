@@ -212,8 +212,6 @@ export const BALANCE = {
     offline: { share: 0.03, baseCapSec: 3600, perLevelSec: 3600, minSec: 180 },
     /** Income-rate EMA time constant (s) for offline earnings. */
     incomeTau: 60,
-    /** Account prompt: share of Area 1 stars and play time before it may show (never forced). */
-    accountPrompt: { starShare: 0.7, minPlaySec: 300 },
   },
   /** Effects of decor objects once built (multipliers, stack multiplicatively). */
   perks: {

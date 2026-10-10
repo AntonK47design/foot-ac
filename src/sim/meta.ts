@@ -21,7 +21,6 @@ export function newMeta(): MetaState {
     cupDay: '',
     album: {},
     albumClaimed: 0,
-    accountPrompted: false,
     incomeRate: 0,
     ads: { day: '', used: {}, officeAt: 0 },
   };

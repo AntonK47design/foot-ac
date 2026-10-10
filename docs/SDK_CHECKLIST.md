@@ -34,7 +34,7 @@ VITE_TEST_HOOKS=1 VITE_ADS=on npm run build && npm run preview   # same, with ad
 ## Data / account
 
 - [ ] Progress survives a reload (saved through `SDK.data`).
-- [ ] Log in from the account prompt (5+ min of play and 70% of the stars). The account's progress loads and the toast "Progress loaded from your account" appears.
+- [ ] The game never asks you to log in. If you log in through the CrazyGames site anyway, the account's progress loads and the toast "Progress loaded from your account" appears.
 
 ## Ads (`VITE_ADS=on` build only)
 
