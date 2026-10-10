@@ -146,3 +146,9 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Level table:** extended to level 20.
 67. **No login prompt** (user request). The one-time "log in to keep your academy safe across devices" card is gone. The game never asks players to log in.
     - **What stays:** the SDK auth listener. If a player logs in through the CrazyGames site anyway, the platform swaps in their account's save, and the game must reload it.
+68. **Playtest fixes (Training Ground).**
+    - **2nd Water Carrier sooner:** it now unlocks right after the Agility Course, for $2,000 (it used to come after the Skills Square). Any earlier opened a 3-minute dead spot later on in the bot.
+    - **Showing the way:**
+      - the guide arrow shows whenever the objective is the gate;
+      - opening the gate pans the camera to the Hydration Point, with a "Training Ground open!" toast;
+      - the arrow then guides the first 3 Training Ground purchases, like the Sunday Park tutorial (`objectives.guideUnlocksNewArea`).

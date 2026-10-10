@@ -234,6 +234,8 @@ export const BALANCE = {
     upgradeShareGate: 0.6,
     /** The 3D guide arrow always shows until this many unlocks (tutorial)... */
     guideUnlocks: 3,
+    /** …and for the first purchases inside a newly opened area. */
+    guideUnlocksNewArea: 3,
     /** ...after that only when the coach has stood still this long (s). */
     hintIdleSec: 5,
   },

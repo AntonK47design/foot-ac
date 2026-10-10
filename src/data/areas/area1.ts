@@ -314,7 +314,7 @@ export const AREA1: AreaDef = {
     { id: 'p2_skills', area: 2, pos: { x: 4.6, z: 25.4 }, cost: 3400, stars: 2, xp: 14, requires: ['p2_agility'], unlock: { type: 'station', id: 'skills' }, icon: 'skills', nameKey: 'station.skills', major: true },
     { id: 'p2_agility_l2', area: 2, pos: { x: -8.0, z: 25.6 }, cost: 3200, stars: 1, xp: 10, requires: ['p2_skills'], unlock: { type: 'lane', station: 'agility' }, icon: 'lane', nameKey: 'lane.agility' },
     { id: 'p2_skills_l2', area: 2, pos: { x: 3.0, z: 27.6 }, cost: 3800, stars: 1, xp: 10, requires: ['p2_skills'], unlock: { type: 'lane', station: 'skills' }, icon: 'lane', nameKey: 'lane.skills' },
-    { id: 'p2_carrier2', area: 2, pos: { x: 15.6, z: 17.4 }, cost: 3000, stars: 1, xp: 12, requires: ['p2_skills'], unlock: { type: 'staff', id: 'water_carrier_2' }, icon: 'staff', nameKey: 'staff.water_carrier_2' },
+    { id: 'p2_carrier2', area: 2, pos: { x: 15.6, z: 17.4 }, cost: 2000, stars: 1, xp: 12, requires: ['p2_agility'], unlock: { type: 'staff', id: 'water_carrier_2' }, icon: 'staff', nameKey: 'staff.water_carrier_2' },
     { id: 'p2_physio', area: 2, pos: { x: 13.0, z: 27.6 }, cost: 4400, stars: 2, xp: 16, requires: ['p2_skills'], unlock: { type: 'object', id: 'physio' }, icon: 'physio', nameKey: 'obj.physio', major: true },
     { id: 'p2_seven', area: 2, pos: { x: 0, z: 28.2 }, cost: 6000, stars: 3, xp: 24, requires: ['p2_physio'], unlock: { type: 'object', id: 'seven_pitch' }, icon: 'pitch', nameKey: 'obj.seven_pitch', major: true },
     { id: 'p2_asst_gym', area: 2, pos: { x: -9.4, z: 14.4 }, cost: 4000, stars: 1, xp: 12, requires: ['p2_gym_l2', 'p2_physio'], unlock: { type: 'staff', id: 'assistant:gym' }, icon: 'whistle', nameKey: 'staff.assistant_gym' },

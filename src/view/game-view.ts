@@ -500,7 +500,12 @@ export class GameView {
       this.hud.bumpStars();
       if (e.major) {
         const u = this.sim.world.pads.get(e.padId)?.unlock;
-        if (u && u.type === 'station') {
+        if (u && u.type === 'object' && u.id === this.sim.area.expansion.gateObjectId) {
+          // show the player where the new area is: pan to the Hydration Point, the first pad in there
+          const w = this.sim.area.water.spot;
+          this.rig.panTo(w.x, w.z);
+          this.hud.toast(t('toast.area2'), 'gold', 3200);
+        } else if (u && u.type === 'station') {
           const c = this.sim.station(u.id).def.center;
           this.rig.panTo((c.x + e.x) / 2, (c.z + e.z) / 2);
         }
@@ -1274,6 +1279,16 @@ export class GameView {
     });
   }
 
+  /** A new area just opened: guide the first few purchases there, like the tutorial did in Sunday Park. */
+  private freshArea(): boolean {
+    const sim = this.sim;
+    // the gate itself (once Sunday Park is done) is easy to miss at the south edge
+    if (!sim.area2Open()) return sim.objective?.targetId === 'p2_gate';
+    let done = 0;
+    for (const p of sim.world.padList) if (p.area === 2 && p.id !== 'p2_gate' && sim.state.pads[p.id]?.done) done++;
+    return done < BALANCE.objectives.guideUnlocksNewArea;
+  }
+
   private updateArrow(cx: number, cz: number): void {
     const o = this.sim.objective;
     const edge = this.hud.edge;
@@ -1285,7 +1300,7 @@ export class GameView {
     const near = Math.hypot(o.x - cx, o.z - cz) < o.radius * 0.8;
     // guided only during the tutorial; afterwards the player plans their own route (arrow returns when idle)
     const OB = BALANCE.objectives;
-    const guided = this.sim.state.stats.unlocks < OB.guideUnlocks || this.coachIdle >= OB.hintIdleSec;
+    const guided = this.sim.state.stats.unlocks < OB.guideUnlocks || this.coachIdle >= OB.hintIdleSec || this.freshArea();
     if (!guided) {
       this.arrow.visible = false;
       edge.classList.add('hidden');
