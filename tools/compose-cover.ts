@@ -40,6 +40,8 @@ const BOLD_LAYOUTS: Layout[] = [
   { name: 'cover-landscape-1920x1080', w: 1920, h: 1080, crop: { x: 0.12, y: 0.3, s: 0.8 }, title: 'right:2.5%;top:6%;font-size:46px' },
   { name: 'cover-portrait-800x1200', w: 800, h: 1200, crop: { x: 0.2, y: 0.12, s: 0.6 }, title: 'left:0;right:0;top:3%;font-size:27px' },
   { name: 'cover-square-800x800', w: 800, h: 800, crop: { x: 0.1, y: 0.16, s: 0.8 }, title: 'left:0;right:0;top:2%;font-size:21px' },
+  // 9:16 portrait slot (some portals ask for at least 1080×1920): the full source height, a strip through the coach
+  { name: 'cover-portrait-1080x1920', w: 1080, h: 1920, crop: { x: 0.215, y: 0, s: 0.5625 }, title: 'left:0;right:0;top:3%;font-size:36px' },
 ];
 const LAYOUTS = BOLD ? BOLD_LAYOUTS : CLASSIC;
 
