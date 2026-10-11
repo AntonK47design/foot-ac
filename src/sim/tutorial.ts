@@ -76,6 +76,7 @@ export function currentStep(sim: Sim): TutorialStep | null {
     if (step.ready && !step.ready(sim)) return null;
     if (step.done(sim)) {
       f['tut:' + step.id] = true;
+      sim.events.emit('tutorialStep', { id: step.id });
       continue;
     }
     return step;

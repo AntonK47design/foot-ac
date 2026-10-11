@@ -48,6 +48,7 @@ function fakeBridge(store: Record<string, unknown> = {}) {
     },
     player: { isAuthorizationSupported: false, isAuthorized: false, name: null, authorize: async () => undefined },
     device: { type: 'tablet' },
+    analytics: { send: (e: string, d?: Record<string, unknown>) => void messages.push(`analytics:${e}:${JSON.stringify(d ?? {})}`) },
   });
   return { bridge: bridge as unknown as PGBridge, messages, platform, advertisement, store };
 }
@@ -120,6 +121,15 @@ describe('Playgama Bridge adapter', () => {
     f.advertisement.emit('interstitial_state_changed', 'opened');
     f.advertisement.emit('interstitial_state_changed', 'closed');
     expect(await p).toEqual({ ok: true });
+  });
+});
+
+describe('Playgama analytics', () => {
+  it('sends funnel events through the Bridge analytics module', () => {
+    const f = fakeBridge();
+    const a = new PlaygamaAdapter(f.bridge, () => undefined);
+    a.sendAnalytics('tut_cash', { sec: 3 });
+    expect(f.messages).toContain('analytics:tut_cash:{"sec":3}');
   });
 });
 

@@ -133,7 +133,7 @@ export const AREA1_LAYOUT: Layout = {
   ghosts: [],
   busStop: { x: 18.8, z: 0.4 },
   gate: { x: 17, z: 0.4 },
-  coachSpawn: { x: -6.8, z: -1.6 },
+  coachSpawn: { x: -5.4, z: 0.7 },
   area2: {
     plot: { x0: -17, z0: 12, x1: 17, z1: 40 },
     gateGap: [8.5, 12.5],

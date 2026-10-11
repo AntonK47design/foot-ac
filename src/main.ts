@@ -46,6 +46,7 @@ function newSeed(): number {
 async function boot(): Promise<void> {
   analytics.track('boot');
   const platform: Platform = await createPlatform();
+  if (platform.hasAnalytics) analytics.setSink((e, p) => platform.track(e, p));
   analytics.track('sdk_ready', { kind: platform.kind });
   platform.loadingStart();
 
@@ -570,6 +571,8 @@ async function boot(): Promise<void> {
     }
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
+  // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
+  sim.events.on('tutorialStep', (e) => analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) }));
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());
@@ -638,6 +641,12 @@ async function boot(): Promise<void> {
         if (!blockers.has('panel')) platform.gameplayStart();
         analytics.track('first_frame', { ms: Math.round(performance.now() - (window.__wkBootT0 ?? 0)) });
         document.getElementById('boot')?.remove();
+        // portals embed us in an iframe: take keyboard focus so WASD works without a first click
+        try {
+          window.focus();
+        } catch {
+          /* focus is best-effort */
+        }
         void import('./view/music').then((m) => m.startMusic(audio)).catch(() => undefined);
       }
       if (watchdog.sample(frameDt) && loop.fpsCap === 0) {

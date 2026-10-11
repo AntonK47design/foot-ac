@@ -55,6 +55,8 @@ export interface SimEvents {
   staffHired: { id: string };
   objectiveChanged: { objective: Objective | null };
   guideChanged: { objective: Objective | null; mode: GuideMode };
+  /** A tutorial route step was completed (first-minute funnel). */
+  tutorialStep: { id: string };
   saveNeeded: { reason: string };
 }
 
@@ -102,7 +104,8 @@ export function createInitialState(area: AreaDef = AREA1, seed = 12345): SimStat
       pz: area.spawn.z,
       vx: 0,
       vz: 0,
-      yaw: 0,
+      // facing the camera on the first frame
+      yaw: Math.PI,
       carry: 0,
       pickT: 0,
       dropT: 0,

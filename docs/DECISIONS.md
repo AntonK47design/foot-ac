@@ -239,3 +239,13 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Layout:** the plot is still drawn in its design frame and placed by `AREA3_OFFSET`. Its walkway runs along the east hedge, which is now the shared border, and the gate is a gap in Sunday Park's west curb.
     - **Bounds:** the coach's bounds are the box around all open plots. The empty corner south of the Youth Stadium is an obstacle.
     - **Pacing:** Area 3 is done at about 68–72 min (was 70–74). Dead air from 40 to 70 min is about 85–95 s median.
+80. **First-minute fixes after day-one data** (CrazyGames desktop: gameplay conversion 54%, bottom 20%; CrazyGames counts a player as converted after 1 minute of play).
+    - **Coach visible from the start:** the coach used to spawn behind the tactics board, hidden from the camera. They now spawn in the open, facing the camera, 2 m from the first cash pile.
+    - **Keyboard focus:** `window.focus()` on the first frame, so WASD works in the portal iframe without a first click.
+    - **Funnel analytics, on Playgama only:**
+      - Each tutorial step fires `tut_<step>` with the time it happened.
+      - Existing events (first frame, minute marks, firsts) go to the Bridge analytics module, the only analytics allowed there; `sendAnalyticsEvents` is on.
+      - CrazyGames gets no analytics events: no third parties.
+81. **Bold cover style** (`compose-cover.ts --bold` → `store/bold/`), made for the store grid where a cover is about 300 px wide.
+    - **Changes:** tighter crop (characters about 40% bigger), chunky yellow logo with a thick outline and 3D drop, red "FOOTBALL TYCOON" badge, +25% saturation and a vignette. Day-one CTR was 1.1%, bottom 20%.
+    - **New art:** a close-up key art (coach with a golden wonderkid card) is the next step.

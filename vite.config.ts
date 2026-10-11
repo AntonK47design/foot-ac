@@ -7,10 +7,10 @@ const SDK_SCRIPT: Record<string, string> = {
   playgama: 'https://bridge.playgama.com/v2/stable/playgama-bridge.js',
 };
 
-/** Playgama Bridge reads this next to index.html: no Bridge splash (no splash at all, §2), our own ad UI. */
+/** Playgama Bridge reads this next to index.html: no Bridge splash (no splash at all, §2), our own ad UI, Bridge analytics on (the only analytics we use there). */
 const PLAYGAMA_CONFIG = {
   disableLoadingLogo: true,
-  sendAnalyticsEvents: false,
+  sendAnalyticsEvents: true,
   advertisement: { useBuiltInErrorPopup: false },
 };
 

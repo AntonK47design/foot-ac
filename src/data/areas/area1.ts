@@ -22,7 +22,8 @@ export const AREA1: AreaDef = {
     // Area 3 "Youth Stadium" (west of Sunday Park; the border and its gate are obstacles)
     { x0: -50.6, z0: -11.6, x1: -16.6, z1: 23.6 },
   ],
-  spawn: { x: -6.8, z: -1.6 },
+  // in the open, south of the tactics board (the camera looks north: behind it the coach was hidden), 2 m from the first cash
+  spawn: { x: -5.4, z: 0.7 },
   gate: {
     busStop: { x: 18.8, z: 0.4 },
     door: { x: 17.7, z: 0.4 },

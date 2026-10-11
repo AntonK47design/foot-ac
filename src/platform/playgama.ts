@@ -32,6 +32,7 @@ export interface PGBridge extends BridgeEmitter {
     showRewarded(placement?: string | null): void;
     checkAdBlock(): Promise<unknown>;
   };
+  analytics?: { send(eventName: string, data?: Record<string, unknown>): void };
   player: {
     isAuthorizationSupported: boolean;
     isAuthorized: boolean;
@@ -135,6 +136,9 @@ export class PlaygamaAdapter implements PlatformAdapter {
   }
   onSettingsChange(fn: (muted: boolean) => void): void {
     this.guard('audio_state_changed', () => this.bridge.platform.on('audio_state_changed', (enabled) => fn(enabled === false)));
+  }
+  sendAnalytics(event: string, data?: Record<string, string | number | boolean>): void {
+    this.guard('analytics.send', () => this.bridge.analytics?.send(event, data));
   }
   onPauseChange(fn: (paused: boolean) => void): void {
     this.guard('pause_state_changed', () => this.bridge.platform.on('pause_state_changed', (paused) => fn(paused === true)));

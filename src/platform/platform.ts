@@ -95,6 +95,15 @@ export class Platform {
     return this.adapter.isMuted();
   }
 
+  /** True when the portal has its own analytics module (events are only ever sent there). */
+  get hasAnalytics(): boolean {
+    return !!this.adapter.sendAnalytics;
+  }
+
+  track(event: string, data?: Record<string, string | number | boolean>): void {
+    this.adapter.sendAnalytics?.(event, data);
+  }
+
   onPauseChange(fn: (paused: boolean) => void): void {
     this.adapter.onPauseChange?.(fn);
   }

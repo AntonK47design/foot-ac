@@ -26,6 +26,8 @@ export interface PlatformAdapter {
   onSettingsChange(fn: (muted: boolean) => void): void;
   /** The platform asks the game to pause / resume (e.g. its own overlays). Optional. */
   onPauseChange?(fn: (paused: boolean) => void): void;
+  /** The portal's own analytics module, if it has one (Playgama Bridge). */
+  sendAnalytics?(event: string, data?: Record<string, string | number | boolean>): void;
   dataGet(key: string): string | null;
   dataSet(key: string, value: string): void;
   dataRemove(key: string): void;
