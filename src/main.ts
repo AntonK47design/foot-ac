@@ -405,7 +405,10 @@ async function boot(): Promise<void> {
 
   // ── hints: shown for the method the player actually uses until they've moved
   let hintDone = sim.state.coach.moved > 2;
-  const updateHint = (): void => hud.showHint(hintDone ? null : input.lastMethod);
+  // touch input works without keyboard focus; on desktop, ask for a click while the page around us has the keyboard
+  const updateHint = (): void => hud.showHint(hintDone ? null : input.lastMethod, input.lastMethod === 'touch' || document.hasFocus());
+  window.addEventListener('focus', updateHint);
+  window.addEventListener('blur', updateHint);
   input.onMethodChange(updateHint);
   updateHint();
 
@@ -641,12 +644,14 @@ async function boot(): Promise<void> {
         if (!blockers.has('panel')) platform.gameplayStart();
         analytics.track('first_frame', { ms: Math.round(performance.now() - (window.__wkBootT0 ?? 0)) });
         document.getElementById('boot')?.remove();
-        // portals embed us in an iframe: take keyboard focus so WASD works without a first click
+        // portals embed us in an iframe: ask for keyboard focus (browsers usually refuse until the first click;
+        // the movement hint then says "click the game" — see updateHint)
         try {
           window.focus();
         } catch {
           /* focus is best-effort */
         }
+        updateHint();
         void import('./view/music').then((m) => m.startMusic(audio)).catch(() => undefined);
       }
       if (watchdog.sample(frameDt) && loop.fpsCap === 0) {

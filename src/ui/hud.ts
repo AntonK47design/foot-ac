@@ -38,7 +38,7 @@ export class Hud {
   private readonly ticketText: HTMLSpanElement;
   private shownCash = 0;
   private targetCash = 0;
-  private hintMethod: InputMethod | null = null;
+  private hintMethod: string | null = null;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'hud', parent);
@@ -187,9 +187,14 @@ export class Hud {
     this.objPill.classList.add('pop');
   }
 
-  showHint(method: InputMethod | null): void {
-    if (method === this.hintMethod) return;
-    this.hintMethod = method;
+  /**
+   * Movement hint for the player's input method. `focused` false (desktop, the page around our iframe has the
+   * keyboard): browsers don't let an embedded game take focus on its own, so ask for one click first.
+   */
+  showHint(method: InputMethod | null, focused = true): void {
+    const key = method ? method + (focused ? '' : ':nofocus') : null;
+    if (key === this.hintMethod) return;
+    this.hintMethod = key;
     if (!method) {
       this.hint.classList.add('hidden');
       return;
@@ -197,7 +202,7 @@ export class Hud {
     if (method === 'touch') {
       this.hint.innerHTML = `<div class="hint-touch"><span class="finger"></span><span class="ring"></span></div><span class="hint-text">${t('hint.touch')}</span>`;
     } else {
-      this.hint.innerHTML = `<div class="hint-keys"><div class="keys"><span class="k k-w">W</span><span class="k k-a">A</span><span class="k k-s">S</span><span class="k k-d">D</span></div><span class="mouse"><span class="mouse-btn"></span></span></div><span class="hint-text">${t('hint.desktop')}</span>`;
+      this.hint.innerHTML = `<div class="hint-keys"><div class="keys"><span class="k k-w">W</span><span class="k k-a">A</span><span class="k k-s">S</span><span class="k k-d">D</span></div><span class="mouse"><span class="mouse-btn"></span></span></div><span class="hint-text">${t(focused ? 'hint.desktop' : 'hint.desktop_click')}</span>`;
     }
     this.hint.classList.remove('hidden');
   }

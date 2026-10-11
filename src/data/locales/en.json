@@ -32,6 +32,7 @@
   "staff.ball_boy_2": "2nd Ball Boy",
   "pad.hire": "Hire {name}",
   "hint.desktop": "WASD or hold mouse",
+  "hint.desktop_click": "Click the game, then WASD (or hold mouse)",
   "hint.touch": "Drag to move",
   "hud.level": "LVL {level}",
   "hud.stars": "{stars}/{total}",

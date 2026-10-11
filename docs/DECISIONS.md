@@ -241,7 +241,7 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Pacing:** Area 3 is done at about 68–72 min (was 70–74). Dead air from 40 to 70 min is about 85–95 s median.
 80. **First-minute fixes after day-one data** (CrazyGames desktop: gameplay conversion 54%, bottom 20%; CrazyGames counts a player as converted after 1 minute of play).
     - **Coach visible from the start:** the coach used to spawn behind the tactics board, hidden from the camera. They now spawn in the open, facing the camera, 2 m from the first cash pile.
-    - **Keyboard focus:** `window.focus()` on the first frame, so WASD works in the portal iframe without a first click.
+    - **Keyboard focus:** browsers don't let a cross-origin iframe take the keyboard until the player clicks it, so a first-frame `window.focus()` alone isn't enough (the user saw this on their previous game). The game still asks for focus, but while it doesn't have it (`document.hasFocus()` false, desktop), the movement hint reads "Click the game, then WASD (or hold mouse)". Hold-mouse works without focus. Tested with the game in a cross-origin iframe whose parent page holds focus.
     - **Funnel analytics, on Playgama only:**
       - Each tutorial step fires `tut_<step>` with the time it happened.
       - Existing events (first frame, minute marks, firsts) go to the Bridge analytics module, the only analytics allowed there; `sendAnalyticsEvents` is on.
