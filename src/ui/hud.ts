@@ -207,6 +207,28 @@ export class Hud {
     this.hint.classList.remove('hidden');
   }
 
+  private infoEl: HTMLDivElement | null = null;
+  private infoTimer = 0;
+
+  /** "What is this?" card for a tapped station / object (never pauses; fades after a few seconds). */
+  showInfo(title: string, text: string, iconUrl?: string): void {
+    if (!this.infoEl) this.infoEl = el('div', 'info-card hidden', this.root);
+    const e = this.infoEl;
+    e.innerHTML = `${iconUrl ? `<img class="info-icon" src="${iconUrl}" alt="">` : ''}<div><b></b><p></p></div>`;
+    (e.querySelector('b') as HTMLElement).textContent = title;
+    (e.querySelector('p') as HTMLElement).textContent = text;
+    e.classList.remove('hidden', 'pop');
+    void e.offsetWidth;
+    e.classList.add('pop');
+    window.clearTimeout(this.infoTimer);
+    this.infoTimer = window.setTimeout(() => this.hideInfo(), 5200);
+  }
+
+  hideInfo(): void {
+    window.clearTimeout(this.infoTimer);
+    this.infoEl?.classList.add('hidden');
+  }
+
   toast(text: string, kind: 'info' | 'good' | 'gold' = 'info', ms = 2400): void {
     const e = el('div', `toast ${kind}`, this.toasts);
     e.textContent = text;

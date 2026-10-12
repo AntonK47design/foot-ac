@@ -257,3 +257,12 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
     - **Related fixes:**
       - The task pill wraps to two lines instead of cutting the text off.
       - The guide arrow's off-screen check uses its real height, so a target under the top HUD bar gets the edge pointer.
+
+## 83. Tap / click anything to see what it does
+
+- **What it does:** a quick tap or click on a built station, the sign-up desk, the ball crate, the hydration station, the Kit Room, the reception chairs, the kick-off spot, the office computer, the lockers or the safe shows a small card explaining it. A station's card names the stat it trains and the supply it needs.
+- **What counts as a tap:** released within 280 ms and moved less than 12 px. Anything longer or further is still movement, so the joystick and click-to-move are unchanged.
+- **Gameplay keeps running:** the card ignores pointer events and hides itself after about 5 s, or when you tap empty ground.
+- **Matching:** the tap goes to the nearest object on screen within max(48 px, 10 % of the short side).
+- **Not shown:** nothing while a panel is open.
+- **Analytics:** `info_tap` is sent once.

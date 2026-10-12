@@ -410,6 +410,15 @@ async function boot(): Promise<void> {
   window.addEventListener('focus', updateHint);
   window.addEventListener('blur', updateHint);
   input.onMethodChange(updateHint);
+  // tap / click on a station, desk, room… → a short "what is this?" card (gameplay keeps running)
+  input.onTap = (x, y) => {
+    if (blockers.size > 0) return;
+    const info = view.explainAt(x, y);
+    if (info) {
+      hud.showInfo(info.title, info.text, info.icon);
+      analytics.once('info_tap');
+    } else hud.hideInfo();
+  };
   updateHint();
 
   // ── M4: daily reward, quests, scouting, Daily Cup, Hall of Fame, chests, offline earnings

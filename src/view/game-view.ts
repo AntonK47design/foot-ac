@@ -1537,6 +1537,66 @@ export class GameView {
     }
   }
 
+  /**
+   * "What is this?": the built station / object nearest to a tapped screen point (within a finger's reach), with a
+   * title, an explanation and its icon. Null when the tap wasn't near anything explainable.
+   */
+  explainAt(sx: number, sy: number): { title: string; text: string; icon: string } | null {
+    const sim = this.sim;
+    const s = sim.state;
+    const area = sim.area;
+    const items: Array<{ x: number; z: number; title: string; text: string; icon: string }> = [];
+    const statName = (k: string): string => t('info.stat.' + k);
+    for (const [id, st] of sim.world.stations) {
+      if (!s.stations[id]) continue;
+      const sup = st.supply;
+      const text = sup ? t('info.station', { stat: statName(st.stat), supply: t('info.supply.' + sup) }) : t('info.station_open', { stat: statName(st.stat) });
+      const lv = sim.upLevel('st:' + id);
+      items.push({ x: st.def.center.x, z: st.def.center.z, title: t('station.' + id) + (lv > 0 ? ` · Lv ${lv + 1}` : ''), text, icon: st.def.kind === 'shoot' ? 'goal' : id === 'dribble_cones' ? 'cones' : id === 'passing_wall' ? 'wall' : id === 'sprint_track' ? 'track' : st.def.kind });
+    }
+    const special: Record<string, { key: string; icon: string }> = {
+      desk: { key: 'desk', icon: 'sign' },
+      ball_crate: { key: 'crate', icon: 'ball' },
+      hydration: { key: 'hydration', icon: 'water' },
+      kit_room: { key: 'kit_room', icon: 'bib' },
+      chairs_1: { key: 'chairs', icon: 'chair' },
+      chairs_2: { key: 'chairs', icon: 'chair' },
+      match_pitch: { key: 'bus', icon: 'pitch' },
+    };
+    for (const o of area.objects) {
+      if (!s.built[o.id] || o.kind === 'gate') continue;
+      // objects placed by their footprint (stands, lights) have pos 0,0
+      const f = o.footprint[0];
+      const x = o.pos.x === 0 && o.pos.z === 0 && f ? (f.x0 + f.x1) / 2 : o.pos.x;
+      const z = o.pos.x === 0 && o.pos.z === 0 && f ? (f.z0 + f.z1) / 2 : o.pos.z;
+      const known = special[o.id];
+      const at = o.id === 'match_pitch' ? area.matchPitch.kickoff : { x, z };
+      if (known) items.push({ ...at, title: t('info.' + known.key + '.title'), text: t('info.' + known.key), icon: known.icon });
+      else {
+        const perk = perkText(o.id);
+        const pad = sim.world.padList.find((p) => p.unlock.type === 'object' && p.unlock.id === o.id);
+        if (perk && pad) items.push({ ...at, title: t(pad.nameKey), text: perk, icon: pad.icon });
+      }
+    }
+    items.push({ ...area.office.computer, title: t('info.office.title'), text: t('info.office'), icon: 'podium' });
+    const ls = area.lockers.seats;
+    items.push({ x: ls.reduce((a, p) => a + p.x, 0) / ls.length, z: ls.reduce((a, p) => a + p.z, 0) / ls.length, title: t('info.lockers.title'), text: t('info.lockers'), icon: 'shirt' });
+    if (sim.hasStaff('accountant')) items.push({ ...area.safe, title: t('info.safe.title'), text: t('info.safe'), icon: 'cash' });
+    const reach = Math.max(48, Math.min(this.projector.w, this.projector.h) * 0.1);
+    let best: (typeof items)[number] | null = null;
+    let bestD = reach;
+    for (const it of items) {
+      const p = this.projector.project(it.x, 0.6, it.z, sp);
+      if (!p.visible) continue;
+      const d = Math.hypot(p.x - sx, p.y - sy);
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    return best ? { title: best.title, text: best.text, icon: this.iconUrl(best.icon) } : null;
+  }
+
   private padTag(p: PadDef, afford: boolean): string {
     const rem = Math.ceil(this.sim.padRemaining(p));
     const name = p.unlock.type === 'staff' ? t('pad.hire', { name: t(p.nameKey) }) : t(p.nameKey);

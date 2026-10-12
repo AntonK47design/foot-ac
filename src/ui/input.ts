@@ -10,6 +10,9 @@ const KEYMAP: Record<string, [number, number]> = {
   KeyD: [1, 0],
   ArrowRight: [1, 0],
 };
+/** A tap: released within this long (ms) and moved less than this far (px). Longer / further is moving. */
+const TAP_MS = 280;
+const TAP_PX = 12;
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
 
 /**
@@ -34,6 +37,9 @@ export class Input {
   private methodListeners: Array<(m: InputMethod) => void> = [];
   /** Called on Space / tap for skill moments (M2). */
   onAction: (() => void) | null = null;
+  /** A quick click / tap without dragging (screen px): "what is this?" info cards. */
+  onTap: ((x: number, y: number) => void) | null = null;
+  private readonly downs = new Map<number, { x: number; y: number; t: number }>();
 
   constructor(
     layer: HTMLElement,
@@ -97,6 +103,7 @@ export class Input {
 
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.enabled) return;
+    this.downs.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
     if (e.pointerType === 'mouse') {
       if (e.button !== 0) return;
       this.mouseHeld = true;
@@ -144,6 +151,9 @@ export class Input {
   };
 
   private readonly onPointerUp = (e: PointerEvent): void => {
+    const d = this.downs.get(e.pointerId);
+    this.downs.delete(e.pointerId);
+    if (d && e.type === 'pointerup' && performance.now() - d.t < TAP_MS && Math.hypot(e.clientX - d.x, e.clientY - d.y) < TAP_PX) this.onTap?.(e.clientX, e.clientY);
     if (e.pointerId === this.mouseId) {
       this.mouseHeld = false;
       this.mouseId = -1;
