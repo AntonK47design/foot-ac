@@ -249,3 +249,11 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 81. **Bold cover style** (`compose-cover.ts --bold` → `store/bold/`), made for the store grid where a cover is about 300 px wide.
     - **Changes:** tighter crop (characters about 40% bigger), chunky yellow logo with a thick outline and 3D drop, red "FOOTBALL TYCOON" badge, +25% saturation and a vignette. Day-one CTR was 1.1%, bottom 20%.
     - **New art:** a close-up key art (coach with a golden wonderkid card) is the next step.
+82. **Feature intros in the tutorial route.** Optional steps appear once, when they first matter, and never block the route while not ready.
+    - **First graduate waiting:** "Office: sell {name} or add to your squad".
+    - **First affordable upgrade:** "Office: buy upgrades to earn more".
+    - **First match ready:** "Kick-off spot: play your first match".
+    - **Cash in the safe:** "Collect the safe: your accountant's cash".
+    - **Related fixes:**
+      - The task pill wraps to two lines instead of cutting the text off.
+      - The guide arrow's off-screen check uses its real height, so a target under the top HUD bar gets the edge pointer.

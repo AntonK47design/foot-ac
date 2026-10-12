@@ -1,4 +1,6 @@
+import { BALANCE } from '../data/balance';
 import { ballObjective, deskObjective, padObjective, pileObjective, type Objective } from './objectives';
+import { firstName } from './players';
 import type { Sim } from './sim';
 
 /**
@@ -10,6 +12,11 @@ export interface TutorialStep {
   id: string;
   /** The step may start (later routes wait for their area). Default: always. */
   ready?: (sim: Sim) => boolean;
+  /**
+   * A feature intro that only matters once its moment comes (first graduate, first affordable upgrade…): while not
+   * ready it is skipped instead of holding up the rest of the route, and picked up when it becomes ready.
+   */
+  optional?: boolean;
   done: (sim: Sim) => boolean;
   objective: (sim: Sim) => Objective | null;
 }
@@ -38,6 +45,41 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => orBalls(s, 'shooting_goal', pileObjective(s, 'st:shooting_goal', 'obj.collect_fees')),
   },
   { id: 'cones', done: (s) => padDone(s, 'p_cones'), objective: (s) => padObjective(s, 'p_cones') },
+  // ── feature intros (each shown once, when it first matters)
+  {
+    id: 'graduate',
+    optional: true,
+    ready: (s) => !!s.podiumGraduate(),
+    done: (s) => s.state.records.sold + s.state.records.promoted > 0,
+    objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
+  },
+  {
+    id: 'upgrade',
+    optional: true,
+    ready: (s) => {
+      const up = s.cheapestUpgrade();
+      return !!up && s.state.cash + 1e-6 >= up.cost;
+    },
+    done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
+    objective: (s) => officeObjective(s, 'tut.upgrade'),
+  },
+  {
+    id: 'match',
+    optional: true,
+    ready: (s) => s.matchAvailable(),
+    done: (s) => s.state.records.matches > 0,
+    objective: (s) => {
+      const K = s.area.matchPitch.kickoff;
+      return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
+    },
+  },
+  {
+    id: 'safe',
+    optional: true,
+    ready: (s) => (s.pile('safe')?.amount ?? 0) >= BALANCE.objectives.minPileWorth,
+    done: (s) => !!s.state.flags.firstSafe,
+    objective: (s) => pileObjective(s, 'safe', 'tut.safe'),
+  },
   // ── Training Ground (starts once the gate shows up)
   { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => padObjective(s, 'p2_gate') },
   { id: 'water', done: (s) => padDone(s, 'p2_water'), objective: (s) => padObjective(s, 'p2_water') },
@@ -58,6 +100,12 @@ export const TUTORIAL: TutorialStep[] = [
   },
 ];
 
+/** Points at the office computer with an explanation (first graduate / first upgrade). */
+function officeObjective(sim: Sim, key: string, grad?: ReturnType<Sim['podiumGraduate']>): Objective {
+  const P = sim.area.office.computer;
+  return { key, params: grad ? { name: firstName(grad) } : undefined, icon: 'podium', x: P.x, z: P.z, targetId: grad ? 'podium' : 'office', radius: BALANCE.transfer.zoneRadius };
+}
+
 function isVisible(sim: Sim, padId: string): boolean {
   const p = sim.world.pads.get(padId);
   return !!p && sim.isPadVisible(p);
@@ -73,7 +121,10 @@ export function currentStep(sim: Sim): TutorialStep | null {
   const f = sim.state.flags;
   for (const step of TUTORIAL) {
     if (f['tut:' + step.id]) continue;
-    if (step.ready && !step.ready(sim)) return null;
+    if (step.ready && !step.ready(sim)) {
+      if (step.optional) continue;
+      return null;
+    }
     if (step.done(sim)) {
       f['tut:' + step.id] = true;
       sim.events.emit('tutorialStep', { id: step.id });

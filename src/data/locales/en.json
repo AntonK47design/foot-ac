@@ -360,5 +360,9 @@
   "up.st:reaction": "Reaction Lights",
   "up.academy_shop": "Matchday Merch",
   "upfx.more.academy_shop": "+{n} Fan Shop sales",
-  "toast.area3": "Youth Stadium open!"
+  "toast.area3": "Youth Stadium open!",
+  "tut.graduate": "Office: sell {name} or add to your squad",
+  "tut.upgrade": "Office: buy upgrades to earn more",
+  "tut.match": "Kick-off spot: play your first match",
+  "tut.safe": "Collect the safe: your accountant's cash"
 }

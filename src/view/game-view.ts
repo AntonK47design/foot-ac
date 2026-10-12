@@ -1577,7 +1577,8 @@ export class GameView {
     this.arrow.position.set(o.x, 1.9 + Math.abs(Math.sin(this.time * 4)) * 0.4, o.z);
     // face the camera (camera never rotates); tilt back so it reads from the 52° view
     this.arrow.rotation.set(-0.5, 0, 0);
-    const p = this.projector.project(o.x, 0.5, o.z, sp);
+    // measured at the arrow's height: a target near the screen top hides the 3D arrow under the HUD bar → edge pointer
+    const p = this.projector.project(o.x, 2.1, o.z, sp);
     const w = this.projector.w;
     const h = this.projector.h;
     const m = 44;

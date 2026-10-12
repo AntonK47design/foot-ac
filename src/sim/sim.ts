@@ -654,6 +654,7 @@ export class Sim {
       s.stats.cashCollected += amount;
       s.flags.firstCash = true;
       Meta.questProgress(s, 'collect', amount);
+      if (p.id === 'safe') s.flags.firstSafe = true;
       this.events.emit('cashCollected', { pileId: p.id, amount, x: p.x, z: p.z });
       if (p.id.startsWith('starter')) s.piles.splice(i, 1);
     }
