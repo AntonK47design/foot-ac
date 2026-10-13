@@ -284,3 +284,11 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   - first rep: 0:27 → 0:15;
   - Dribble Cones: 0:28 → 0:18.
 - **Knock-on fix:** the faster start shifted the saving phase before the Training Ground gate, which left a 64 s stretch with nothing to buy. The Academy Bus upgrade now starts at $800 (was $1000) to fill it.
+
+## 85. Store covers v3 from illustrated key art
+
+- **Why:** CTR stayed at 0.8 % with the bold covers, which were made from in-game renders. Those look busy and flat at thumbnail size.
+- **The art:** the new key art is a painted 16:9 illustration made with an image AI from our brief. It shows one big coach face pointing at the viewer, a cash stack, and the academy behind.
+- **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
+  - The landscape cover shows the whole image, with the logo in the sky on the right.
+  - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
