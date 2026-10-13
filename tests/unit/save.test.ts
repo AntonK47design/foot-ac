@@ -92,7 +92,8 @@ describe('save', () => {
     expect(sim2.state.pads.p_goal?.done).toBe(true);
     expect(sim2.state.flags.relayout).toBeUndefined();
     for (let i = 0; i < 600; i++) sim2.tick(1 / 60);
-    for (const t of sim2.state.trainees) expect(sim2.nav.isBlocked(t.x, t.z) && t.state !== 'training').toBe(false);
+    // (seated trainees sit on the reception chairs and training ones stand in their drill: both inside a footprint)
+    for (const t of sim2.state.trainees) expect(sim2.nav.isBlocked(t.x, t.z) && t.state !== 'training' && t.state !== 'seated', t.state).toBe(false);
   });
 
   it('adds pads introduced by newer content', () => {

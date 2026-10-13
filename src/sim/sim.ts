@@ -718,6 +718,8 @@ export class Sim {
       if (u.id === 'shooting_goal' && !s.flags.busEnabled) {
         s.flags.busEnabled = true;
         s.bus.timer = BALANCE.bus.firstDelay;
+        // the first player is already waiting in reception: no 35 m walk from the bus before the first sign-up
+        if (!s.flags.firstTraineeSpawned) this.seatNow(this.spawnTrainee());
       }
     } else if (u.type === 'lane') {
       const ss = s.stations[u.station];
@@ -835,8 +837,19 @@ export class Sim {
     return BALANCE.coach.carryCap + this.upLevel('coach_carry') * (UPGRADE_BY_ID.get('coach_carry')?.step ?? 1);
   }
 
+  /** 1 during the opening boost, easing to 0 after it (BALANCE.opening). */
+  openingK(): number {
+    const O = BALANCE.opening;
+    return Math.min(1, Math.max(0, 1 - (this.state.time - O.sec) / O.fade));
+  }
+
+  /** Blends an opening-boost multiplier with 1 by how far the opening has faded. */
+  private opening(m: number): number {
+    return 1 + (m - 1) * this.openingK();
+  }
+
   signTime(): number {
-    return BALANCE.desk.signTime * this.upMult('coach_sign', -1);
+    return BALANCE.desk.signTime * this.upMult('coach_sign', -1) * this.opening(BALANCE.opening.signTimeMult);
   }
 
   ballBoySpeed(): number {
@@ -1099,12 +1112,25 @@ export class Sim {
         if (k >= 1) {
           b.phase = 'away';
           b.z = startZ;
-          b.timer = B.interval * (s.built.bus_shelter ? B.shelterIntervalMult : 1) * this.upMult('academy_bus', -1);
+          const interval = B.interval * (s.built.bus_shelter ? B.shelterIntervalMult : 1) * this.upMult('academy_bus', -1);
+          b.timer = interval + (Math.min(interval, BALANCE.opening.busInterval) - interval) * this.openingK();
           this.events.emit('busLeft', EMPTY);
         }
         break;
       }
     }
+  }
+
+  /** Puts a just-spawned trainee straight on their reception seat. */
+  private seatNow(t: Trainee | undefined): void {
+    const sp = t ? this.seatPos[t.seat] : undefined;
+    if (!t || !sp) return;
+    t.x = t.px = sp.x;
+    t.z = t.pz = sp.z;
+    t.goal = null;
+    t.path.length = 0;
+    t.state = 'seated';
+    t.yaw = sp.yaw;
   }
 
   spawnTrainee(): Trainee | undefined {
@@ -1139,7 +1165,7 @@ export class Sim {
 
   private updateTrainees(dt: number): void {
     const s = this.state;
-    const speed = BALANCE.trainee.speed;
+    const speed = BALANCE.trainee.speed * this.opening(BALANCE.opening.traineeSpeedMult);
     let deskBusy = false;
     for (const t of s.trainees) if (t.state === 'toDesk' || t.state === 'atDesk') deskBusy = true;
     if (!deskBusy) {
@@ -1184,7 +1210,7 @@ export class Sim {
           }
           break;
         case 'changing':
-          t.repT += dt / BALANCE.trainee.changeTime;
+          t.repT += dt / (BALANCE.trainee.changeTime * this.opening(BALANCE.opening.changeTimeMult));
           if (t.repT >= 1) {
             t.repT = 0;
             t.seat = -1;
@@ -1247,7 +1273,7 @@ export class Sim {
       t.repT = 0;
       this.events.emit('repStart', { traineeId: t.id, stationId: t.stationId });
     }
-    t.repT += dt / (cfg.repTime * this.perk('repTimeMult') * this.stationRepMult(t.stationId));
+    t.repT += dt / (cfg.repTime * this.perk('repTimeMult') * this.stationRepMult(t.stationId) * this.opening(BALANCE.opening.repTimeMult));
     if (t.repT < 1) return;
     // rep complete
     t.repT = 0;
@@ -1258,7 +1284,7 @@ export class Sim {
     const before = t.stats[stat];
     t.stats[stat] = Math.min(t.cap, before + cfg.statGain);
     const gain = t.stats[stat] - before;
-    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult') * this.upMult('st:' + t.stationId, 1));
+    const cash = Math.round(cfg.cashPerRep * BALANCE.rarity.cashMult[t.rarity] * this.perk('feeMult') * this.upMult('st:' + t.stationId, 1) * this.opening(BALANCE.opening.cashMult));
     const p = this.pile('st:' + t.stationId);
     if (p) p.amount += cash;
     t.reps++;

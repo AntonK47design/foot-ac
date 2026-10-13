@@ -29,6 +29,21 @@ export const BALANCE = {
   },
   crate: { zoneRadius: 1.4 },
   basket: { zoneRadius: 1.35 },
+  /**
+   * Opening boost for brand-new players: during the first `sec` seconds of play everything that makes the first
+   * minute wait (bus, walking, signing, changing, reps) runs faster and reps pay more, then eases back to normal
+   * over `fade` seconds. Keyed to total play time, so returning players never see it.
+   */
+  opening: {
+    sec: 50,
+    fade: 20,
+    busInterval: 13,
+    traineeSpeedMult: 1.5,
+    signTimeMult: 0.5,
+    changeTimeMult: 0.4,
+    repTimeMult: 1,
+    cashMult: 1,
+  },
   bus: {
     firstDelay: 0.6,
     interval: 13,

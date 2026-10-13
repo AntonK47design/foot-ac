@@ -266,3 +266,21 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Matching:** the tap goes to the nearest object on screen within max(48 px, 10 % of the short side).
 - **Not shown:** nothing while a panel is open.
 - **Analytics:** `info_tap` is sent once.
+
+## 84. A faster first minute (mobile conversion was 29 %)
+
+- **Why:** on CrazyGames, mobile players who stay past the first minute play over 11 minutes, but 71 % leave before it. Desktop players drop off too, at 43 %.
+- **The slow part:** the first player's walk. They got off the bus and walked about 50 m (bus → chairs → desk → lockers → pitch) before the first fee, so the first rep came at 0:27.
+- **The first player is already waiting:** when the Shooting Goal is built, Leo is already sitting in reception (no bus walk). The bus still brings the next players.
+- **Opening boost:** `BALANCE.opening` applies for the first 50 s of play, then fades over 20 s:
+  - trainees walk 1.5× faster;
+  - signing takes half as long;
+  - changing takes 40 % as long.
+  
+  Cash, rep speed and bus timing are unchanged, so the economy stays the same. It's keyed to total play time, so returning players never get it.
+- **It applies on every device.** Desktop conversion is also in the bottom 20 %, and one opening keeps the economy bot meaningful.
+- **Result (economy bot):**
+  - first player signed: 0:17 → 0:09;
+  - first rep: 0:27 → 0:15;
+  - Dribble Cones: 0:28 → 0:18.
+- **Knock-on fix:** the faster start shifted the saving phase before the Training Ground gate, which left a 64 s stretch with nothing to buy. The Academy Bus upgrade now starts at $800 (was $1000) to fill it.

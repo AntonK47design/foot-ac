@@ -128,8 +128,9 @@ describe('guide: feature intros (office, match, safe)', () => {
     follow(sim, 900, () => {
       if (sim.prompt === 'podium') {
         if (sim.podiumGraduate()) sim.decideGraduate('sell');
+        // (only once the guide has pointed at it, as a player would)
         const up = sim.cheapestUpgrade();
-        if (up && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
+        if (up && keys.has('tut.upgrade') && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
         sim.dismissPrompt();
       } else if (sim.prompt === 'kickoff') {
         const m = sim.startMatch();
