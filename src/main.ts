@@ -500,7 +500,7 @@ async function boot(): Promise<void> {
       () => rewardToast(sim.claimAlbum()),
     );
   hud.button('quests', 'left', 'scroll', t('hud.quests'), openQuests);
-  hud.button('album', 'left', 'trophy', t('hud.album'), openAlbum);
+  hud.button('album', 'left', 'star', t('hud.album'), openAlbum);
   hud.button('daily', 'right', 'gift', t('hud.daily'), openDaily);
   hud.button('scout', 'right', 'scout', t('hud.scout'), openScout);
   hud.button('cup', 'right', 'whistle', t('hud.cup'), () => hud.toast(t('cup.hint')));
@@ -555,14 +555,18 @@ async function boot(): Promise<void> {
     if (metaHudT > 0) return;
     metaHudT = 0.25;
     const st = sim.state;
-    hud.setTickets(st.tickets, st.tickets > 0 || Meta.unlocked(st, 'daily'));
+    // a new academy sees only the core loop: the meta buttons appear once the Sunday Park route (up to the first match) is done
+    const route = !!st.flags['tut:match'];
+    hud.setTickets(st.tickets, route && (st.tickets > 0 || Meta.unlocked(st, 'daily')));
     const qn = Meta.questsClaimable(st);
-    hud.setButton('quests', Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
-    hud.setButton('album', Meta.albumSlots(st) > 0, Meta.albumClaimable(st) ? '!' : null);
-    hud.setButton('daily', Meta.unlocked(st, 'daily'), Meta.dailyAvailable(st, sim.now, sim.tz) ? '!' : null);
+    hud.setButton('quests', route && Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
+    hud.setButton('album', route && Meta.albumSlots(st) > 0, Meta.albumClaimable(st) ? '!' : null);
+    hud.setButton('daily', route && Meta.unlocked(st, 'daily'), Meta.dailyAvailable(st, sim.now, sim.tz) ? '!' : null);
     const sc = st.meta.scout;
-    hud.setButton('scout', Meta.unlocked(st, 'scout'), !sc.tier && st.tickets > 0 ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
-    const cupOk = Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
+    // badge only when a mission can actually start (tickets alone pile up every level)
+    const canScout = !sc.tier && TIERS.some((tier) => Meta.canScout(st, tier));
+    hud.setButton('scout', route && Meta.unlocked(st, 'scout'), canScout ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
+    const cupOk = route && Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
     hud.setButton('cup', cupOk, sim.cupAvailable() ? '!' : null, sim.cupAvailable() ? t('hud.cup_today') : hms(Meta.msToMidnight(sim.now, sim.tz)));
   };
 
@@ -671,7 +675,8 @@ async function boot(): Promise<void> {
       const as = sim.areaStars();
       hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
-      hud.setSideButtons(sim.state.squad.length > 0 || sim.state.records.promoted > 0, !!sim.state.built[sim.area.matchPitch.objectId]);
+      const route = !!sim.state.flags['tut:match'];
+      hud.setSideButtons(route && (sim.state.squad.length > 0 || sim.state.records.promoted > 0), route && !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;
       const hi = BALANCE.levelXp[lv] ?? lo + 1000;

@@ -1,3 +1,5 @@
+import { BUILD } from '../data/constants';
+
 type Props = Record<string, string | number | boolean>;
 
 const seen = new Set<string>();
@@ -14,7 +16,8 @@ export const analytics = {
   track(event: string, props?: Props): void {
     if (DEV) console.info('[analytics]', event, props ?? '');
     try {
-      sink?.(event, props);
+      // every event carries the build, so before/after comparisons don't depend on dates
+      sink?.(event, { ...props, build_version: BUILD });
     } catch {
       /* analytics never breaks the game */
     }

@@ -298,7 +298,7 @@ export const AREA1: AreaDef = {
     { id: 'p_cones_l2', area: 1, pos: { x: 7.3, z: -4.6 }, cost: 55, stars: 1, xp: 8, requires: ['p_wall'], unlock: { type: 'lane', station: 'dribble_cones' }, icon: 'lane', nameKey: 'lane.dribble_cones' },
     { id: 'p_ballboy', area: 1, pos: { x: 5.5, z: 3.0 }, cost: 190, stars: 2, xp: 14, requires: ['p_bench', 'p_cones_l2'], unlock: { type: 'staff', id: 'ball_boy' }, icon: 'staff', nameKey: 'staff.ball_boy', major: true },
     { id: 'p_ballboy2', area: 1, pos: { x: 7.1, z: 2.2 }, cost: 150, stars: 1, xp: 10, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'ball_boy_2' }, icon: 'staff', nameKey: 'staff.ball_boy_2' },
-    { id: 'p_match', area: 1, pos: { x: 13.6, z: 1.9 }, cost: 85, stars: 2, xp: 14, requires: ['p_cones_l2'], unlock: { type: 'object', id: 'match_pitch' }, icon: 'pitch', nameKey: 'obj.match_pitch', major: true },
+    { id: 'p_match', area: 1, pos: { x: 13.6, z: 1.9 }, cost: 85, stars: 2, xp: 14, requires: ['p_cones'], unlock: { type: 'object', id: 'match_pitch' }, icon: 'pitch', nameKey: 'obj.match_pitch', major: true },
     // M3 staff: receptionist, one assistant coach per drill, accountant
     { id: 'p_reception', area: 1, pos: { x: -11.5, z: -9.7 }, cost: 260, stars: 1, xp: 12, requires: ['p_ballboy'], unlock: { type: 'staff', id: 'receptionist' }, icon: 'sign', nameKey: 'staff.receptionist' },
     { id: 'p_asst_goal', area: 1, pos: { x: -2.4, z: -6.8 }, cost: 320, stars: 1, xp: 12, requires: ['p_goal_l2', 'p_sprint'], unlock: { type: 'staff', id: 'assistant:shooting_goal' }, icon: 'whistle', nameKey: 'staff.assistant_goal' },

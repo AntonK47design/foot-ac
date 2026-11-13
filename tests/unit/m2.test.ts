@@ -170,6 +170,16 @@ describe('M2: matches and league', () => {
     sim.startMatch();
     sim.finishCurrentMatch();
     expect(sim.matchAvailable()).toBe(false);
+    // a new academy plays more often: the early gap first, the regular one after `earlyMatches`
+    expect(sim.matchCountdown()).toBeCloseTo(BALANCE.match.earlyInterval, 0);
+    for (let i = 1; i < BALANCE.match.earlyMatches; i++) {
+      sim.state.time = sim.state.matchNextAt;
+      sim.startMatch();
+      sim.finishCurrentMatch();
+    }
+    sim.state.time = sim.state.matchNextAt;
+    sim.startMatch();
+    sim.finishCurrentMatch();
     expect(sim.matchCountdown()).toBeCloseTo(BALANCE.match.interval, 0);
   });
 });

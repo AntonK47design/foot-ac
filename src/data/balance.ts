@@ -147,7 +147,10 @@ export const BALANCE = {
   },
   match: {
     /** Seconds between matches (the first is available as soon as the pitch is built). */
-    interval: 180,
+    interval: 150,
+    /** A new academy plays more often: this gap after each of its first `earlyMatches` matches. */
+    earlyInterval: 100,
+    earlyMatches: 5,
     chances: [3, 5] as [number, number],
     powerShotsMax: 2,
     /** Goal probability = base + (attack − defence) × perOvr, clamped. */

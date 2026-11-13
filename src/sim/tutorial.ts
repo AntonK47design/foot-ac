@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import { ballObjective, deskObjective, padObjective, pileObjective, type Objective } from './objectives';
+import { ballObjective, computeObjective, deskObjective, padObjective, pileObjective, type Objective } from './objectives';
 import { firstName } from './players';
 import type { Sim } from './sim';
 
@@ -53,6 +53,17 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => s.state.records.sold + s.state.records.promoted > 0,
     objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
   },
+  // the team bus and the first match come right after the basics: the match is the game's big moment
+  { id: 'pitch', done: (s) => padDone(s, 'p_match'), objective: (s) => saveUpFor(s, 'p_match') },
+  {
+    id: 'match',
+    ready: (s) => s.state.records.matches > 0 || s.matchAvailable(),
+    done: (s) => s.state.records.matches > 0,
+    objective: (s) => {
+      const K = s.area.matchPitch.kickoff;
+      return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
+    },
+  },
   {
     id: 'upgrade',
     optional: true,
@@ -62,16 +73,6 @@ export const TUTORIAL: TutorialStep[] = [
     },
     done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
     objective: (s) => officeObjective(s, 'tut.upgrade'),
-  },
-  {
-    id: 'match',
-    optional: true,
-    ready: (s) => s.matchAvailable(),
-    done: (s) => s.state.records.matches > 0,
-    objective: (s) => {
-      const K = s.area.matchPitch.kickoff;
-      return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
-    },
   },
   {
     id: 'safe',
@@ -109,6 +110,15 @@ function officeObjective(sim: Sim, key: string, grad?: ReturnType<Sim['podiumGra
 function isVisible(sim: Sim, padId: string): boolean {
   const p = sim.world.pads.get(padId);
   return !!p && sim.isPadVisible(p);
+}
+
+/**
+ * A pad the route wants next: go buy it once affordable; until then the usual best action (collect fees, bring balls,
+ * sign the next trainee…), which is what earns the money. Never just "save up" while nothing earns.
+ */
+function saveUpFor(sim: Sim, padId: string): Objective | null {
+  if (canAffordPad(sim, padId) || (sim.state.coach.padId === padId && sim.paying)) return padObjective(sim, padId);
+  return computeObjective(sim, padId) ?? padObjective(sim, padId);
 }
 
 function canAffordPad(sim: Sim, padId: string): boolean {

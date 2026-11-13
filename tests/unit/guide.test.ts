@@ -5,9 +5,22 @@ import { Sim, createInitialState } from '../../src/sim/sim';
 
 const STEP = 1 / 60;
 
+/** Plays a match whenever the kick-off prompt opens (the UI does this when the player steps on the spot). */
+function kickoff(sim: Sim): void {
+  if (sim.prompt === 'podium') {
+    if (sim.podiumGraduate()) sim.decideGraduate('sell');
+    sim.dismissPrompt();
+  }
+  if (sim.prompt !== 'kickoff') return;
+  const m = sim.startMatch();
+  m.chances.forEach((_, i) => sim.resolveMatchChance(i, 0.6));
+  sim.finishCurrentMatch();
+}
+
 /** A player who follows the guide when it shows something and otherwise the best action (like a human who knows the game). */
 function play(sim: Sim, sec: number, onFrame?: () => void): void {
   for (let t = 0; t < sec; t += STEP) {
+    kickoff(sim);
     const o = sim.guide.objective ?? sim.objective;
     const c = sim.state.coach;
     sim.input.x = sim.input.z = 0;
@@ -32,25 +45,31 @@ describe('guide: fixed tutorial route, then hidden', () => {
       const k = e.objective ? `${e.mode}:${e.objective.key}` : `${e.mode}`;
       if (seen[seen.length - 1] !== k) seen.push(k);
     });
-    play(sim, 120);
+    play(sim, 240);
     const tut = seen.filter((k) => k.startsWith('tutorial:')).map((k) => k.slice(9));
-    // the route as the player sees it (save-up steps may appear when short of cash)
-    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock'];
+    // the route as the player sees it (save-up steps may appear when short of cash), then the team bus and the first
+    // match. While saving for the bus the guide shows whatever earns money; the office intro may cut in for a graduate.
+    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match'];
+    const always = ['obj.save_for', 'obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'tut.graduate'];
+    const earning = ['obj.collect_cash', 'obj.collect_fees', 'obj.podium'];
     let i = 0;
     for (const k of tut) {
-      while (i < order.length && !(order[i] as string).split('|').includes(k) && k !== 'obj.save_for' && k !== 'obj.sign' && k !== 'obj.grab_balls' && k !== 'obj.bring_balls') i++;
+      const free = (): boolean => always.includes(k) || (i >= 6 && earning.includes(k));
+      while (i < order.length && !(order[i] as string).split('|').includes(k) && !free()) i++;
       expect(i, `unexpected step ${k} in ${tut.join(' → ')}`).toBeLessThan(order.length);
     }
     expect(sim.state.pads.p_cones?.done).toBe(true);
     expect(sim.state.flags['tut:cones']).toBe(true);
+    expect(sim.state.flags['tut:match']).toBe(true);
     // after the route: nothing is forced on the player
     expect(['hidden', 'lost']).toContain(sim.guide.mode);
   });
 
   it('shows a hint when the player stands still, and hides it again on progress', () => {
     const sim = new Sim(createInitialState(AREA1, 7));
-    play(sim, 100);
-    expect(sim.state.flags['tut:cones']).toBe(true);
+    // play until the Sunday Park route (ending with the first match) is done, before the next feature intro is due
+    for (let t = 0; t < 240 && !sim.state.flags['tut:match']; t += 1) play(sim, 1);
+    expect(sim.state.flags['tut:match']).toBe(true);
     // stand still
     for (let t = 0; t < BALANCE.objectives.lostIdleSec + 0.5; t += STEP) {
       sim.input.x = sim.input.z = 0;
@@ -132,11 +151,7 @@ describe('guide: feature intros (office, match, safe)', () => {
         const up = sim.cheapestUpgrade();
         if (up && keys.has('tut.upgrade') && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
         sim.dismissPrompt();
-      } else if (sim.prompt === 'kickoff') {
-        const m = sim.startMatch();
-        m.chances.forEach((_, i) => sim.resolveMatchChance(i, 0.6));
-        sim.finishCurrentMatch();
-      }
+      } else kickoff(sim);
     });
     for (const k of ['tut.graduate', 'tut.upgrade', 'tut.match']) expect(keys.has(k), k).toBe(true);
     for (const f of ['graduate', 'upgrade', 'match']) expect(sim.state.flags['tut:' + f], f).toBe(true);

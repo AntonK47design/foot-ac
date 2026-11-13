@@ -30,6 +30,7 @@ import type { MatchUi } from '../ui/match-ui';
 import type { Hud } from '../ui/hud';
 import { icon } from '../ui/icons';
 import { LabelLayer, Popups, Projector, type ScreenPoint } from '../ui/labels';
+import { isCompact } from '../ui/compact';
 import type { Assets, CharacterKey } from './assets';
 import type { AudioSystem } from './audio';
 import { Batch } from './batch';
@@ -55,6 +56,10 @@ const MAX_BIBS = 160;
 const MAX_BILLS = 420;
 const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
+/** Phones: world-unit radii around the coach for the pad perk line, "+1 PAC" pops and trainee rating badges. */
+const NEAR_PERK = 3.5;
+const NEAR_STAT = 6;
+const NEAR_OVR = 7;
 /** Plot culling margins (m) around the camera focus: north = towards the screen top. */
 const PLOT_SEE_NORTH = 30;
 const PLOT_SEE_SOUTH = 20;
@@ -702,7 +707,7 @@ export class GameView {
     ev.on('rep', (e) => {
       const tr = this.sim.trainee(e.traineeId);
       if (!tr) return;
-      if (e.gain > 0) this.popups.text(tr.x, 1.9, tr.z, t('popup.stat', { n: e.gain, stat: t('stat.' + e.stat) }), 'stat');
+      if (e.gain > 0 && this.nearCoach(tr.x, tr.z, NEAR_STAT)) this.popups.text(tr.x, 1.9, tr.z, t('popup.stat', { n: e.gain, stat: t('stat.' + e.stat) }), 'stat');
     });
     ev.on('graduated', (e) => {
       const tr = this.sim.trainee(e.id);
@@ -1373,7 +1378,7 @@ export class GameView {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble">👕</div>`);
     } else if (tr.state === 'seated' && tr.waitT > BALANCE.trainee.moodWaitSec) {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<div class="bubble">⏳<span class="emo">😴</span></div>`);
-    } else {
+    } else if (this.nearCoach(x, z, NEAR_OVR)) {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${rc}">${ovr}</span>`);
     }
     return a;
@@ -1528,7 +1533,11 @@ export class GameView {
         this.fx.coins.spawn(s.coach.x, 1.4, s.coach.z, p.pos.x, 0.1, p.pos.z, 0.35);
         this.audio.play('coin', 0.8 + (paid / p.cost) * 0.6);
       }
-      if (!this.matchActive) this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford));
+      if (!this.matchActive) {
+        // phones: the perk line ("+25% transfer fees") only when the coach walks up to the pad
+        const perk = !isCompact() || Math.hypot(s.coach.x - p.pos.x, s.coach.z - p.pos.z) < NEAR_PERK;
+        this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford, perk));
+      }
     }
     for (const [id, pv] of this.pads) {
       if (seen.has(id)) continue;
@@ -1597,10 +1606,17 @@ export class GameView {
     return best ? { title: best.title, text: best.text, icon: this.iconUrl(best.icon) } : null;
   }
 
-  private padTag(p: PadDef, afford: boolean): string {
+  /** Phones show some world labels only around the coach (desktop: everywhere). */
+  private nearCoach(x: number, z: number, r: number): boolean {
+    if (!isCompact()) return true;
+    const c = this.sim.state.coach;
+    return (c.x - x) * (c.x - x) + (c.z - z) * (c.z - z) < r * r;
+  }
+
+  private padTag(p: PadDef, afford: boolean, showPerk = true): string {
     const rem = Math.ceil(this.sim.padRemaining(p));
     const name = p.unlock.type === 'staff' ? t('pad.hire', { name: t(p.nameKey) }) : t(p.nameKey);
-    const perk = p.unlock.type === 'object' ? perkText(p.unlock.id) : '';
+    const perk = showPerk && p.unlock.type === 'object' ? perkText(p.unlock.id) : '';
     return `<div class="pad2${afford ? ' ok' : ''}"><div class="pad2-price">${icon('cash')}<b>${formatCash(rem)}</b></div><div class="pad2-name">${icon(p.icon)}<i>${t('pad.unlock')}</i>${name}</div>${perk ? `<div class="pad2-perk">${perk}</div>` : ''}</div>`;
   }
 

@@ -1635,7 +1635,7 @@ export class Sim {
       // the cup doesn't reset the league timer; a win adds Scout Tickets
       s.meta.cupDay = Meta.dayKey(this.now, this.tz);
       if (r.outcome === 'win') s.tickets += BALANCE.meta.cup.tickets;
-    } else s.matchNextAt = s.time + BALANCE.match.interval;
+    } else s.matchNextAt = s.time + (s.records.matches <= BALANCE.match.earlyMatches ? BALANCE.match.earlyInterval : BALANCE.match.interval);
     if (r.seasonOver) {
       if (r.champion) s.records.titles++;
       const div = r.promoted ? s.league.division + 1 : s.league.division;

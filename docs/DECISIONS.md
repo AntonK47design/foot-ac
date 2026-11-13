@@ -292,3 +292,21 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
   - The landscape cover shows the whole image, with the logo in the sky on the right.
   - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
+
+## 86. First match in the first minute, more matches early, a quieter phone HUD (Playgama telemetry, Oct 16 – Nov 13)
+
+- **Why:** 74 % of sessions were still playing at 1 min but only 29 % at 10 min. The median first match came at 7:54 of play and only about half of new players ever played one. The economy bot built the team bus at about 2:00, so the pitch was there; nothing pointed real players to it. On phones, a level-up stacked three toasts over the coach, and six labelled side buttons covered about a quarter of the portrait width.
+- **Matches:**
+  - The Team Bus pad needs only the dribble cones (it used to need the second cones lane).
+  - Two required tutorial steps after the cones: build the Team Bus, play the first match. While the player is short of cash, the guide shows whatever earns it (fees, balls, the next sign-up) and leaves other pads out (`computeObjective(sim, focusPadId)`). A guide that only said "save up" at the pad soft-locked the scripted test player.
+  - The graduate intro may still cut in before the bus. The upgrade intro now waits until after the first match, so it doesn't spend the bus money.
+  - Gap between matches: 100 s after each of the first 5 matches, 150 s after that (was 180 s). With 90 s, one focused-bot seed had nothing affordable for 81 s; 100 s passes every check.
+  - In the economy bot, a focused player may now reach the Training Ground from 5:30 (was 7:00). Earlier is the goal: most real sessions ended before minute 10.
+- **Phone HUD** (`ui/compact.ts`: portrait ≤ 760 px wide or landscape ≤ 460 px tall):
+  - Toasts that arrive within 1.2 s share one card, one line each, up to 3 lines. Phones show one card at a time; the rest wait, and anything older than 5 s is dropped.
+  - Side buttons are icon only (52 px). The Hall of Fame uses the star icon, so it isn't a second trophy next to League.
+  - Daily, Quests, Scout, Cup, the Hall of Fame, League, Squad and the ticket counter appear only once the first match is played. The Scout badge shows only when a mission can actually start.
+  - The star bar hides when it's full.
+  - World labels: a pad's perk line only when the coach is within 3.5 m; "+1 PAC" pops within 6 m of the coach; idle rating badges within 7 m. Labels that would be cut off at the side edges, or that sit under the top HUD band, are hidden (desktop dims those under the band, as before).
+- **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
+- **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).

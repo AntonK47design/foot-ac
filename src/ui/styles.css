@@ -2254,3 +2254,41 @@ body {
 .info-card.hidden {
   display: none;
 }
+
+/* ── phone declutter: one toast card with a line per message; icon-only side buttons ── */
+.toast-line {
+  display: block;
+}
+.toast-line + .toast-line {
+  margin-top: 2px;
+  font-size: 0.88em;
+}
+@media (orientation: portrait) and (max-width: 760px), (orientation: landscape) and (max-height: 460px) {
+  .btn-side {
+    width: 52px;
+    min-height: 52px;
+    border-radius: 14px;
+    padding: 2px;
+  }
+  .btn-side svg {
+    width: 28px;
+    height: 28px;
+  }
+  .btn-side .bs-label,
+  .btn-side > span:not(.bs-label) {
+    display: none;
+  }
+  .hud-side {
+    gap: 8px;
+  }
+  .bs-badge {
+    top: -7px;
+    right: -7px;
+    min-width: 20px;
+    height: 20px;
+    line-height: 16px;
+  }
+  .toast {
+    padding: 6px 14px;
+  }
+}

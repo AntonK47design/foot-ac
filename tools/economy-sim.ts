@@ -41,9 +41,10 @@ function checksFor(r: BotReport, strict: boolean): Check[] {
   const avg610 = 240 / Math.max(1, n610);
   out.push({ name: 'avg purchase gap 6–10 min ≥ 18s', ok: avg610 >= 18, detail: `${avg610.toFixed(1)}s` });
   out.push({ name: '≥ 15 unlocks by 10:00 (pads + upgrades)', ok: [...r.unlockTimes, ...r.upgradeTimes].filter((t) => t <= 600).length >= 15, detail: String([...r.unlockTimes, ...r.upgradeTimes].filter((t) => t <= 600).length) });
-  // M6: the Training Ground opens around minute 12 and carries the session to ~minute 35
+  // M6: the Training Ground opens around minute 10 and carries the session to ~minute 35. A focused player may get
+  // there from 5:30: telemetry showed most real sessions end before minute 10, so earlier is fine (DECISIONS #86)
   const gate = r.marks['unlock:p2_gate'];
-  const [g0, g1] = strict ? [420, 960] : [420, 1080];
+  const [g0, g1] = strict ? [330, 960] : [420, 1080];
   out.push({ name: `Training Ground opens ${fmt(g0)}–${fmt(g1)}`, ok: gate !== undefined && gate >= g0 && gate <= g1, detail: gate === undefined ? 'never' : fmt(gate) });
   if (r.sim.state.time >= 2400) {
     const done = r.areaDoneAt[2];

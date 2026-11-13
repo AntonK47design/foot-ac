@@ -24,7 +24,8 @@ export interface Objective {
  * the next pad → starving station → sign → refill → collect → save up.
  * This also drives the economy bot, so it must always return something sensible.
  */
-export function computeObjective(sim: Sim): Objective | null {
+/** `focusPadId`: the tutorial wants this pad next, so other pads are left out (the money goes to it). */
+export function computeObjective(sim: Sim, focusPadId?: string): Objective | null {
   const s = sim.state;
   const c = s.coach;
   const area = sim.area;
@@ -35,7 +36,8 @@ export function computeObjective(sim: Sim): Objective | null {
     if (p && p.amount > 0) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
-  const pads = sim.visiblePads();
+  const visible = sim.visiblePads();
+  const pads = focusPadId ? visible.filter((p) => p.id === focusPadId) : visible;
   let cheapest = null as (typeof pads)[number] | null;
   for (const p of pads) if (!cheapest || sim.padRemaining(p) < sim.padRemaining(cheapest)) cheapest = p;
 
