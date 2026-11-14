@@ -37,7 +37,7 @@ function play(sim: Sim, sec: number, onFrame?: () => void): void {
   }
 }
 
-describe('guide: fixed tutorial route, then hidden', () => {
+describe('guide: fixed tutorial route, then a steady goal', () => {
   it('walks the Sunday Park route in order without jumping around', () => {
     const sim = new Sim(createInitialState(AREA1, 12345));
     const seen: string[] = [];
@@ -61,8 +61,8 @@ describe('guide: fixed tutorial route, then hidden', () => {
     expect(sim.state.pads.p_cones?.done).toBe(true);
     expect(sim.state.flags['tut:cones']).toBe(true);
     expect(sim.state.flags['tut:match']).toBe(true);
-    // after the route: nothing is forced on the player
-    expect(['hidden', 'lost']).toContain(sim.guide.mode);
+    // after the route: one steady next goal (or the lost hint), never the route again
+    expect(['goal', 'lost']).toContain(sim.guide.mode);
   });
 
   it('shows a hint when the player stands still, and hides it again on progress', () => {
@@ -83,10 +83,29 @@ describe('guide: fixed tutorial route, then hidden', () => {
     sim.events.on('guideChanged', () => flips++);
     for (let t = 0; t < BALANCE.objectives.lostRefreshSec - 1; t += STEP) sim.tick(STEP);
     expect(flips).toBe(0);
-    // progress hides it
+    // progress hides it: back to the steady goal
     sim.events.emit('signed', { id: 0, fee: 0 });
-    expect(sim.guide.mode).toBe('hidden');
-    expect(sim.guide.objective).toBeNull();
+    expect(sim.guide.mode).toBe('goal');
+    expect(['obj.unlock', 'obj.save_for', 'obj.kickoff', 'obj.podium']).toContain(sim.guide.objective?.key);
+  });
+
+  it('after the route the goal is steady: no chores, it changes only when a goal is reached', () => {
+    const sim = new Sim(createInitialState(AREA1, 12345));
+    for (let t = 0; t < 240 && !sim.state.flags['tut:match']; t += 1) play(sim, 1);
+    expect(sim.state.flags['tut:match']).toBe(true);
+    const goals: string[] = [];
+    let reached = 0;
+    for (const e of ['unlocked', 'matchFinished', 'sold', 'promoted', 'upgraded'] as const) sim.events.on(e, () => reached++);
+    sim.events.on('guideChanged', (e) => {
+      if (e.mode === 'goal' && e.objective) goals.push(`${e.objective.key}:${e.objective.targetId}`);
+    });
+    play(sim, 180);
+    const chores = ['obj.grab_balls', 'obj.bring_balls', 'obj.collect_cash', 'obj.collect_fees', 'obj.sign', 'obj.meet_first'];
+    expect(goals.length).toBeGreaterThan(0);
+    for (const g of goals) expect(chores, g).not.toContain(g.split(':')[0]);
+    // a different target only after something was reached (bought, played, decided); the lost hint may come and go
+    const targets = goals.map((g) => g.split(':')[1]).filter((x, i, a) => i === 0 || x !== a[i - 1]);
+    expect(targets.length).toBeLessThanOrEqual(reached + 1);
   });
 
   it('old saves skip steps they have already done', () => {

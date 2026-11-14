@@ -1,14 +1,15 @@
 import { BALANCE } from '../data/balance';
-import { computeObjective, type Objective } from './objectives';
+import { computeObjective, goalObjective, type Objective } from './objectives';
 import type { Sim } from './sim';
 import { currentStep } from './tutorial';
 
-export type GuideMode = 'tutorial' | 'lost' | 'hidden';
+export type GuideMode = 'tutorial' | 'goal' | 'lost' | 'hidden';
 
 /**
  * What the player is told to do (objective pill + guide arrow).
  * - tutorial: the fixed route (sim/tutorial.ts), step by step;
- * - otherwise hidden, so the player plans their own route;
+ * - goal: after a route, one steady next goal in the pill (match ready, graduate waiting, the next pad), changing
+ *   only when it is reached; no bouncing arrow (only the edge pointer while it is off screen);
  * - lost: after standing still or a long stretch without progress, the best next thing is shown and stays put
  *   (re-picked at most every `lostRefreshSec`) until the player makes progress.
  * Pure sim logic: the host reads `objective` / `mode` and listens for 'guideChanged'.
@@ -37,7 +38,7 @@ export class Guide {
 
   private progress(): void {
     this.sinceProgress = 0;
-    if (this.mode === 'lost') this.set('hidden', null);
+    if (this.mode === 'lost') this.set('goal', goalObjective(this.sim));
   }
 
   private set(mode: GuideMode, o: Objective | null): void {
@@ -73,6 +74,6 @@ export class Guide {
       this.set('lost', computeObjective(sim));
       return;
     }
-    if (this.mode !== 'hidden') this.set('hidden', null);
+    this.set('goal', goalObjective(sim));
   }
 }

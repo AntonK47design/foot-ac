@@ -310,3 +310,14 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   - World labels: a pad's perk line only when the coach is within 3.5 m; "+1 PAC" pops within 6 m of the coach; idle rating badges within 7 m. Labels that would be cut off at the side edges, or that sit under the top HUD band, are hidden (desktop dims those under the band, as before).
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
+
+## 87. A steady "next goal" after the tutorial instead of nothing
+
+- **Why:** after the last route step the pill and arrow switched off (#72). They came back only after 8 s standing still or 20 s without progress, and disappeared again on the next bit of progress. In the live build the route ended at the cones (about minute 1); sessions fell from 74 % at 1 min to 52 % at 3 min. Player feedback: "players drop off after the first game without knowing what's next".
+- **New `goal` mode** (`sim/guide.ts`, `goalObjective()` in `sim/objectives.ts`). Once a route is done, the pill always shows one goal, in this order:
+  1. a match that is ready ("Board the team bus!");
+  2. a graduate waiting in the office;
+  3. otherwise the cheapest pad still to build ("Save up: X", then "Unlock X").
+- **Steady:** it never switches to small chores (balls, cash, sign-ups), so it changes only when the goal is reached. #72's playtest complaint was exactly that flicker. A unit test checks there are no chores and that the target changes only after something was reached.
+- **Calm:** no bouncing 3D arrow in goal mode, only the edge pointer while the target is off screen. The "lost" hint (arrow and the best small action) still comes after 8 s idle or 20 s without progress, and goes back to the goal on progress.
+- **Build:** `BUILD` 0.8.1.
