@@ -136,12 +136,12 @@ test.describe('desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('after the first graduate is sold, the office offers a free first upgrade', async ({ page }) => {
+  test('after the first match, the office offers a free first upgrade', async ({ page }) => {
     const errors = attachConsole(page);
     await page.goto('/');
     await waitForGameplay(page);
     type S = { state: { flags: Record<string, boolean>; records: { matches: number; sold: number }; cash: number; upgrades: Record<string, number>; coach: { x: number; z: number; px: number; pz: number } }; area: { office: { computer: { x: number; z: number } } } };
-    // everything before the last tutorial step done: Sunday Park up to the bus, a match played, a graduate sold
+    // everything before the last tutorial step done: Sunday Park up to the bus, the first match played
     await page.evaluate(() => {
       const sim = window.__wk!.sim as unknown as S & { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> } };
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_match']) sim.unlockPad(sim.world.pads.get(id));

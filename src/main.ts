@@ -310,6 +310,7 @@ async function boot(): Promise<void> {
     }));
     return {
       cash: sim.state.cash,
+      freeUpgrade: sim.firstUpgradeFree(),
       waiting: sim.state.podiumQueue.length,
       rows,
       ad: officeAd(),

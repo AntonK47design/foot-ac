@@ -69,24 +69,12 @@ export const TUTORIAL: TutorialStep[] = [
       return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
     },
   },
-  // then the rest of the loop, each taught once: a graduate is sold or joins the squad, the first office upgrade
-  {
-    id: 'sell',
-    done: (s) => s.state.records.sold + s.state.records.promoted > 0,
-    objective: (s) => {
-      const g = s.podiumGraduate();
-      return g ? officeObjective(s, 'tut.graduate', g) : earn(s, 'tut.fees_grad');
-    },
-  },
+  // right after the first match: the office, with a free first upgrade (one clear target, nothing to wait for). Selling
+  // is taught by the 'graduate' intro above the moment the first graduate waits; no chores while waiting for one.
   {
     id: 'upgrade',
     done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
-    // the first upgrade is free (Sim.firstUpgradeFree): straight to the office, no saving up
-    objective: (s) => {
-      if (s.firstUpgradeFree()) return officeObjective(s, 'tut.upgrade_free');
-      const up = s.cheapestUpgrade();
-      return up && s.state.cash + 1e-6 >= up.cost ? officeObjective(s, 'tut.upgrade') : earn(s, 'tut.fees_upgrade');
-    },
+    objective: (s) => officeObjective(s, s.firstUpgradeFree() ? 'tut.upgrade_free' : 'tut.upgrade'),
   },
   {
     id: 'safe',
@@ -126,26 +114,66 @@ function isVisible(sim: Sim, padId: string): boolean {
   return !!p && sim.isPadVisible(p);
 }
 
+/** The earning task the route is showing: it stays until it is done, so the pill doesn't jump between chores. */
+interface EarnTask {
+  kind: 'balls' | 'sign' | 'fees';
+  /** Station (balls) or pile id (fees). */
+  id: string;
+  /** The coach has held balls for this run (it is done once they're delivered). */
+  carried: boolean;
+}
+const earnTasks = new WeakMap<Sim, EarnTask>();
+
+function earnTaskDone(sim: Sim, task: EarnTask): boolean {
+  const s = sim.state;
+  if (task.kind === 'sign') return !sim.deskTrainee() || !sim.canSign() || sim.hasStaff('receptionist');
+  if (task.kind === 'fees') return (sim.pile(task.id)?.amount ?? 0) < 1;
+  const ss = s.stations[task.id];
+  const full = !ss || ss.balls >= sim.station(task.id).cfg.basketCap;
+  if (s.coach.carry > 0) task.carried = true;
+  // delivered (or the basket filled up / the ball boy took over): done
+  return (task.carried && s.coach.carry === 0) || (full && (s.coach.carry === 0 || task.carried)) || sim.hasStaff('ball_boy');
+}
+
+function earnTaskObjective(sim: Sim, task: EarnTask, feesKey: string): Objective | null {
+  if (task.kind === 'balls') return ballObjective(sim, task.id);
+  if (task.kind === 'fees') return pileObjective(sim, task.id, feesKey);
+  const dt = sim.deskTrainee();
+  const sp = sim.area.desk.coachSpot;
+  return dt ? { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius } : null;
+}
+
 /**
- * How a new academy earns money, one thing at a time: finish a ball run, sign the player waiting at the desk, refill an
- * empty basket, else collect the fees (`feesKey` says what the money is for).
+ * How a new academy earns money, one task at a time, each kept until it is done: finish a ball run, sign the player
+ * waiting at the desk, refill an empty basket, else collect the fees (`feesKey` says what the money is for).
  */
 function earn(sim: Sim, feesKey: string): Objective | null {
+  const cur = earnTasks.get(sim);
+  if (cur && !earnTaskDone(sim, cur)) {
+    const o = earnTaskObjective(sim, cur, feesKey);
+    if (o) return o;
+  }
+  const task = nextEarnTask(sim);
+  if (!task) {
+    earnTasks.delete(sim);
+    return pileObjective(sim, 'st:shooting_goal', feesKey);
+  }
+  earnTasks.set(sim, task);
+  return earnTaskObjective(sim, task, feesKey);
+}
+
+function nextEarnTask(sim: Sim): EarnTask | null {
   const s = sim.state;
   // (a ball run only while some basket can take balls: with every basket full the coach would wait forever)
   const needy = s.coach.carry > 0 && sim.coachCarryKind() === 'ball' ? sim.neediestStation(1, undefined, 'ball') : null;
-  if (needy) return ballObjective(sim, needy);
-  const dt = sim.deskTrainee();
-  if (dt && sim.canSign() && !sim.hasStaff('receptionist')) {
-    const sp = sim.area.desk.coachSpot;
-    return { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
-  }
+  if (needy) return { kind: 'balls', id: needy, carried: true };
+  if (sim.deskTrainee() && sim.canSign() && !sim.hasStaff('receptionist')) return { kind: 'sign', id: 'desk', carried: false };
   if (!sim.hasStaff('ball_boy')) {
-    for (const t of s.trainees) if (t.stationId && sim.isWaitingForBalls(t) && sim.station(t.stationId).supply === 'ball') return ballObjective(sim, t.stationId);
+    for (const t of s.trainees) if (t.stationId && sim.isWaitingForBalls(t) && sim.station(t.stationId).supply === 'ball') return { kind: 'balls', id: t.stationId, carried: false };
   }
   let best = null as (typeof s.piles)[number] | null;
   for (const p of s.piles) if (p.amount >= BALANCE.objectives.minPileWorth && (!best || p.amount > best.amount)) best = p;
-  return pileObjective(sim, best?.id ?? 'st:shooting_goal', feesKey);
+  return best ? { kind: 'fees', id: best.id, carried: false } : null;
 }
 
 function canAffordPad(sim: Sim, padId: string): boolean {

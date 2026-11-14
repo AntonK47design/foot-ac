@@ -2318,3 +2318,15 @@ body {
 .wn-go {
   width: 100%;
 }
+
+/* tutorial: the free first upgrade */
+.free-banner {
+  margin: 0 0 10px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: linear-gradient(#ffcf4a, #f0a21a);
+  color: #4a2c00;
+  font-family: var(--display);
+  font-size: 16px;
+  text-align: center;
+}

@@ -782,12 +782,12 @@ export class Sim {
   }
 
   /**
-   * The tutorial's office lesson: once the first graduate has been sold or promoted, the first upgrade is free (the
-   * cheapest ones cost $550+, out of reach at minute 2–3 while cash drains into pads on the way).
+   * The tutorial's office lesson: after the first match the first upgrade is free (the cheapest ones cost $550+, out of
+   * reach at minute 1–3 while cash drains into pads on the way).
    */
   firstUpgradeFree(): boolean {
     const s = this.state;
-    if (s.records.sold + s.records.promoted === 0) return false;
+    if (s.records.matches === 0) return false;
     for (const id in s.upgrades) if ((s.upgrades[id] ?? 0) > 0) return false;
     return true;
   }

@@ -348,6 +348,8 @@ export interface OfficeData {
   transfer: PodiumInfo | null;
   waiting: number;
   rows: UpgradeRow[];
+  /** The tutorial's free first upgrade is waiting (Sim.firstUpgradeFree). */
+  freeUpgrade: boolean;
   /** Rewarded "▶ Get $X" when short on cash. */
   ad?: AdOffer | null;
 }
@@ -372,7 +374,8 @@ export class OfficePanel extends Panel {
   open(data: () => OfficeData, cb: { sell(): void; promote(): void; buy(id: string): void }): void {
     this.data = data;
     this.cb = cb;
-    this.tab = data().transfer ? 'transfers' : this.tab === 'transfers' ? 'coach' : this.tab;
+    const d0 = data();
+    this.tab = d0.transfer ? 'transfers' : d0.freeUpgrade || this.tab === 'transfers' ? 'coach' : this.tab;
     this.title.textContent = t('office.title');
     this.render();
     this.show();
@@ -399,6 +402,11 @@ export class OfficePanel extends Panel {
       });
       this.tabsEl.appendChild(b);
     }
+    // decided on the last graduate while the free first upgrade waits: go straight to the upgrades
+    if (this.tab === 'transfers' && !d.transfer && d.freeUpgrade) {
+      this.tab = 'coach';
+      return this.render();
+    }
     const c = this.content;
     c.innerHTML = '';
     if (this.tab === 'transfers') {
@@ -417,6 +425,12 @@ export class OfficePanel extends Panel {
       row.appendChild(button(t('podium.promote'), 'promote', () => cb.promote(), sub));
       c.appendChild(row);
       return;
+    }
+    if (d.freeUpgrade) {
+      const fb = document.createElement('div');
+      fb.className = 'free-banner';
+      fb.textContent = t('office.free_banner');
+      c.appendChild(fb);
     }
     const adEl = adElement(d.ad, () => this.render(), 'office-ad');
     if (adEl) c.appendChild(adEl);

@@ -68,9 +68,9 @@ describe('guide: fixed tutorial route, then hidden', () => {
     // the route as the player sees it, in order: the basics, the team bus and the first match, a graduate sold, the first
     // upgrade. While the next step needs money it shows how to earn it (sign, balls, fees: never a bare "save up");
     // the office intro may cut in early once a graduate waits.
-    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.graduate', 'tut.upgrade_free|tut.upgrade'];
+    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.upgrade_free'];
     const always = ['obj.save_for', 'obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'tut.graduate'];
-    const earning = ['obj.collect_cash', 'obj.collect_fees', 'tut.fees_bus', 'tut.fees_grad', 'tut.fees_upgrade'];
+    const earning = ['obj.collect_cash', 'obj.collect_fees', 'tut.fees_bus'];
     let i = 0;
     for (const k of tut) {
       const free = (): boolean => always.includes(k) || (i >= 6 && earning.includes(k));
@@ -78,8 +78,11 @@ describe('guide: fixed tutorial route, then hidden', () => {
       expect(i, `unexpected step ${k} in ${tut.join(' → ')}`).toBeLessThan(order.length);
     }
     expect(tut, 'never a bare "save up" in Sunday Park').not.toContain('obj.save_for');
+    // after the first match: straight to the free upgrade (and the sell intro if a graduate waits), never a chore
+    const after = tut.slice(tut.indexOf('tut.match') + 1);
+    for (const k of after) expect(['tut.upgrade_free', 'tut.graduate'], `after the match: ${tut.join(' → ')}`).toContain(k);
     expect(sim.state.pads.p_cones?.done).toBe(true);
-    for (const f of ['cones', 'pitch', 'match', 'sell', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
+    for (const f of ['cones', 'pitch', 'match', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
     // after the route: nothing is forced on the player
     expect(['hidden', 'lost']).toContain(sim.guide.mode);
   });
@@ -174,20 +177,19 @@ describe('guide: feature intros (office, match, safe)', () => {
     });
     // (the free first upgrade is usually taken in the same office visit as the sale: the panel stays open on its upgrades)
     for (const k of ['tut.graduate', 'tut.match']) expect(keys.has(k), k).toBe(true);
-    for (const f of ['sell', 'upgrade', 'match']) expect(sim.state.flags['tut:' + f], f).toBe(true);
+    for (const f of ['graduate', 'upgrade', 'match']) expect(sim.state.flags['tut:' + f], f).toBe(true);
   });
 });
 
 describe('tutorial: the first upgrade is free', () => {
-  it('is free once a graduate was sold, only for the first purchase, and the route points at the office', () => {
+  it('is free after the first match, only for the first purchase, and the route points at the office', () => {
     const sim = new Sim(createInitialState(AREA1, 21));
     const up = sim.cheapestUpgrade();
     expect(up?.cost).toBeGreaterThan(0);
-    sim.state.records.sold = 1;
+    sim.state.records.matches = 1;
     expect(sim.firstUpgradeFree()).toBe(true);
     expect(sim.cheapestUpgrade()?.cost).toBe(0);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'sell']) sim.state.flags['tut:' + k] = true;
-    sim.state.records.matches = 1;
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.upgrade_free');
     const cash = sim.state.cash;

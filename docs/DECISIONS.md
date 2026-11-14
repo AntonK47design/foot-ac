@@ -311,31 +311,35 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
 
-## 87. A longer tutorial that teaches the whole loop, a "What's next?" card after the first match, a free first upgrade
+## 87. The tutorial teaches the loop up to the first match, then a free first upgrade; a "What's next?" card after the match
 
-- **Why:** after the step-by-step part, players didn't know they had to keep bringing balls, sell graduates or buy upgrades (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). Two earlier attempts were dropped:
+- **Why:** after the step-by-step part, players didn't know they had to keep bringing balls, sell graduates or buy upgrades (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). Rejected along the way:
   - a permanent "next goal" pill, which still told players exact steps (#72's playtest already rejected that);
-  - a bare "Save up: Team Bus" step, which gave players nothing to do.
-- **Route after the Dribble Cones** (`sim/tutorial.ts`), each step taught once, in order:
+  - a bare "Save up: Team Bus" step, which gave players nothing to do;
+  - after the first match, cycling "collect fees / sign / bring balls" while waiting for a graduate and the money for an upgrade. The developer's playtest: "it jumps around a lot and never tells the player to upgrade".
+- **Route after the Dribble Cones** (`sim/tutorial.ts`):
   1. Team Bus;
   2. first match;
-  3. **sell or promote the first graduate** (now required);
-  4. **the first office upgrade** (now required).
-  - The office intro can still cut in earlier when a graduate is waiting.
-- **No "Save up" in Sunday Park:** while a step needs money or a graduate, it shows how to earn, in this order:
-  1. finish a ball run, but only while some basket can take balls (with every basket full the coach would wait forever: a stuck case found in testing);
-  2. sign the player waiting at the desk;
-  3. refill an empty basket;
-  4. collect the biggest fee pile.
-  - The pill says what the money is for: "Collect fees for the Team Bus", "…while they train to graduate".
+  3. **"Office: pick a free upgrade"** (required).
+  - Then the route is done.
+  - Selling is taught by the existing graduate intro ("Office: sell {name} or add to your squad") the moment the first graduate waits, before or after the upgrade. No chores while waiting for one.
+- **Earning for the Team Bus** (the only place the route shows chores), never a bare "save up":
+  - The order is: finish a ball run, sign the waiting player, refill an empty basket, collect the biggest fee pile. The pill says "Collect fees for the Team Bus".
+  - **Each task stays until it is done:** a ball run until the balls are delivered (or the basket is full), a sign-up until signed, a fee pile until collected. Only then is the next one picked. It used to re-pick every frame and jumped.
+  - A ball run shows only while some basket can take balls. With every basket full the coach would wait forever: a stuck case found in testing.
   - The Training Ground and Youth Stadium gate steps still say "Save up", with the lost hint after 8 s idle or 20 s without progress.
-- **First upgrade free** (`Sim.firstUpgradeFree`, the developer's choice over a cheaper first level or naming the price):
-  - The cheapest upgrades cost $550–600. At minute 2–3 that kept the route on "Collect fees for an upgrade" for minutes, while walking across pads paid the cash into them.
-  - Once a graduate has been sold or promoted and nothing has been bought yet, every first level costs $0. The office shows "Free" and the pill says "Office: pick a free upgrade".
-  - It is usually taken in the same office visit as the sale: the panel stays open on its upgrades. Prices are normal again after that purchase.
-- **"What's next?" card** (`WhatsNextPanel`): once, right after the first match's results, as soon as nothing else is open. With the "League table" button it comes after the table. This is what the developer asked for; the tutorial then goes on to selling and the upgrade.
+- **First upgrade free** (`Sim.firstUpgradeFree`, the developer's choice):
+  - It applies once the first match has been played and nothing has been bought yet. The cheapest upgrades cost $550–600, out of reach at minute 1–3 while walking across pads pays the cash into them.
+  - Every first level costs $0, and the office shows "Free" with a banner, "Your first upgrade is free: pick one!".
+  - The office opens on its upgrades, also right after deciding on the last waiting graduate, so a new player doesn't need to find the tabs.
+  - Prices are normal after that purchase.
+- **"What's next?" card** (`WhatsNextPanel`): once, right after the first match's results, as soon as nothing else is open. With "League table" it comes after the table.
   - Four lines explain the loop. Saved as `flags.whatsNextSeen`. Analytics event: `whats_next`.
   - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the route is done (`tut:upgrade`).
-- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, panels clicked like a player. The first match came at about 1:00, the card after its results, the first graduate sold at about 1:55, and the free upgrade in the same office visit ended the tutorial.
-  - The unit route test walks the whole route with a player that follows full nav paths, checks every step in order, and checks that Sunday Park never shows "Save up". Further unit and e2e tests cover the free upgrade and the card.
-- **Build:** `BUILD` 0.8.4.
+- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys; the office was handled without clicking any tabs, like a new player.
+  - The first match came at about 1:10. After its results: the card, then "Office: pick a free upgrade". The office opened on the upgrades with the banner, the free upgrade was taken, and the tutorial was done at about 1:17 of sim time.
+  - A unit test checks that after the first match the route shows only the free upgrade (or the sell intro), never a chore.
+- **Economy bot** (`npm run sim`):
+  - The free upgrade makes the early game a little faster. A distracted bot may now open the Training Ground from 6:00 (was 7:00), matching #86's 5:30 for a focused bot. One seed opened it at 6:37.
+  - Bug fix in the "never > 85 s with nothing affordable" check: it ran right after the bot's purchases in the same tick, so a run buying an upgrade every ~30 s while saving for the Youth Stadium gate counted as an 88 s dead stretch. A purchase in that tick now counts as affordable.
+- **Build:** `BUILD` 0.8.5.
