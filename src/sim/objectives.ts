@@ -178,27 +178,6 @@ export function computeObjective(sim: Sim, focusPadId?: string): Objective | nul
   return null;
 }
 
-/**
- * The steady "what's next" goal after the tutorial: a match that is ready, a graduate waiting in the office, else the
- * cheapest pad still to build. Unlike `computeObjective` it never switches to small chores (balls, cash, sign-ups),
- * so the pill only changes when the goal is reached.
- */
-export function goalObjective(sim: Sim): Objective | null {
-  const area = sim.area;
-  if (sim.matchAvailable()) {
-    const K = area.matchPitch.kickoff;
-    return { key: 'obj.kickoff', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
-  }
-  const grad = sim.podiumGraduate();
-  if (grad) {
-    const P = area.office.computer;
-    return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
-  }
-  let next = null as ReturnType<Sim['visiblePads']>[number] | null;
-  for (const p of sim.visiblePads()) if (!next || sim.padRemaining(p) < sim.padRemaining(next)) next = p;
-  return next ? padObjective(sim, next.id) : null;
-}
-
 /** The coach has to run this supply: its source is built and no runner (ball boy / water carrier / kit manager) does it. */
 function needsCoach(sim: Sim, supply: Supply): boolean {
   if (!sim.supplySource(supply)) return false;

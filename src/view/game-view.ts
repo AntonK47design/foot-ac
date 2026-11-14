@@ -1640,7 +1640,7 @@ export class GameView {
   }
 
   private updateArrow(cx: number, cz: number): void {
-    // the guide decides what's shown: the tutorial route, the next goal, or a hint when the player looks lost
+    // the guide decides what's shown: the tutorial route, or a hint when the player looks lost
     const o = this.sim.guide.objective;
     const edge = this.hud.edge;
     if (!o) {
@@ -1649,9 +1649,7 @@ export class GameView {
       return;
     }
     const near = Math.hypot(o.x - cx, o.z - cz) < o.radius * 0.8;
-    // the steady goal after the tutorial is calm: no bouncing arrow, only the edge pointer while it is off screen
-    const calm = this.sim.guide.mode === 'goal';
-    this.arrow.visible = !near && !calm;
+    this.arrow.visible = !near;
     this.arrow.position.set(o.x, 1.9 + Math.abs(Math.sin(this.time * 4)) * 0.4, o.z);
     // face the camera (camera never rotates); tilt back so it reads from the 52° view
     this.arrow.rotation.set(-0.5, 0, 0);
