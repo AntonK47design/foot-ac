@@ -19,8 +19,8 @@ test.describe('M4 meta', () => {
         claimDaily(): unknown;
       };
       sim.state.level = 2;
-      // past the first-session route (the meta buttons show from the first match on)
-      sim.state.flags['tut:match'] = true;
+      // past the first-session route (the meta buttons show once it ends with the first upgrade)
+      sim.state.flags['tut:upgrade'] = true;
       sim.state.staff.push({ ...sim.state.coach, id: 'ball_boy', kind: 'ball_boy', state: 'idle', carry: 0, target: null, timer: 0, goal: null, path: [], pathI: 0, stuckT: 0, bestD: 0, moving: false });
       sim.state.meta.incomeRate = 2;
       sim.now = (wk.clock as { now(): number }).now();
@@ -57,7 +57,7 @@ test.describe('M4 meta', () => {
     await page.evaluate(() => {
       const sim = window.__wk!.sim as { state: { level: number; tickets: number; flags: Record<string, boolean>; meta: { album: Record<string, number> } }; updateMeta(): void };
       sim.state.level = 7;
-      sim.state.flags['tut:match'] = true;
+      sim.state.flags['tut:upgrade'] = true;
       sim.state.tickets = 3;
       sim.state.meta.album = { 'FW:common': 2, 'MF:rare': 1 };
       sim.updateMeta();
@@ -96,7 +96,7 @@ test.describe('M4 meta', () => {
       opts.adMs = 300;
       const sim = wk.sim as { state: { level: number; flags: Record<string, boolean>; meta: { daily: { claims: number } } } };
       sim.state.level = 2;
-      sim.state.flags['tut:match'] = true;
+      sim.state.flags['tut:upgrade'] = true;
       sim.state.meta.daily.claims = 1; // day 2 = 1 ticket
     });
     const tickets0 = await page.evaluate(() => (window.__wk!.sim as { state: { tickets: number } }).state.tickets);

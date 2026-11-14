@@ -216,6 +216,7 @@ async function boot(): Promise<void> {
   const officePanel = new OfficePanel(gameEl, panelHooks);
   const resultsPanel = new ResultsPanel(gameEl, panelHooks);
   const whatsNextPanel = new WhatsNextPanel(gameEl, panelHooks);
+  let whatsNextDue = false;
   const squadPanel = new SquadPanel(gameEl, panelHooks);
   const leaguePanel = new LeaguePanel(gameEl, panelHooks);
   const matchUi = new MatchUi(gameEl);
@@ -365,15 +366,9 @@ async function boot(): Promise<void> {
           blockers.delete('match');
           refreshPause();
           updateHint();
-          // the step-by-step tutorial ends with the first match: explain the loop once, then the HUD stays clean
-          if (firstMatch) {
-            analytics.once('whats_next');
-            whatsNextPanel.open(() => then?.());
-            return;
-          }
           then?.();
           // midgame only at this natural break, never after the very first match or when a rewarded ad was watched here
-          if (!rewardedAtBreak) void ads.midgame();
+          if (!firstMatch && !rewardedAtBreak) void ads.midgame();
         };
         if (!r) return release();
         resultsPanel.open(
@@ -560,8 +555,8 @@ async function boot(): Promise<void> {
     if (metaHudT > 0) return;
     metaHudT = 0.25;
     const st = sim.state;
-    // a new academy sees only the core loop: the meta buttons appear once the Sunday Park route (up to the first match) is done
-    const route = !!st.flags['tut:match'];
+    // a new academy sees only the core loop: the meta buttons appear once the Sunday Park route (up to the first upgrade) is done
+    const route = !!st.flags['tut:upgrade'];
     hud.setTickets(st.tickets, route && (st.tickets > 0 || Meta.unlocked(st, 'daily')));
     const qn = Meta.questsClaimable(st);
     hud.setButton('quests', route && Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
@@ -593,7 +588,11 @@ async function boot(): Promise<void> {
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
-  sim.events.on('tutorialStep', (e) => analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) }));
+  sim.events.on('tutorialStep', (e) => {
+    analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
+    // the Sunday Park route ends with the first upgrade: explain the loop once (not for old saves that pass the step on load)
+    if (e.id === 'upgrade' && !sim.state.flags.whatsNextSeen && sim.state.records.matches <= 3) whatsNextDue = true;
+  });
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());
@@ -680,7 +679,14 @@ async function boot(): Promise<void> {
       const as = sim.areaStars();
       hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
-      const route = !!sim.state.flags['tut:match'];
+      // "What's next?" once the route is done, as soon as nothing else is open (e.g. after the office panel closes)
+      if (whatsNextDue && blockers.size === 0 && !view.matchActive) {
+        whatsNextDue = false;
+        sim.state.flags.whatsNextSeen = true;
+        analytics.once('whats_next');
+        whatsNextPanel.open(() => undefined);
+      }
+      const route = !!sim.state.flags['tut:upgrade'];
       hud.setSideButtons(route && (sim.state.squad.length > 0 || sim.state.records.promoted > 0), route && !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;

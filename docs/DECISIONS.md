@@ -311,15 +311,27 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
 
-## 87. One "What's next?" card after the first match; the save-up step stays put
+## 87. A longer tutorial that teaches the whole loop, then one "What's next?" card
 
-- **Why:** after the step-by-step tutorial, players had no idea what came next (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). A permanent "next goal" pill was tried and dropped: it still told players exact steps, and #72's playtest already rejected that.
-- **Card** (`WhatsNextPanel`): opens once, when the first match's results close (also on the "League table" path, before the table). The tutorial ends with that match. Four lines explain the loop, never a to-do list:
-  1. new players arrive by bus, sign them at the desk;
-  2. they train at the drills and pay fees (keep baskets full, collect the cash);
-  3. graduates wait in the office: sell them or add them to the squad for the next match;
-  4. build to earn stars; completing Sunday Park opens the Training Ground.
-  - It is a blocking panel (gameplay stops while it shows; "Let's go!" resumes). There is no midgame ad after the first match, as before. Analytics event: `whats_next`.
-- **"Save up" route steps stay put** (`sim/guide.ts`): while the route waits for money ("Save up: Team Bus"), the pill no longer cycles through small tasks. In a real-input playthrough it changed 13 times in 33 s; now it holds. If the player stands still for 8 s or nothing happens for 20 s, the usual lost hint shows what earns money, pointing only at that pad, and the step returns on the next bit of progress.
-- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, through the real match, Power Shot, results and card. The first match came at about 1:39 of play with a player who only follows the pill. The median in the live build is 7:54.
-- **Build:** `BUILD` 0.8.2.
+- **Why:** after the step-by-step part, players didn't know they had to keep bringing balls, sell graduates or buy upgrades (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). Two earlier attempts were dropped:
+  - a permanent "next goal" pill, which still told players exact steps (#72's playtest already rejected that);
+  - a bare "Save up: Team Bus" step, which gave players nothing to do.
+- **Route after the Dribble Cones** (`sim/tutorial.ts`), each step taught once, in order:
+  1. Team Bus;
+  2. first match;
+  3. **sell or promote the first graduate** (now required);
+  4. **buy the first office upgrade** (now required).
+  - The office intro can still cut in earlier when a graduate is waiting.
+- **No "Save up" in Sunday Park:** while a step needs money or a graduate, it shows how to earn, in this order:
+  1. finish a ball run, but only while some basket can take balls (with every basket full the coach would wait forever: a stuck case found in testing);
+  2. sign the player waiting at the desk;
+  3. refill an empty basket;
+  4. collect the biggest fee pile.
+  - The pill says what the money is for: "Collect fees for the Team Bus", "…while they train to graduate", "…for an upgrade".
+  - The Training Ground and Youth Stadium gate steps still say "Save up", with the lost hint after 8 s idle or 20 s without progress.
+- **"What's next?" card** (`WhatsNextPanel`): once, when the route ends with the first upgrade. It waits until no panel or match is open, so it opens after the office closes. Four lines explain the loop, then the HUD stays clean.
+  - Saved as `flags.whatsNextSeen`. Old saves that already passed the step (more than 3 matches) don't get it. Analytics event: `whats_next`.
+  - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the route is done (`tut:upgrade`; was the first match).
+- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, panels clicked like a player. The first match came at 0:58, the first graduate sold at about 1:57, the first upgrade at about 3:05, then the card.
+  - The unit route test walks the whole route with a player that follows full nav paths, checks every step in order, and checks that Sunday Park never shows "Save up".
+- **Build:** `BUILD` 0.8.3.

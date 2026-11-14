@@ -79,8 +79,8 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = (window.__wk as unknown as W).sim;
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
-      // past the first-session route (the side buttons show from the first match on)
-      (sim.state.flags as Record<string, boolean>)['tut:match'] = true;
+      // past the first-session route (the side buttons show once it ends with the first upgrade)
+      (sim.state.flags as Record<string, boolean>)['tut:upgrade'] = true;
       const t = sim.spawnTrainee();
       if (t) sim.graduate(t);
     });
@@ -121,18 +121,45 @@ test.describe('desktop', () => {
     const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
     await page.locator('.results-panel .btn-big.promote').click();
     await expect(page.locator('.results-panel')).toBeHidden();
-    // the first match ends the tutorial: a one-time "What's next?" card explains the loop (gameplay stays stopped)
-    const card = page.locator('.overlay:not(.hidden) .whatsnext-panel');
-    await expect(card).toBeVisible();
-    await expect(card.locator('.wn-list li')).toHaveCount(4);
-    await card.locator('.wn-go').click();
-    await expect(card).toBeHidden();
     await expect(page.locator('.match-ui')).toBeHidden();
     const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
     expect(rows).toBe(6);
     expect(cash).toBeGreaterThan(0);
     const log = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
     expect(log[log.length - 1]).toBe('gameplayStart');
+    expect(errors).toEqual([]);
+  });
+
+  test('the tutorial ends with the first upgrade, then a one-time "What\'s next?" card', async ({ page }) => {
+    const errors = attachConsole(page);
+    await page.goto('/');
+    await waitForGameplay(page);
+    type S = { state: { flags: Record<string, boolean>; records: { matches: number; sold: number }; cash: number }; cheapestUpgrade(): { id: string; cost: number } | null; buyUpgrade(id: string): void };
+    // everything before the last step done: Sunday Park built up to the bus, a match played, a graduate sold
+    await page.evaluate(() => {
+      const sim = window.__wk!.sim as unknown as S & { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> } };
+      for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
+      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'sell']) sim.state.flags['tut:' + k] = true;
+      sim.state.records.matches = 1;
+      sim.state.records.sold = 1;
+    });
+    await expect(page.locator('.objective:not(.hidden) .obj-text')).toContainText(/upgrade/i);
+    await page.evaluate(() => {
+      const sim = window.__wk!.sim as unknown as S;
+      const up = sim.cheapestUpgrade();
+      if (!up) throw new Error('no upgrade');
+      sim.state.cash = up.cost;
+      sim.buyUpgrade(up.id);
+    });
+    const card = page.locator('.overlay:not(.hidden) .whatsnext-panel');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wn-list li')).toHaveCount(4);
+    await card.locator('.wn-go').click();
+    await expect(card).toBeHidden();
+    const log = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
+    expect(log[log.length - 1]).toBe('gameplayStart');
+    // once only
+    expect(await page.evaluate(() => (window.__wk!.sim as unknown as S).state.flags.whatsNextSeen)).toBe(true);
     expect(errors).toEqual([]);
   });
 

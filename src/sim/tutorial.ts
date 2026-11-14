@@ -53,8 +53,13 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => s.state.records.sold + s.state.records.promoted > 0,
     objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
   },
-  // the team bus and the first match come right after the basics: the match is the game's big moment
-  { id: 'pitch', done: (s) => padDone(s, 'p_match'), objective: (s) => padObjective(s, 'p_match') },
+  // the team bus and the first match come right after the basics; while the money isn't there yet the route shows how
+  // to earn it (never a bare "save up")
+  {
+    id: 'pitch',
+    done: (s) => padDone(s, 'p_match'),
+    objective: (s) => (canAffordPad(s, 'p_match') || (s.state.coach.padId === 'p_match' && s.paying) ? padObjective(s, 'p_match') : earn(s, 'tut.fees_bus')),
+  },
   {
     id: 'match',
     ready: (s) => s.state.records.matches > 0 || s.matchAvailable(),
@@ -64,15 +69,22 @@ export const TUTORIAL: TutorialStep[] = [
       return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
     },
   },
+  // then the rest of the loop, each taught once: a graduate is sold or joins the squad, the first office upgrade
+  {
+    id: 'sell',
+    done: (s) => s.state.records.sold + s.state.records.promoted > 0,
+    objective: (s) => {
+      const g = s.podiumGraduate();
+      return g ? officeObjective(s, 'tut.graduate', g) : earn(s, 'tut.fees_grad');
+    },
+  },
   {
     id: 'upgrade',
-    optional: true,
-    ready: (s) => {
-      const up = s.cheapestUpgrade();
-      return !!up && s.state.cash + 1e-6 >= up.cost;
-    },
     done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
-    objective: (s) => officeObjective(s, 'tut.upgrade'),
+    objective: (s) => {
+      const up = s.cheapestUpgrade();
+      return up && s.state.cash + 1e-6 >= up.cost ? officeObjective(s, 'tut.upgrade') : earn(s, 'tut.fees_upgrade');
+    },
   },
   {
     id: 'safe',
@@ -110,6 +122,28 @@ function officeObjective(sim: Sim, key: string, grad?: ReturnType<Sim['podiumGra
 function isVisible(sim: Sim, padId: string): boolean {
   const p = sim.world.pads.get(padId);
   return !!p && sim.isPadVisible(p);
+}
+
+/**
+ * How a new academy earns money, one thing at a time: finish a ball run, sign the player waiting at the desk, refill an
+ * empty basket, else collect the fees (`feesKey` says what the money is for).
+ */
+function earn(sim: Sim, feesKey: string): Objective | null {
+  const s = sim.state;
+  // (a ball run only while some basket can take balls: with every basket full the coach would wait forever)
+  const needy = s.coach.carry > 0 && sim.coachCarryKind() === 'ball' ? sim.neediestStation(1, undefined, 'ball') : null;
+  if (needy) return ballObjective(sim, needy);
+  const dt = sim.deskTrainee();
+  if (dt && sim.canSign() && !sim.hasStaff('receptionist')) {
+    const sp = sim.area.desk.coachSpot;
+    return { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
+  }
+  if (!sim.hasStaff('ball_boy')) {
+    for (const t of s.trainees) if (t.stationId && sim.isWaitingForBalls(t) && sim.station(t.stationId).supply === 'ball') return ballObjective(sim, t.stationId);
+  }
+  let best = null as (typeof s.piles)[number] | null;
+  for (const p of s.piles) if (p.amount >= BALANCE.objectives.minPileWorth && (!best || p.amount > best.amount)) best = p;
+  return pileObjective(sim, best?.id ?? 'st:shooting_goal', feesKey);
 }
 
 function canAffordPad(sim: Sim, padId: string): boolean {

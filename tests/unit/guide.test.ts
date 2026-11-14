@@ -5,10 +5,15 @@ import { Sim, createInitialState } from '../../src/sim/sim';
 
 const STEP = 1 / 60;
 
-/** Plays a match whenever the kick-off prompt opens (the UI does this when the player steps on the spot). */
+/**
+ * What the panels do when the player steps into a prompt: plays the match at the kick-off spot; at the office sells
+ * the waiting graduate and buys the cheapest upgrade it can afford.
+ */
 function kickoff(sim: Sim): void {
   if (sim.prompt === 'podium') {
     if (sim.podiumGraduate()) sim.decideGraduate('sell');
+    const up = sim.cheapestUpgrade();
+    if (up && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
     sim.dismissPrompt();
   }
   if (sim.prompt !== 'kickoff') return;
@@ -17,25 +22,38 @@ function kickoff(sim: Sim): void {
   sim.finishCurrentMatch();
 }
 
-/** A player who follows the guide when it shows something and otherwise the best action (like a human who knows the game). */
+/**
+ * A player who follows the guide when it shows something and otherwise the best action (like a human who knows the
+ * game), walking the whole nav path waypoint by waypoint (no corner-cutting into fences or stations).
+ */
 function play(sim: Sim, sec: number, onFrame?: () => void): void {
   for (let t = 0; t < sec; t += STEP) {
     kickoff(sim);
     const o = sim.guide.objective ?? sim.objective;
     const c = sim.state.coach;
     sim.input.x = sim.input.z = 0;
-    if (o && Math.hypot(o.x - c.x, o.z - c.z) > 0.3) {
-      const path = sim.nav.findPath(c.x, c.z, o.x, o.z);
-      const wx = path[2] ?? o.x;
-      const wz = path[3] ?? o.z;
-      const d = Math.hypot(wx - c.x, wz - c.z) || 1;
-      sim.input.x = (wx - c.x) / d;
-      sim.input.z = (wz - c.z) / d;
+    if (o) {
+      const k = o.targetId + Math.floor(sim.state.time / 2);
+      if (k !== nav.key) {
+        nav.key = k;
+        nav.path = sim.nav.findPath(c.x, c.z, o.x, o.z);
+        nav.i = 0;
+      }
+      if (Math.hypot(o.x - c.x, o.z - c.z) > 0.3) {
+        const p = nav.path;
+        while (nav.i * 2 < p.length - 2 && Math.hypot((p[nav.i * 2] as number) - c.x, (p[nav.i * 2 + 1] as number) - c.z) < 0.3) nav.i++;
+        const wx = p[nav.i * 2] ?? o.x;
+        const wz = p[nav.i * 2 + 1] ?? o.z;
+        const d = Math.hypot(wx - c.x, wz - c.z) || 1;
+        sim.input.x = (wx - c.x) / d;
+        sim.input.z = (wz - c.z) / d;
+      }
     }
     sim.tick(STEP);
     onFrame?.();
   }
 }
+const nav = { key: '', path: [] as number[], i: 0 };
 
 describe('guide: fixed tutorial route, then hidden', () => {
   it('walks the Sunday Park route in order without jumping around', () => {
@@ -45,31 +63,32 @@ describe('guide: fixed tutorial route, then hidden', () => {
       const k = e.objective ? `${e.mode}:${e.objective.key}` : `${e.mode}`;
       if (seen[seen.length - 1] !== k) seen.push(k);
     });
-    play(sim, 240);
+    for (let t = 0; t < 600 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
     const tut = seen.filter((k) => k.startsWith('tutorial:')).map((k) => k.slice(9));
-    // the route as the player sees it (save-up steps may appear when short of cash), then the team bus and the first
-    // match. While saving for the bus the guide shows whatever earns money; the office intro may cut in for a graduate.
-    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match'];
+    // the route as the player sees it, in order: the basics, the team bus and the first match, a graduate sold, the first
+    // upgrade. While the next step needs money it shows how to earn it (sign, balls, fees: never a bare "save up");
+    // the office intro may cut in early once a graduate waits.
+    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.graduate', 'tut.upgrade'];
     const always = ['obj.save_for', 'obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'tut.graduate'];
-    const earning = ['obj.collect_cash', 'obj.collect_fees', 'obj.podium'];
+    const earning = ['obj.collect_cash', 'obj.collect_fees', 'tut.fees_bus', 'tut.fees_grad', 'tut.fees_upgrade'];
     let i = 0;
     for (const k of tut) {
       const free = (): boolean => always.includes(k) || (i >= 6 && earning.includes(k));
       while (i < order.length && !(order[i] as string).split('|').includes(k) && !free()) i++;
       expect(i, `unexpected step ${k} in ${tut.join(' → ')}`).toBeLessThan(order.length);
     }
+    expect(tut, 'never a bare "save up" in Sunday Park').not.toContain('obj.save_for');
     expect(sim.state.pads.p_cones?.done).toBe(true);
-    expect(sim.state.flags['tut:cones']).toBe(true);
-    expect(sim.state.flags['tut:match']).toBe(true);
+    for (const f of ['cones', 'pitch', 'match', 'sell', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
     // after the route: nothing is forced on the player
     expect(['hidden', 'lost']).toContain(sim.guide.mode);
   });
 
   it('shows a hint when the player stands still, and hides it again on progress', () => {
     const sim = new Sim(createInitialState(AREA1, 7));
-    // play until the Sunday Park route (ending with the first match) is done, before the next feature intro is due
-    for (let t = 0; t < 240 && !sim.state.flags['tut:match']; t += 1) play(sim, 1);
-    expect(sim.state.flags['tut:match']).toBe(true);
+    // play until the Sunday Park route (ending with the first upgrade) is done
+    for (let t = 0; t < 600 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
+    expect(sim.state.flags['tut:upgrade']).toBe(true);
     // stand still
     for (let t = 0; t < BALANCE.objectives.lostIdleSec + 0.5; t += STEP) {
       sim.input.x = sim.input.z = 0;
