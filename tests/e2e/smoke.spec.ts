@@ -121,6 +121,12 @@ test.describe('desktop', () => {
     const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
     await page.locator('.results-panel .btn-big.promote').click();
     await expect(page.locator('.results-panel')).toBeHidden();
+    // the first match ends the tutorial: a one-time "What's next?" card explains the loop (gameplay stays stopped)
+    const card = page.locator('.overlay:not(.hidden) .whatsnext-panel');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wn-list li')).toHaveCount(4);
+    await card.locator('.wn-go').click();
+    await expect(card).toBeHidden();
     await expect(page.locator('.match-ui')).toBeHidden();
     const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
     expect(rows).toBe(6);

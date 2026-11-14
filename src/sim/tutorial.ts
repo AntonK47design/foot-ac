@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import { ballObjective, computeObjective, deskObjective, padObjective, pileObjective, type Objective } from './objectives';
+import { ballObjective, deskObjective, padObjective, pileObjective, type Objective } from './objectives';
 import { firstName } from './players';
 import type { Sim } from './sim';
 
@@ -54,7 +54,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
   },
   // the team bus and the first match come right after the basics: the match is the game's big moment
-  { id: 'pitch', done: (s) => padDone(s, 'p_match'), objective: (s) => saveUpFor(s, 'p_match') },
+  { id: 'pitch', done: (s) => padDone(s, 'p_match'), objective: (s) => padObjective(s, 'p_match') },
   {
     id: 'match',
     ready: (s) => s.state.records.matches > 0 || s.matchAvailable(),
@@ -110,15 +110,6 @@ function officeObjective(sim: Sim, key: string, grad?: ReturnType<Sim['podiumGra
 function isVisible(sim: Sim, padId: string): boolean {
   const p = sim.world.pads.get(padId);
   return !!p && sim.isPadVisible(p);
-}
-
-/**
- * A pad the route wants next: go buy it once affordable; until then the usual best action (collect fees, bring balls,
- * sign the next trainee…), which is what earns the money. Never just "save up" while nothing earns.
- */
-function saveUpFor(sim: Sim, padId: string): Objective | null {
-  if (canAffordPad(sim, padId) || (sim.state.coach.padId === padId && sim.paying)) return padObjective(sim, padId);
-  return computeObjective(sim, padId) ?? padObjective(sim, padId);
 }
 
 function canAffordPad(sim: Sim, padId: string): boolean {

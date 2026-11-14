@@ -310,3 +310,16 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   - World labels: a pad's perk line only when the coach is within 3.5 m; "+1 PAC" pops within 6 m of the coach; idle rating badges within 7 m. Labels that would be cut off at the side edges, or that sit under the top HUD band, are hidden (desktop dims those under the band, as before).
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
+
+## 87. One "What's next?" card after the first match; the save-up step stays put
+
+- **Why:** after the step-by-step tutorial, players had no idea what came next (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). A permanent "next goal" pill was tried and dropped: it still told players exact steps, and #72's playtest already rejected that.
+- **Card** (`WhatsNextPanel`): opens once, when the first match's results close (also on the "League table" path, before the table). The tutorial ends with that match. Four lines explain the loop, never a to-do list:
+  1. new players arrive by bus, sign them at the desk;
+  2. they train at the drills and pay fees (keep baskets full, collect the cash);
+  3. graduates wait in the office: sell them or add them to the squad for the next match;
+  4. build to earn stars; completing Sunday Park opens the Training Ground.
+  - It is a blocking panel (gameplay stops while it shows; "Let's go!" resumes). There is no midgame ad after the first match, as before. Analytics event: `whats_next`.
+- **"Save up" route steps stay put** (`sim/guide.ts`): while the route waits for money ("Save up: Team Bus"), the pill no longer cycles through small tasks. In a real-input playthrough it changed 13 times in 33 s; now it holds. If the player stands still for 8 s or nothing happens for 20 s, the usual lost hint shows what earns money, pointing only at that pad, and the step returns on the next bit of progress.
+- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, through the real match, Power Shot, results and card. The first match came at about 1:39 of play with a player who only follows the pill. The median in the live build is 7:54.
+- **Build:** `BUILD` 0.8.2.

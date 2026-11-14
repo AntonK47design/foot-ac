@@ -221,6 +221,34 @@ export class ResultsPanel extends Panel {
   }
 }
 
+/**
+ * Once, after the first match's results: how the academy works from here (the step-by-step tutorial ends with the
+ * first match). Explains the loop, never a to-do list.
+ */
+export class WhatsNextPanel extends Panel {
+  constructor(parent: HTMLElement, hooks: PanelHooks) {
+    super(parent, hooks, 'whatsnext-panel', false);
+  }
+
+  open(onDone: () => void): void {
+    this.title.textContent = t('next.title');
+    const lines: Array<[string, string]> = [
+      ['sign', 'next.arrive'],
+      ['ball', 'next.train'],
+      ['trophy', 'next.graduate'],
+      ['star', 'next.stars'],
+    ];
+    this.body.innerHTML = `<ul class="wn-list">${lines.map(([ic, key]) => `<li>${icon(ic)}<span>${t(key)}</span></li>`).join('')}</ul>`;
+    this.body.appendChild(
+      button(t('next.go'), 'promote wn-go', () => {
+        this.close();
+        onDone();
+      }),
+    );
+    this.show();
+  }
+}
+
 export interface SquadRow {
   id: number;
   card: CardData;

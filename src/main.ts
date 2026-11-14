@@ -22,7 +22,7 @@ import { DIVISIONS } from './data/clubs';
 import { computeOvr } from './sim/players';
 import { opponentsOf, pairings, sortedTable } from './sim/match';
 import { MatchUi } from './ui/match-ui';
-import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
+import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, WhatsNextPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
 import { UPGRADES, type UpgradeDef } from './data/upgrades';
 import type { Position, Rarity, Stat } from './data/types';
 import * as Meta from './sim/meta';
@@ -215,6 +215,7 @@ async function boot(): Promise<void> {
   });
   const officePanel = new OfficePanel(gameEl, panelHooks);
   const resultsPanel = new ResultsPanel(gameEl, panelHooks);
+  const whatsNextPanel = new WhatsNextPanel(gameEl, panelHooks);
   const squadPanel = new SquadPanel(gameEl, panelHooks);
   const leaguePanel = new LeaguePanel(gameEl, panelHooks);
   const matchUi = new MatchUi(gameEl);
@@ -359,13 +360,20 @@ async function boot(): Promise<void> {
         sim.state.flags.firstMatchPlayed = true;
         if (r && script.cup && r.outcome === 'win') platform.happytime();
         let rewardedAtBreak = false;
-        const release = (): void => {
+        const release = (then?: () => void): void => {
           view.endTrip();
           blockers.delete('match');
           refreshPause();
           updateHint();
+          // the step-by-step tutorial ends with the first match: explain the loop once, then the HUD stays clean
+          if (firstMatch) {
+            analytics.once('whats_next');
+            whatsNextPanel.open(() => then?.());
+            return;
+          }
+          then?.();
           // midgame only at this natural break, never after the very first match or when a rewarded ad was watched here
-          if (!firstMatch && !rewardedAtBreak) void ads.midgame();
+          if (!rewardedAtBreak) void ads.midgame();
         };
         if (!r) return release();
         resultsPanel.open(
@@ -393,11 +401,8 @@ async function boot(): Promise<void> {
                   })
                 : null,
           },
-          release,
-          () => {
-            release();
-            openLeague();
-          },
+          () => release(),
+          () => release(openLeague),
         );
       },
     });

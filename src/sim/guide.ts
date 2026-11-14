@@ -54,25 +54,32 @@ export class Guide {
     this.idle = Math.hypot(c.vx, c.vz) < 0.2 ? this.idle + dt : 0;
     this.sinceProgress += dt;
     const step = currentStep(sim);
-    if (step) {
-      this.set('tutorial', step.objective(sim));
+    const stepObj = step ? step.objective(sim) : null;
+    // a route step that is something to do: show it. A "save up" step stays put like a goal; if the player then
+    // stands still or nothing happens for a while, the lost hint shows what earns the money (that pad stays the
+    // only one it points at), and the step comes back on the next bit of progress
+    const saving = stepObj?.key === 'obj.save_for';
+    if (step && !saving) {
+      this.set('tutorial', stepObj);
       return;
     }
+    const focus = saving ? stepObj?.targetId : undefined;
     const OB = BALANCE.objectives;
     if (this.mode === 'lost') {
       this.lostT += dt;
       if (this.lostT >= OB.lostRefreshSec) {
         this.lostT = 0;
-        this.set('lost', computeObjective(sim));
+        this.set('lost', computeObjective(sim, focus));
       }
       return;
     }
     if (this.idle >= OB.lostIdleSec || this.sinceProgress >= OB.lostNoProgressSec) {
       this.lostT = 0;
       this.sinceProgress = 0;
-      this.set('lost', computeObjective(sim));
+      this.set('lost', computeObjective(sim, focus) ?? stepObj);
       return;
     }
-    if (this.mode !== 'hidden') this.set('hidden', null);
+    if (step) this.set('tutorial', stepObj);
+    else if (this.mode !== 'hidden') this.set('hidden', null);
   }
 }
