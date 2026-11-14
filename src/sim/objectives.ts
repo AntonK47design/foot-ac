@@ -17,6 +17,8 @@ export interface Objective {
   targetId: string;
   /** World radius of the target zone (for the arrow / bot). */
   radius: number;
+  /** The player is short of cash for this target (the guide may show the lost hint meanwhile). */
+  saving?: boolean;
 }
 
 /**

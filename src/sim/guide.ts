@@ -58,7 +58,7 @@ export class Guide {
     // a route step that is something to do: show it. A "save up" step stays put like a goal; if the player then
     // stands still or nothing happens for a while, the lost hint shows what earns the money (that pad stays the
     // only one it points at), and the step comes back on the next bit of progress
-    const saving = stepObj?.key === 'obj.save_for';
+    const saving = stepObj?.key === 'obj.save_for' || !!stepObj?.saving;
     if (step && !saving) {
       this.set('tutorial', stepObj);
       return;

@@ -22,7 +22,7 @@ import { DIVISIONS } from './data/clubs';
 import { computeOvr } from './sim/players';
 import { opponentsOf, pairings, sortedTable } from './sim/match';
 import { MatchUi } from './ui/match-ui';
-import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, WhatsNextPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
+import { LeaguePanel, OfficePanel, ResultsPanel, SquadPanel, type CardData, type OfficeData, type PanelHooks, type UpgradeRow } from './ui/panels';
 import { UPGRADES, type UpgradeDef } from './data/upgrades';
 import type { Position, Rarity, Stat } from './data/types';
 import * as Meta from './sim/meta';
@@ -215,8 +215,6 @@ async function boot(): Promise<void> {
   });
   const officePanel = new OfficePanel(gameEl, panelHooks);
   const resultsPanel = new ResultsPanel(gameEl, panelHooks);
-  const whatsNextPanel = new WhatsNextPanel(gameEl, panelHooks);
-  let whatsNextDue = false;
   const squadPanel = new SquadPanel(gameEl, panelHooks);
   const leaguePanel = new LeaguePanel(gameEl, panelHooks);
   const matchUi = new MatchUi(gameEl);
@@ -367,9 +365,6 @@ async function boot(): Promise<void> {
           blockers.delete('match');
           refreshPause();
           updateHint();
-          // the first match: explain the loop once, as soon as nothing else is open (the tutorial goes on to selling
-          // and upgrades)
-          if (firstMatch && !sim.state.flags.whatsNextSeen) whatsNextDue = true;
           then?.();
           // midgame only at this natural break, never after the very first match or when a rewarded ad was watched here
           if (!firstMatch && !rewardedAtBreak) void ads.midgame();
@@ -594,6 +589,11 @@ async function boot(): Promise<void> {
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
   sim.events.on('tutorialStep', (e) => {
     analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
+    // the route ends with the first upgrade: one short line, once (not for old saves passing the step on load)
+    if (e.id === 'upgrade' && !sim.state.flags.tutDoneSeen && sim.state.records.matches <= 3) {
+      sim.state.flags.tutDoneSeen = true;
+      hud.toast(t('tut.done'), 'gold', 4000);
+    }
   });
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
@@ -681,13 +681,6 @@ async function boot(): Promise<void> {
       const as = sim.areaStars();
       hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
-      // "What's next?" once the route is done, as soon as nothing else is open (e.g. after the office panel closes)
-      if (whatsNextDue && blockers.size === 0 && !view.matchActive) {
-        whatsNextDue = false;
-        sim.state.flags.whatsNextSeen = true;
-        analytics.once('whats_next');
-        whatsNextPanel.open(() => undefined);
-      }
       const route = !!sim.state.flags['tut:upgrade'];
       hud.setSideButtons(route && (sim.state.squad.length > 0 || sim.state.records.promoted > 0), route && !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;

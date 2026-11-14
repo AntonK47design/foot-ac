@@ -32,9 +32,10 @@ function orBalls(sim: Sim, stationId: string, o: Objective | null): Objective | 
 }
 
 export const TUTORIAL: TutorialStep[] = [
-  // ── Sunday Park
+  // ── Sunday Park: one task at a time, each done with one action, never coming back. No step waits for money: the
+  // starting cash pays the crate and the goal, the first fees the cones.
   { id: 'cash', done: (s) => !!s.state.flags.firstCash, objective: (s) => pileObjective(s, 'starter_a') ?? pileObjective(s, 'starter_b') },
-  { id: 'crate', done: (s) => padDone(s, 'p_crate'), objective: (s) => padObjective(s, 'p_crate') },
+  { id: 'crate', done: (s) => padDone(s, 'p_crate'), objective: (s) => withKey(padObjective(s, 'p_crate'), 'tut.build_tag') },
   { id: 'goal', done: (s) => padDone(s, 'p_goal'), objective: (s) => padObjective(s, 'p_goal') },
   { id: 'sign', done: (s) => s.state.stats.signed > 0, objective: (s) => deskObjective(s) },
   { id: 'grab', done: (s) => s.state.coach.carry > 0 || !!s.state.flags.firstDelivery, objective: (s) => ballObjective(s, 'shooting_goal') },
@@ -44,8 +45,9 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => padDone(s, 'p_cones') || canAffordPad(s, 'p_cones'),
     objective: (s) => orBalls(s, 'shooting_goal', pileObjective(s, 'st:shooting_goal', 'obj.collect_fees')),
   },
-  { id: 'cones', done: (s) => padDone(s, 'p_cones'), objective: (s) => padObjective(s, 'p_cones') },
-  // ── feature intros (each shown once, when it first matters)
+  // the core mechanic, said once: more drills → more players training → more fees
+  { id: 'cones', done: (s) => padDone(s, 'p_cones'), objective: (s) => withKey(padObjective(s, 'p_cones'), 'tut.build_more') },
+  // ── then the player builds on their own (price tags glow when affordable); no task until the next lesson is ready
   {
     id: 'graduate',
     optional: true,
@@ -53,12 +55,12 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => s.state.records.sold + s.state.records.promoted > 0,
     objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
   },
-  // the team bus and the first match come right after the basics; while the money isn't there yet the route shows how
-  // to earn it (never a bare "save up")
+  // the Team Bus only once they've built a bit more and can pay for it right away (never "save up")
   {
     id: 'pitch',
+    ready: (s) => padDone(s, 'p_match') || (builtAfterBasics(s) >= BALANCE.objectives.busAfterBuilds && canAffordPad(s, 'p_match')),
     done: (s) => padDone(s, 'p_match'),
-    objective: (s) => (canAffordPad(s, 'p_match') || (s.state.coach.padId === 'p_match' && s.paying) ? padObjective(s, 'p_match') : earn(s, 'tut.fees_bus')),
+    objective: (s) => withKey(padObjective(s, 'p_match'), 'tut.build_bus'),
   },
   {
     id: 'match',
@@ -69,8 +71,7 @@ export const TUTORIAL: TutorialStep[] = [
       return { key: 'tut.match', icon: 'pitch', x: K.x, z: K.z, targetId: 'kickoff', radius: BALANCE.match.kickoffRadius };
     },
   },
-  // right after the first match: the office, with a free first upgrade (one clear target, nothing to wait for). Selling
-  // is taught by the 'graduate' intro above the moment the first graduate waits; no chores while waiting for one.
+  // after the first match: the office, with a free first upgrade (Sim.firstUpgradeFree). Then the route is done.
   {
     id: 'upgrade',
     done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
@@ -84,7 +85,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => pileObjective(s, 'safe', 'tut.safe'),
   },
   // ── Training Ground (starts once the gate shows up)
-  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => padObjective(s, 'p2_gate') },
+  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => gateObjective(s, 'p2_gate') },
   { id: 'water', done: (s) => padDone(s, 'p2_water'), objective: (s) => padObjective(s, 'p2_water') },
   { id: 'gym', done: (s) => padDone(s, 'p2_gym'), objective: (s) => padObjective(s, 'p2_gym') },
   {
@@ -93,7 +94,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => ballObjective(s, 'gym'),
   },
   // ── Youth Stadium (starts once its gate shows up)
-  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => padObjective(s, 'p3_gate') },
+  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => gateObjective(s, 'p3_gate') },
   { id: 'kit', done: (s) => padDone(s, 'p3_kit'), objective: (s) => padObjective(s, 'p3_kit') },
   { id: 'crossing', done: (s) => padDone(s, 'p3_crossing'), objective: (s) => padObjective(s, 'p3_crossing') },
   {
@@ -114,66 +115,25 @@ function isVisible(sim: Sim, padId: string): boolean {
   return !!p && sim.isPadVisible(p);
 }
 
-/** The earning task the route is showing: it stays until it is done, so the pill doesn't jump between chores. */
-interface EarnTask {
-  kind: 'balls' | 'sign' | 'fees';
-  /** Station (balls) or pile id (fees). */
-  id: string;
-  /** The coach has held balls for this run (it is done once they're delivered). */
-  carried: boolean;
-}
-const earnTasks = new WeakMap<Sim, EarnTask>();
-
-function earnTaskDone(sim: Sim, task: EarnTask): boolean {
-  const s = sim.state;
-  if (task.kind === 'sign') return !sim.deskTrainee() || !sim.canSign() || sim.hasStaff('receptionist');
-  if (task.kind === 'fees') return (sim.pile(task.id)?.amount ?? 0) < 1;
-  const ss = s.stations[task.id];
-  const full = !ss || ss.balls >= sim.station(task.id).cfg.basketCap;
-  if (s.coach.carry > 0) task.carried = true;
-  // delivered (or the basket filled up / the ball boy took over): done
-  return (task.carried && s.coach.carry === 0) || (full && (s.coach.carry === 0 || task.carried)) || sim.hasStaff('ball_boy');
-}
-
-function earnTaskObjective(sim: Sim, task: EarnTask, feesKey: string): Objective | null {
-  if (task.kind === 'balls') return ballObjective(sim, task.id);
-  if (task.kind === 'fees') return pileObjective(sim, task.id, feesKey);
-  const dt = sim.deskTrainee();
-  const sp = sim.area.desk.coachSpot;
-  return dt ? { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius } : null;
+/** Pads built in Sunday Park besides the crate, the goal and the cones (the tutorial's first builds). */
+function builtAfterBasics(sim: Sim): number {
+  let n = 0;
+  for (const p of sim.world.padList) if (p.area === 1 && p.id !== 'p_crate' && p.id !== 'p_goal' && p.id !== 'p_cones' && padDone(sim, p.id)) n++;
+  return n;
 }
 
 /**
- * How a new academy earns money, one task at a time, each kept until it is done: finish a ball run, sign the player
- * waiting at the desk, refill an empty basket, else collect the fees (`feesKey` says what the money is for).
+ * An area gate: one steady line ("Open the Training Ground Gate") whether or not the cash is there yet. Standing on
+ * its price tag pays in whatever the player has, so "Unlock" / "Save up" used to flip every few seconds.
  */
-function earn(sim: Sim, feesKey: string): Objective | null {
-  const cur = earnTasks.get(sim);
-  if (cur && !earnTaskDone(sim, cur)) {
-    const o = earnTaskObjective(sim, cur, feesKey);
-    if (o) return o;
-  }
-  const task = nextEarnTask(sim);
-  if (!task) {
-    earnTasks.delete(sim);
-    return pileObjective(sim, 'st:shooting_goal', feesKey);
-  }
-  earnTasks.set(sim, task);
-  return earnTaskObjective(sim, task, feesKey);
+function gateObjective(sim: Sim, padId: string): Objective | null {
+  const o = padObjective(sim, padId);
+  return o ? { ...o, key: 'tut.open_gate', saving: o.key === 'obj.save_for' } : null;
 }
 
-function nextEarnTask(sim: Sim): EarnTask | null {
-  const s = sim.state;
-  // (a ball run only while some basket can take balls: with every basket full the coach would wait forever)
-  const needy = s.coach.carry > 0 && sim.coachCarryKind() === 'ball' ? sim.neediestStation(1, undefined, 'ball') : null;
-  if (needy) return { kind: 'balls', id: needy, carried: true };
-  if (sim.deskTrainee() && sim.canSign() && !sim.hasStaff('receptionist')) return { kind: 'sign', id: 'desk', carried: false };
-  if (!sim.hasStaff('ball_boy')) {
-    for (const t of s.trainees) if (t.stationId && sim.isWaitingForBalls(t) && sim.station(t.stationId).supply === 'ball') return { kind: 'balls', id: t.stationId, carried: false };
-  }
-  let best = null as (typeof s.piles)[number] | null;
-  for (const p of s.piles) if (p.amount >= BALANCE.objectives.minPileWorth && (!best || p.amount > best.amount)) best = p;
-  return best ? { kind: 'fees', id: best.id, carried: false } : null;
+/** A route step's own wording for an "Unlock X" objective (a "Save up" one keeps its own text). */
+function withKey(o: Objective | null, key: string): Objective | null {
+  return o && o.key === 'obj.unlock' ? { ...o, key } : o;
 }
 
 function canAffordPad(sim: Sim, padId: string): boolean {

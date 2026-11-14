@@ -63,24 +63,23 @@ describe('guide: fixed tutorial route, then hidden', () => {
       const k = e.objective ? `${e.mode}:${e.objective.key}` : `${e.mode}`;
       if (seen[seen.length - 1] !== k) seen.push(k);
     });
-    for (let t = 0; t < 600 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
+    for (let t = 0; t < 900 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
     const tut = seen.filter((k) => k.startsWith('tutorial:')).map((k) => k.slice(9));
-    // the route as the player sees it, in order: the basics, the team bus and the first match, a graduate sold, the first
-    // upgrade. While the next step needs money it shows how to earn it (sign, balls, fees: never a bare "save up");
-    // the office intro may cut in early once a graduate waits.
-    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.upgrade_free'];
-    const always = ['obj.save_for', 'obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'tut.graduate'];
-    const earning = ['obj.collect_cash', 'obj.collect_fees', 'tut.fees_bus'];
+    const msg = tut.join(' → ');
+    // the basics, strictly in order (in the fees step an empty basket may ask for balls first)
+    const basics = ['obj.collect_cash', 'tut.build_tag', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'tut.build_more'];
+    const cones = tut.indexOf('tut.build_more');
+    expect(cones, msg).toBeGreaterThan(0);
     let i = 0;
-    for (const k of tut) {
-      const free = (): boolean => always.includes(k) || (i >= 6 && earning.includes(k));
-      while (i < order.length && !(order[i] as string).split('|').includes(k) && !free()) i++;
-      expect(i, `unexpected step ${k} in ${tut.join(' → ')}`).toBeLessThan(order.length);
+    for (const k of tut.slice(0, cones + 1)) {
+      while (i < basics.length && !(basics[i] as string).split('|').includes(k) && !(i >= 6 && ['obj.grab_balls', 'obj.bring_balls'].includes(k)) && k !== 'obj.sign') i++;
+      expect(i, `unexpected step ${k} in ${msg}`).toBeLessThan(basics.length);
     }
-    expect(tut, 'never a bare "save up" in Sunday Park').not.toContain('obj.save_for');
-    // after the first match: straight to the free upgrade (and the sell intro if a graduate waits), never a chore
-    const after = tut.slice(tut.indexOf('tut.match') + 1);
-    for (const k of after) expect(['tut.upgrade_free', 'tut.graduate'], `after the match: ${tut.join(' → ')}`).toContain(k);
+    // after the cones: no chores and no "save up", only the next lessons, each once: the Team Bus (when affordable),
+    // the first match, the free upgrade; the sell intro when a graduate waits
+    const after = tut.slice(cones + 1).filter((k) => k !== 'tut.graduate');
+    expect(after, msg).toEqual(['tut.build_bus', 'tut.match', 'tut.upgrade_free']);
+    expect(tut, msg).not.toContain('obj.save_for');
     expect(sim.state.pads.p_cones?.done).toBe(true);
     for (const f of ['cones', 'pitch', 'match', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
     // after the route: nothing is forced on the player
@@ -90,7 +89,7 @@ describe('guide: fixed tutorial route, then hidden', () => {
   it('shows a hint when the player stands still, and hides it again on progress', () => {
     const sim = new Sim(createInitialState(AREA1, 7));
     // play until the Sunday Park route (ending with the first upgrade) is done
-    for (let t = 0; t < 600 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
+    for (let t = 0; t < 900 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
     expect(sim.state.flags['tut:upgrade']).toBe(true);
     // stand still
     for (let t = 0; t < BALANCE.objectives.lostIdleSec + 0.5; t += STEP) {
@@ -200,5 +199,20 @@ describe('tutorial: the first upgrade is free', () => {
     expect(sim.cheapestUpgrade()?.cost).toBeGreaterThan(0);
     sim.tick(STEP);
     expect(sim.state.flags['tut:upgrade']).toBe(true);
+  });
+});
+
+describe('tutorial: area gates keep one line', () => {
+  it('shows "Open the Training Ground Gate" whether or not the cash is there (no Save up / Unlock flip)', () => {
+    const sim = new Sim(createInitialState(AREA1, 8));
+    for (const p of AREA1.pads) if (p.area === 1) sim.unlockPad(p);
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
+    sim.state.cash = 0;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.open_gate');
+    expect(sim.guide.objective?.targetId).toBe('p2_gate');
+    sim.state.cash = 1e6;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.open_gate');
   });
 });

@@ -282,6 +282,8 @@ export const BALANCE = {
     lostNoProgressSec: 20,
     /** While shown that way, the suggestion is re-picked at most this often (no flip-flopping). */
     lostRefreshSec: 8,
+    /** Tutorial: the Team Bus step waits until the player has built this many more things after the Dribble Cones… */
+    busAfterBuilds: 2,
   },
   camera: {
     /** Visible world width (m) at the focus point at the base view: portrait → landscape. */
