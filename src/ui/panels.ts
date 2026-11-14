@@ -439,7 +439,7 @@ export class OfficePanel extends Panel {
       } else {
         const ok = d.cash + 1e-6 >= r.cost;
         b.className = 'btn-big small ' + (ok ? 'sell' : 'neutral');
-        b.innerHTML = `<span>${formatCash(r.cost)}</span>`;
+        b.innerHTML = `<span>${r.cost === 0 ? t('office.free') : formatCash(r.cost)}</span>`;
         b.disabled = !ok;
         b.addEventListener('click', () => {
           cb.buy(r.id);

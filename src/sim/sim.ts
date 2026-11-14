@@ -777,7 +777,19 @@ export class Sim {
     if (!def) return null;
     const lv = this.upLevel(id);
     if (lv >= def.maxLevel) return null;
+    if (lv === 0 && this.firstUpgradeFree()) return 0;
     return Math.round((def.base * Math.pow(def.growth, lv)) / 5) * 5;
+  }
+
+  /**
+   * The tutorial's office lesson: once the first graduate has been sold or promoted, the first upgrade is free (the
+   * cheapest ones cost $550+, out of reach at minute 2–3 while cash drains into pads on the way).
+   */
+  firstUpgradeFree(): boolean {
+    const s = this.state;
+    if (s.records.sold + s.records.promoted === 0) return false;
+    for (const id in s.upgrades) if ((s.upgrades[id] ?? 0) > 0) return false;
+    return true;
   }
 
   /** Requirements met (station / object built, staff hired). */

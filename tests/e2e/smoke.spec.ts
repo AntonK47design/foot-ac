@@ -121,6 +121,12 @@ test.describe('desktop', () => {
     const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
     await page.locator('.results-panel .btn-big.promote').click();
     await expect(page.locator('.results-panel')).toBeHidden();
+    // the first match: a one-time "What's next?" card explains the loop (gameplay stays stopped until it closes)
+    const card = page.locator('.overlay:not(.hidden) .whatsnext-panel');
+    await expect(card).toBeVisible();
+    await expect(card.locator('.wn-list li')).toHaveCount(4);
+    await card.locator('.wn-go').click();
+    await expect(card).toBeHidden();
     await expect(page.locator('.match-ui')).toBeHidden();
     const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
     expect(rows).toBe(6);
@@ -130,36 +136,42 @@ test.describe('desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the tutorial ends with the first upgrade, then a one-time "What\'s next?" card', async ({ page }) => {
+  test('after the first graduate is sold, the office offers a free first upgrade', async ({ page }) => {
     const errors = attachConsole(page);
     await page.goto('/');
     await waitForGameplay(page);
-    type S = { state: { flags: Record<string, boolean>; records: { matches: number; sold: number }; cash: number }; cheapestUpgrade(): { id: string; cost: number } | null; buyUpgrade(id: string): void };
-    // everything before the last step done: Sunday Park built up to the bus, a match played, a graduate sold
+    type S = { state: { flags: Record<string, boolean>; records: { matches: number; sold: number }; cash: number; upgrades: Record<string, number>; coach: { x: number; z: number; px: number; pz: number } }; area: { office: { computer: { x: number; z: number } } } };
+    // everything before the last tutorial step done: Sunday Park up to the bus, a match played, a graduate sold
     await page.evaluate(() => {
       const sim = window.__wk!.sim as unknown as S & { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> } };
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
       for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'sell']) sim.state.flags['tut:' + k] = true;
+      sim.state.flags.whatsNextSeen = true;
       sim.state.records.matches = 1;
       sim.state.records.sold = 1;
+      sim.state.cash = 0;
     });
-    await expect(page.locator('.objective:not(.hidden) .obj-text')).toContainText(/upgrade/i);
+    await expect(page.locator('.objective:not(.hidden) .obj-text')).toContainText('free upgrade');
+    // walk into the office: the upgrades are free (with $0)
     await page.evaluate(() => {
       const sim = window.__wk!.sim as unknown as S;
-      const up = sim.cheapestUpgrade();
-      if (!up) throw new Error('no upgrade');
-      sim.state.cash = up.cost;
-      sim.buyUpgrade(up.id);
+      const P = sim.area.office.computer;
+      sim.state.coach.x = sim.state.coach.px = P.x;
+      sim.state.coach.z = sim.state.coach.pz = P.z;
     });
-    const card = page.locator('.overlay:not(.hidden) .whatsnext-panel');
-    await expect(card).toBeVisible();
-    await expect(card.locator('.wn-list li')).toHaveCount(4);
-    await card.locator('.wn-go').click();
-    await expect(card).toBeHidden();
-    const log = await page.evaluate(() => (window.__wk!.platform as { log: Array<{ msg: string }> }).log.map((e) => e.msg));
-    expect(log[log.length - 1]).toBe('gameplayStart');
-    // once only
-    expect(await page.evaluate(() => (window.__wk!.sim as unknown as S).state.flags.whatsNextSeen)).toBe(true);
+    const office = page.locator('.overlay:not(.hidden) .office-panel');
+    await expect(office).toBeVisible({ timeout: 10_000 });
+    await office.locator('.tab').nth(1).click();
+    const free = office.locator('.up-item .btn-big.sell', { hasText: 'Free' }).first();
+    await expect(free).toBeVisible();
+    await free.click();
+    const st = await page.evaluate(() => (window.__wk!.sim as unknown as S).state);
+    expect(Object.values(st.upgrades).filter((lv) => lv > 0)).toHaveLength(1);
+    expect(st.cash).toBe(0);
+    // only the first one is free
+    await expect(office.locator('.up-item .btn-big', { hasText: 'Free' })).toHaveCount(0);
+    await office.locator('.btn-round.close').click();
+    await expect(office).toBeHidden();
     expect(errors).toEqual([]);
   });
 

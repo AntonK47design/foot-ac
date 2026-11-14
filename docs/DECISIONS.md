@@ -311,7 +311,7 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
 
-## 87. A longer tutorial that teaches the whole loop, then one "What's next?" card
+## 87. A longer tutorial that teaches the whole loop, a "What's next?" card after the first match, a free first upgrade
 
 - **Why:** after the step-by-step part, players didn't know they had to keep bringing balls, sell graduates or buy upgrades (feedback; sessions fall from 74 % at 1 min to 52 % at 3 min). Two earlier attempts were dropped:
   - a permanent "next goal" pill, which still told players exact steps (#72's playtest already rejected that);
@@ -320,18 +320,22 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   1. Team Bus;
   2. first match;
   3. **sell or promote the first graduate** (now required);
-  4. **buy the first office upgrade** (now required).
+  4. **the first office upgrade** (now required).
   - The office intro can still cut in earlier when a graduate is waiting.
 - **No "Save up" in Sunday Park:** while a step needs money or a graduate, it shows how to earn, in this order:
   1. finish a ball run, but only while some basket can take balls (with every basket full the coach would wait forever: a stuck case found in testing);
   2. sign the player waiting at the desk;
   3. refill an empty basket;
   4. collect the biggest fee pile.
-  - The pill says what the money is for: "Collect fees for the Team Bus", "…while they train to graduate", "…for an upgrade".
+  - The pill says what the money is for: "Collect fees for the Team Bus", "…while they train to graduate".
   - The Training Ground and Youth Stadium gate steps still say "Save up", with the lost hint after 8 s idle or 20 s without progress.
-- **"What's next?" card** (`WhatsNextPanel`): once, when the route ends with the first upgrade. It waits until no panel or match is open, so it opens after the office closes. Four lines explain the loop, then the HUD stays clean.
-  - Saved as `flags.whatsNextSeen`. Old saves that already passed the step (more than 3 matches) don't get it. Analytics event: `whats_next`.
-  - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the route is done (`tut:upgrade`; was the first match).
-- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, panels clicked like a player. The first match came at 0:58, the first graduate sold at about 1:57, the first upgrade at about 3:05, then the card.
-  - The unit route test walks the whole route with a player that follows full nav paths, checks every step in order, and checks that Sunday Park never shows "Save up".
-- **Build:** `BUILD` 0.8.3.
+- **First upgrade free** (`Sim.firstUpgradeFree`, the developer's choice over a cheaper first level or naming the price):
+  - The cheapest upgrades cost $550–600. At minute 2–3 that kept the route on "Collect fees for an upgrade" for minutes, while walking across pads paid the cash into them.
+  - Once a graduate has been sold or promoted and nothing has been bought yet, every first level costs $0. The office shows "Free" and the pill says "Office: pick a free upgrade".
+  - It is usually taken in the same office visit as the sale: the panel stays open on its upgrades. Prices are normal again after that purchase.
+- **"What's next?" card** (`WhatsNextPanel`): once, right after the first match's results, as soon as nothing else is open. With the "League table" button it comes after the table. This is what the developer asked for; the tutorial then goes on to selling and the upgrade.
+  - Four lines explain the loop. Saved as `flags.whatsNextSeen`. Analytics event: `whats_next`.
+  - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the route is done (`tut:upgrade`).
+- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, panels clicked like a player. The first match came at about 1:00, the card after its results, the first graduate sold at about 1:55, and the free upgrade in the same office visit ended the tutorial.
+  - The unit route test walks the whole route with a player that follows full nav paths, checks every step in order, and checks that Sunday Park never shows "Save up". Further unit and e2e tests cover the free upgrade and the card.
+- **Build:** `BUILD` 0.8.4.

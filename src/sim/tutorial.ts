@@ -81,7 +81,9 @@ export const TUTORIAL: TutorialStep[] = [
   {
     id: 'upgrade',
     done: (s) => Object.values(s.state.upgrades).some((lv) => lv > 0),
+    // the first upgrade is free (Sim.firstUpgradeFree): straight to the office, no saving up
     objective: (s) => {
+      if (s.firstUpgradeFree()) return officeObjective(s, 'tut.upgrade_free');
       const up = s.cheapestUpgrade();
       return up && s.state.cash + 1e-6 >= up.cost ? officeObjective(s, 'tut.upgrade') : earn(s, 'tut.fees_upgrade');
     },

@@ -366,6 +366,9 @@ async function boot(): Promise<void> {
           blockers.delete('match');
           refreshPause();
           updateHint();
+          // the first match: explain the loop once, as soon as nothing else is open (the tutorial goes on to selling
+          // and upgrades)
+          if (firstMatch && !sim.state.flags.whatsNextSeen) whatsNextDue = true;
           then?.();
           // midgame only at this natural break, never after the very first match or when a rewarded ad was watched here
           if (!firstMatch && !rewardedAtBreak) void ads.midgame();
@@ -590,8 +593,6 @@ async function boot(): Promise<void> {
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
   sim.events.on('tutorialStep', (e) => {
     analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
-    // the Sunday Park route ends with the first upgrade: explain the loop once (not for old saves that pass the step on load)
-    if (e.id === 'upgrade' && !sim.state.flags.whatsNextSeen && sim.state.records.matches <= 3) whatsNextDue = true;
   });
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);

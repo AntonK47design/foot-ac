@@ -68,7 +68,7 @@ describe('guide: fixed tutorial route, then hidden', () => {
     // the route as the player sees it, in order: the basics, the team bus and the first match, a graduate sold, the first
     // upgrade. While the next step needs money it shows how to earn it (sign, balls, fees: never a bare "save up");
     // the office intro may cut in early once a graduate waits.
-    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.graduate', 'tut.upgrade'];
+    const order = ['obj.collect_cash', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'obj.unlock', 'obj.unlock', 'tut.match', 'tut.graduate', 'tut.upgrade_free|tut.upgrade'];
     const always = ['obj.save_for', 'obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'tut.graduate'];
     const earning = ['obj.collect_cash', 'obj.collect_fees', 'tut.fees_bus', 'tut.fees_grad', 'tut.fees_upgrade'];
     let i = 0;
@@ -168,11 +168,35 @@ describe('guide: feature intros (office, match, safe)', () => {
         if (sim.podiumGraduate()) sim.decideGraduate('sell');
         // (only once the guide has pointed at it, as a player would)
         const up = sim.cheapestUpgrade();
-        if (up && keys.has('tut.upgrade') && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
+        if (up && (keys.has('tut.upgrade') || sim.firstUpgradeFree()) && sim.state.cash >= up.cost) sim.buyUpgrade(up.id);
         sim.dismissPrompt();
       } else kickoff(sim);
     });
-    for (const k of ['tut.graduate', 'tut.upgrade', 'tut.match']) expect(keys.has(k), k).toBe(true);
-    for (const f of ['graduate', 'upgrade', 'match']) expect(sim.state.flags['tut:' + f], f).toBe(true);
+    // (the free first upgrade is usually taken in the same office visit as the sale: the panel stays open on its upgrades)
+    for (const k of ['tut.graduate', 'tut.match']) expect(keys.has(k), k).toBe(true);
+    for (const f of ['sell', 'upgrade', 'match']) expect(sim.state.flags['tut:' + f], f).toBe(true);
+  });
+});
+
+describe('tutorial: the first upgrade is free', () => {
+  it('is free once a graduate was sold, only for the first purchase, and the route points at the office', () => {
+    const sim = new Sim(createInitialState(AREA1, 21));
+    const up = sim.cheapestUpgrade();
+    expect(up?.cost).toBeGreaterThan(0);
+    sim.state.records.sold = 1;
+    expect(sim.firstUpgradeFree()).toBe(true);
+    expect(sim.cheapestUpgrade()?.cost).toBe(0);
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'sell']) sim.state.flags['tut:' + k] = true;
+    sim.state.records.matches = 1;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.upgrade_free');
+    const cash = sim.state.cash;
+    expect(sim.buyUpgrade(up!.id)).toBe(true);
+    expect(sim.state.cash).toBe(cash);
+    // only the first one: prices are back
+    expect(sim.firstUpgradeFree()).toBe(false);
+    expect(sim.cheapestUpgrade()?.cost).toBeGreaterThan(0);
+    sim.tick(STEP);
+    expect(sim.state.flags['tut:upgrade']).toBe(true);
   });
 });
