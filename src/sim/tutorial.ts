@@ -55,12 +55,18 @@ export const TUTORIAL: TutorialStep[] = [
     done: (s) => s.state.records.sold + s.state.records.promoted > 0,
     objective: (s) => officeObjective(s, 'tut.graduate', s.podiumGraduate()),
   },
-  // the Team Bus only once they've built a bit more and can pay for it right away (never "save up")
+  // the core loop by repetition, one steady task: "Build 2 more things (0/2)". The arrow goes to an affordable price
+  // tag, or to the fees while nothing is affordable yet (never sign / balls / fees as separate tasks)
+  {
+    id: 'builds',
+    done: (s) => padDone(s, 'p_match') || builtAfterBasics(s) >= BALANCE.objectives.busAfterBuilds,
+    objective: (s) => buildMoreObjective(s),
+  },
+  // then the Team Bus: one line whether or not the cash is all there (its price tag takes what the player has)
   {
     id: 'pitch',
-    ready: (s) => padDone(s, 'p_match') || (builtAfterBasics(s) >= BALANCE.objectives.busAfterBuilds && canAffordPad(s, 'p_match')),
     done: (s) => padDone(s, 'p_match'),
-    objective: (s) => withKey(padObjective(s, 'p_match'), 'tut.build_bus'),
+    objective: (s) => steadyPad(s, 'p_match', 'tut.build_bus'),
   },
   {
     id: 'match',
@@ -85,7 +91,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => pileObjective(s, 'safe', 'tut.safe'),
   },
   // ── Training Ground (starts once the gate shows up)
-  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => gateObjective(s, 'p2_gate') },
+  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => steadyPad(s, 'p2_gate', 'tut.open_gate') },
   { id: 'water', done: (s) => padDone(s, 'p2_water'), objective: (s) => padObjective(s, 'p2_water') },
   { id: 'gym', done: (s) => padDone(s, 'p2_gym'), objective: (s) => padObjective(s, 'p2_gym') },
   {
@@ -94,7 +100,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => ballObjective(s, 'gym'),
   },
   // ── Youth Stadium (starts once its gate shows up)
-  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => gateObjective(s, 'p3_gate') },
+  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => steadyPad(s, 'p3_gate', 'tut.open_gate') },
   { id: 'kit', done: (s) => padDone(s, 'p3_kit'), objective: (s) => padObjective(s, 'p3_kit') },
   { id: 'crossing', done: (s) => padDone(s, 'p3_crossing'), objective: (s) => padObjective(s, 'p3_crossing') },
   {
@@ -123,12 +129,33 @@ function builtAfterBasics(sim: Sim): number {
 }
 
 /**
- * An area gate: one steady line ("Open the Training Ground Gate") whether or not the cash is there yet. Standing on
- * its price tag pays in whatever the player has, so "Unlock" / "Save up" used to flip every few seconds.
+ * A pad with one steady line ("Build the Team Bus", "Open the Training Ground Gate") whether or not the cash is there
+ * yet. Standing on a price tag pays in whatever the player has, so "Unlock" / "Save up" used to flip every few seconds.
  */
-function gateObjective(sim: Sim, padId: string): Objective | null {
+function steadyPad(sim: Sim, padId: string, key: string): Objective | null {
   const o = padObjective(sim, padId);
-  return o ? { ...o, key: 'tut.open_gate', saving: o.key === 'obj.save_for' } : null;
+  return o ? { ...o, key, saving: o.key === 'obj.save_for' } : null;
+}
+
+/** "Build 2 more things (n/2)": the cheapest affordable price tag (not the bus or a gate), else the biggest fee pile. */
+function buildMoreObjective(sim: Sim): Objective | null {
+  const params = { n: builtAfterBasics(sim), total: BALANCE.objectives.busAfterBuilds };
+  const c = sim.state.coach;
+  let pad = c.padId && sim.paying ? (sim.world.pads.get(c.padId) ?? null) : null;
+  if (!pad) {
+    for (const p of sim.visiblePads()) {
+      if (p.area !== 1 || p.id === 'p_match' || !sim.canAfford(p)) continue;
+      if (!pad || sim.padRemaining(p) < sim.padRemaining(pad)) pad = p;
+    }
+  }
+  if (pad) {
+    const o = padObjective(sim, pad.id);
+    if (o) return { ...o, key: 'tut.build_n', params };
+  }
+  let best = null as (typeof sim.state.piles)[number] | null;
+  for (const p of sim.state.piles) if (p.amount >= 1 && (!best || p.amount > best.amount)) best = p;
+  const pile = pileObjective(sim, best?.id ?? 'st:shooting_goal');
+  return pile ? { ...pile, key: 'tut.build_n', params, saving: true } : null;
 }
 
 /** A route step's own wording for an "Unlock X" objective (a "Save up" one keeps its own text). */

@@ -139,7 +139,7 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = window.__wk!.sim as unknown as S & { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> } };
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
-      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'sell']) sim.state.flags['tut:' + k] = true;
+      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
       sim.state.records.matches = 1;
       sim.state.records.sold = 1;
       sim.state.cash = 0;

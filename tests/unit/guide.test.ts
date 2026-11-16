@@ -75,10 +75,14 @@ describe('guide: fixed tutorial route, then hidden', () => {
       while (i < basics.length && !(basics[i] as string).split('|').includes(k) && !(i >= 6 && ['obj.grab_balls', 'obj.bring_balls'].includes(k)) && k !== 'obj.sign') i++;
       expect(i, `unexpected step ${k} in ${msg}`).toBeLessThan(basics.length);
     }
-    // after the cones: no chores and no "save up", only the next lessons, each once: the Team Bus (when affordable),
+    // after the cones: no chores and no "save up", only the next lessons, each once: build 2 more things, the Team Bus,
     // the first match, the free upgrade; the sell intro when a graduate waits
-    const after = tut.slice(cones + 1).filter((k) => k !== 'tut.graduate');
-    expect(after, msg).toEqual(['tut.build_bus', 'tut.match', 'tut.upgrade_free']);
+    // (a lost hint in between may split one task in two entries: count it once)
+    const after = tut
+      .slice(cones + 1)
+      .filter((k) => k !== 'tut.graduate')
+      .filter((k, j, a) => k !== a[j - 1]);
+    expect(after, msg).toEqual(['tut.build_n', 'tut.build_bus', 'tut.match', 'tut.upgrade_free']);
     expect(tut, msg).not.toContain('obj.save_for');
     expect(sim.state.pads.p_cones?.done).toBe(true);
     for (const f of ['cones', 'pitch', 'match', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
@@ -188,7 +192,7 @@ describe('tutorial: the first upgrade is free', () => {
     sim.state.records.matches = 1;
     expect(sim.firstUpgradeFree()).toBe(true);
     expect(sim.cheapestUpgrade()?.cost).toBe(0);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.upgrade_free');
     const cash = sim.state.cash;
@@ -206,7 +210,7 @@ describe('tutorial: area gates keep one line', () => {
   it('shows "Open the Training Ground Gate" whether or not the cash is there (no Save up / Unlock flip)', () => {
     const sim = new Sim(createInitialState(AREA1, 8));
     for (const p of AREA1.pads) if (p.area === 1) sim.unlockPad(p);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'pitch', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
     sim.state.cash = 0;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.open_gate');
@@ -214,5 +218,34 @@ describe('tutorial: area gates keep one line', () => {
     sim.state.cash = 1e6;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.open_gate');
+  });
+});
+
+describe('tutorial: build 2 more things after the cones', () => {
+  it('keeps one task with a counter, points at an affordable price tag or the fees, then the Team Bus', () => {
+    const sim = new Sim(createInitialState(AREA1, 9));
+    for (const id of ['p_crate', 'p_goal', 'p_cones']) sim.unlockPad(sim.world.pads.get(id)!);
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones']) sim.state.flags['tut:' + k] = true;
+    sim.state.flags.firstCash = true;
+    sim.state.cash = 0;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.build_n');
+    expect(sim.guide.objective?.params).toEqual({ n: 0, total: BALANCE.objectives.busAfterBuilds });
+    expect(sim.guide.objective?.saving).toBe(true); // nothing affordable: the fees
+    sim.state.cash = 1000;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.build_n');
+    const target = sim.guide.objective?.targetId ?? '';
+    expect(target.startsWith('p_')).toBe(true);
+    expect(target).not.toBe('p_match');
+    sim.unlockPad(sim.world.pads.get(target)!);
+    sim.tick(STEP);
+    expect(sim.guide.objective?.params?.n).toBe(1);
+    sim.unlockPad(sim.world.pads.get(sim.guide.objective!.targetId)!);
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.build_bus');
+    sim.state.cash = 0;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.build_bus'); // one line, with or without the cash
   });
 });

@@ -329,19 +329,21 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   6. collect training fees (an empty basket may ask for balls first);
   7. **"Build more drills to earn more: Dribble Cones"**.
   - The starting cash pays the crate and the goal; the first fees pay the cones.
-- **Then the tutorial goes quiet.** Price tags glow when affordable, and the player builds on their own. The lost hint (8 s idle / 20 s without progress) is unchanged.
-- **Later lessons appear only once they can be done straight away:**
+- **Then one steady task: "Build 2 more things (0/2)".** The counter goes up with every build, and the arrow points to the cheapest affordable price tag (never the bus or a gate). While nothing is affordable it points to the biggest fee pile, and the lost hint can help (8 s idle / 20 s without progress). The task doesn't switch to sign / balls / fees.
+  - Added in 0.8.7. The first rework went quiet after the cones; the developer: "why does the tutorial stop after building the cones". In real play that was a 75 s silence.
+  - The 2 is `BALANCE.objectives.busAfterBuilds`.
+- **Later lessons:**
   - "Office: sell {name} or add to your squad": when the first graduate waits.
-  - **"You can afford the Team Bus: build it!"**: once the player has built 2 more things after the cones (`BALANCE.objectives.busAfterBuilds`) and can pay for it. The developer asked for "let the player build a bit; when he has enough money the task appears".
+  - **"Build the Team Bus"** right after 2/2. It is one line whether or not the cash is all there: the price tag takes what the player has, so a bus that isn't affordable yet doesn't bring back a silent wait or a "Save up".
   - "Kick-off spot: play your first match".
   - **"Office: pick a free upgrade"**: the first upgrade is free once a match has been played (`Sim.firstUpgradeFree`). The office opens on its upgrades with a "Your first upgrade is free: pick one!" banner, so no tab-hunting.
   - Then one gold toast for 4 s, nothing to close: **"Build drills, train players, sell or play them!"** (`flags.tutDoneSeen`).
   - The meta side buttons appear from then on.
-- **Area gates keep one line:** "Open the Training Ground Gate" whether or not the cash is there. Standing on the price tag pays in whatever the player has, so "Save up" and "Unlock" used to flip every few seconds. The lost hint still helps while saving (`Objective.saving`).
+- **Area gates keep one line** (`steadyPad`, shared with the bus): "Open the Training Ground Gate" whether or not the cash is there. Standing on the price tag pays in whatever the player has, so "Save up" and "Unlock" used to flip every few seconds. The lost hint still helps while saving (`Objective.saving`).
 - **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, the office handled without tab clicks.
-  - The tasks came in this order: cones at 0:20, quiet until 1:36, the sell hint, the Team Bus at 1:40, the match, then the free upgrade. No task repeated.
-  - The unit route test checks the basics in order and that after the cones the route shows exactly bus → match → free upgrade (plus the sell hint), with no chores and no "Save up".
+  - 0.8.7: cones at 0:20, "Build 2 more things" from 0:22 (1/2 at 0:53), "Build the Team Bus" at 1:50, the sell hint at 2:19, the match, then the free upgrade; done at 2:32.
+  - The unit route test checks the basics in order and that after the cones the route shows exactly build 2 → bus → match → free upgrade (plus the sell hint), with no chores and no "Save up". A unit test also checks the counter, the targets and the steady bus line.
 - **Economy bot** (`npm run sim`):
   - The free upgrade makes the early game a little faster. A distracted bot may now open the Training Ground from 6:00 (was 7:00), matching #86's 5:30 for a focused bot.
   - Bug fix in the "never > 85 s with nothing affordable" check: it ran right after the bot's purchases in the same tick, so a run buying an upgrade every ~30 s counted as a dead stretch. A purchase in that tick now counts as affordable.
-- **Build:** `BUILD` 0.8.6.
+- **Build:** `BUILD` 0.8.7.
