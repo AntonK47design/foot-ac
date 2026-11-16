@@ -1,5 +1,8 @@
 # Tutorial plan from Playgama telemetry (2026-10-17 → 2026-11-16)
 
+> **Status:** sections 1 and 4 still apply. What was built is a simpler version of sections 2–3: one straight line
+> through Sunday Park to the first match and the Ball Boy, with no upgrade changes (DECISIONS §86).
+
 Source: Playgama Developer Console telemetry for *Kickoff Academy: Football Tycoon*: 1,087 sessions, 653 users,
 the `tut_*` step events (with `sec` = sim time), `minute_*` marks, and a sample of 25 session timelines (Nov 1–16).
 

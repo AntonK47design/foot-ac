@@ -56,7 +56,8 @@ export interface SimEvents {
   objectiveChanged: { objective: Objective | null };
   guideChanged: { objective: Objective | null; mode: GuideMode };
   /** A tutorial route step was completed (first-minute funnel). */
-  tutorialStep: { id: string };
+  /** `live`: done by the player just now (false: an old save catching up on a step added later). */
+  tutorialStep: { id: string; live: boolean };
   saveNeeded: { reason: string };
 }
 

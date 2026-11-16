@@ -343,6 +343,20 @@ body {
   height: 112%;
   object-fit: contain;
 }
+.obj-step {
+  /* opening-line counter ("3/14"): a small badge after the text */
+  flex: none;
+  order: 2;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  border: 2px solid var(--ol);
+  font-size: calc(var(--fs) * 0.8);
+  font-variant-numeric: tabular-nums;
+}
+.obj-step.hidden {
+  display: none;
+}
 .obj-text {
   /* up to two lines (tutorial explanations), then an ellipsis */
   display: -webkit-box;
@@ -1074,6 +1088,8 @@ body {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
+    /* centred with left: 50% the pill would only get half the screen to wrap in */
+    width: max-content;
     max-width: 88vw;
   }
   .objective.pop {

@@ -292,3 +292,19 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
   - The landscape cover shows the whole image, with the logo in the sky on the right.
   - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
+
+## 86. One straight opening line for the first ~5 minutes
+
+- **Why:** Playgama telemetry (30 days, 1,087 sessions; see `docs/TUTORIAL_PLAN.md`). The scripted first minute lost about 4 % of players per step and 83 % finished it. The old route ended after the Dribble Cones and the guide hid. A third of the players who got that far quit within the next 2–3 minutes, mostly before buying anything else. The first match came at a median of 8 minutes and 57 % of players never saw one.
+- **The line** (`sim/tutorial.ts`, the steps marked `core`), numbered in the objective pill ("9/16"):
+  - core loop: cash → Ball Crate → Shooting Goal → sign Leo → balls → fees → Dribble Cones (unchanged);
+  - Waiting Bench → Shooting Lane 2 → Team Bench → Passing Wall → Cone Lane 2 → Team Bus → **first match** → **Ball Boy** (first automation);
+  - after the Ball Boy, a gold toast says "the academy is yours". From then on the guide only appears when the player looks lost, as before.
+- **The first graduate cuts in** wherever they happen in the line (optional step): the office is explained at the moment of the first big payout.
+- **Never "wait":** while a build is unaffordable, the step shows the quickest way to earn the rest (`earnObjective`): cash on the ground that covers it → a graduate to sell → a drill out of balls → a player to sign → a basket to top up → a decent pile. It falls back to "Save up" only when there's nothing to do.
+- **No flicker:** an earn hint stays at least `objectives.earnHoldSec` (1.5 s) before a better one replaces it. It is never held back over the build itself, the next step, or "bring" once the coach has the supplies.
+- **Upgrades are left out on purpose.** The office upgrade intro comes after the line, unchanged.
+- **Analytics:** `tutorialStep` now carries `live`. Old saves catching up on steps added later don't send `tut_*` events or show the toast, so the funnel only counts new players.
+- **Pacing (route harness, Sunday Park):** the line ends at 1:46–1:58 for a perfect player and 3:06–3:49 for a distracted one (35–50 % efficiency). Real players were about 3.5× slower than the perfect bot through the old first minute, so we expect about 5–6 minutes. The economy bot follows the always-on objective, not the guide, so its checks are unchanged.
+- **Portrait pill fix:** the centred pill could only wrap in half the screen width ("Unlock Waiting…"). It is now `width: max-content`, capped at 88vw.
+- **What to watch on Playgama:** `tut_cones → tut_match` (was 52 %), `minute_3 / minute_1` users (was 73 %), median session (was 4.6 min).

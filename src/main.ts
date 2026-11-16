@@ -18,6 +18,7 @@ import { autoTier, FpsWatchdog, type Tier } from './view/quality';
 import { RenderCore } from './view/renderer';
 import { loadArea1Assets } from './view/assets';
 import type { Objective } from './sim/objectives';
+import { HANDOVER_STEP } from './sim/tutorial';
 import { DIVISIONS } from './data/clubs';
 import { computeOvr } from './sim/players';
 import { opponentsOf, pairings, sortedTable } from './sim/match';
@@ -584,7 +585,13 @@ async function boot(): Promise<void> {
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
-  sim.events.on('tutorialStep', (e) => analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) }));
+  sim.events.on('tutorialStep', (e) => {
+    // old saves catch up on steps added later: not part of the new-player funnel
+    if (!e.live) return;
+    analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
+    // the opening line is over: say so, so the hidden guide doesn't read as "the game stopped talking to me"
+    if (e.id === HANDOVER_STEP) hud.toast(t('tut.handover'), 'gold', 4000);
+  });
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());

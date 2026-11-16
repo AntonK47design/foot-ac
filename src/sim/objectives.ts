@@ -17,6 +17,8 @@ export interface Objective {
   targetId: string;
   /** World radius of the target zone (for the arrow / bot). */
   radius: number;
+  /** Opening-line counter shown on the pill ("3/14"); absent outside the line. */
+  step?: { n: number; total: number };
 }
 
 /**
@@ -74,21 +76,8 @@ export function computeObjective(sim: Sim): Objective | null {
   // 5. collect cash if the piles would make the next pad affordable
   let pileTotal = 0;
   for (const p of s.piles) pileTotal += Math.floor(p.amount);
-  const nearestPile = (): (typeof s.piles)[number] | null => {
-    let best = null as (typeof s.piles)[number] | null;
-    let bestD = Infinity;
-    for (const p of s.piles) {
-      if (p.amount < 1) continue;
-      const d = dist2(c.x, c.z, p.x, p.z) / Math.max(1, p.amount);
-      if (d < bestD) {
-        bestD = d;
-        best = p;
-      }
-    }
-    return best;
-  };
   if (cheapest && s.cash + pileTotal >= sim.padRemaining(cheapest)) {
-    const p = nearestPile();
+    const p = nearestPile(sim);
     if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
@@ -136,7 +125,7 @@ export function computeObjective(sim: Sim): Objective | null {
 
   // 7. any decent pile
   if (pileTotal >= BALANCE.objectives.minPileWorth) {
-    const p = nearestPile();
+    const p = nearestPile(sim);
     if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
   }
 
@@ -206,14 +195,79 @@ export function ballObjective(sim: Sim, stationId: string): Objective {
   return { key: o.grab, icon: o.icon, x: src.x, z: src.z, targetId: o.target, radius: BALANCE.crate.zoneRadius };
 }
 
-/** "Unlock X" when affordable, else "Save up: X" (tutorial route steps). */
-export function padObjective(sim: Sim, padId: string): Objective | null {
+/** "Unlock X" when affordable, else "Save up: X" (tutorial route steps). `key` replaces the "Unlock X" text. */
+export function padObjective(sim: Sim, padId: string, key = 'obj.unlock'): Objective | null {
   const p = sim.world.pads.get(padId);
   if (!p || !sim.isPadVisible(p)) return null;
   const afford = sim.canAfford(p) || (sim.state.coach.padId === p.id && sim.paying);
   return afford
-    ? { key: 'obj.unlock', params: { name: p.nameKey }, icon: p.icon, x: p.pos.x, z: p.pos.z, targetId: p.id, radius: BALANCE.pad.radius }
+    ? { key, params: { name: p.nameKey }, icon: p.icon, x: p.pos.x, z: p.pos.z, targetId: p.id, radius: BALANCE.pad.radius }
     : { key: 'obj.save_for', params: { name: p.nameKey, cost: Math.ceil(sim.padRemaining(p)) }, icon: p.icon, x: p.pos.x, z: p.pos.z, targetId: p.id, radius: BALANCE.pad.radius };
+}
+
+/**
+ * Linear-route build step: the pad when it can be paid, otherwise the quickest way to earn towards it (never "wait"):
+ * cash on the ground that covers it → a graduate to sell → a drill out of balls → a player to sign → a basket to top up
+ * → any decent pile → the fees about to land. Falls back to "Save up: X" at the pad.
+ */
+export function routePadObjective(sim: Sim, padId: string, key = 'obj.unlock'): Objective | null {
+  const p = sim.world.pads.get(padId);
+  if (!p || !sim.isPadVisible(p)) return null;
+  const pad = padObjective(sim, padId, key);
+  if (!pad || pad.key !== 'obj.save_for') return pad;
+  return earnObjective(sim, sim.padRemaining(p)) ?? pad;
+}
+
+/** Best action that brings in cash towards `need` (null: nothing useful to do right now). */
+export function earnObjective(sim: Sim, need: number): Objective | null {
+  const s = sim.state;
+  const area = sim.area;
+  let pileTotal = 0;
+  for (const p of s.piles) pileTotal += Math.floor(p.amount);
+  if (s.cash + pileTotal >= need) {
+    const p = nearestPile(sim);
+    if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
+  }
+  const grad = sim.podiumGraduate();
+  if (grad) {
+    const P = area.office.computer;
+    return { key: 'obj.podium', params: { name: firstName(grad) }, icon: 'podium', x: P.x, z: P.z, targetId: 'podium', radius: BALANCE.transfer.zoneRadius };
+  }
+  for (const supply of SUPPLIES) {
+    if (!needsCoach(sim, supply)) continue;
+    for (const t of s.trainees) if (sim.isWaitingForBalls(t) && t.stationId && sim.station(t.stationId).supply === supply) return ballObjective(sim, t.stationId);
+  }
+  const dt = sim.deskTrainee();
+  if (dt && sim.canSign()) {
+    const sp = area.desk.coachSpot;
+    return { key: 'obj.sign', params: { name: firstName(dt) }, icon: 'sign', x: sp.x, z: sp.z, targetId: 'desk', radius: BALANCE.desk.zoneRadius };
+  }
+  for (const supply of SUPPLIES) {
+    if (!needsCoach(sim, supply)) continue;
+    const st = sim.neediestStation(0.4, undefined, supply);
+    if (st) return ballObjective(sim, st);
+  }
+  if (pileTotal >= BALANCE.objectives.minPileWorth) {
+    const p = nearestPile(sim);
+    if (p) return { key: 'obj.collect_cash', icon: 'cash', x: p.x, z: p.z, targetId: p.id, radius: BALANCE.cash.collectRadius };
+  }
+  return null;
+}
+
+/** The pile worth walking to: most cash per distance² (null: every pile is empty). */
+function nearestPile(sim: Sim): Sim['state']['piles'][number] | null {
+  const c = sim.state.coach;
+  let best: Sim['state']['piles'][number] | null = null;
+  let bestD = Infinity;
+  for (const p of sim.state.piles) {
+    if (p.amount < 1) continue;
+    const d = dist2(c.x, c.z, p.x, p.z) / Math.max(1, p.amount);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
 }
 
 export function pileObjective(sim: Sim, pileId: string, key = 'obj.collect_cash'): Objective | null {

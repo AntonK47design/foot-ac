@@ -25,6 +25,7 @@ export class Hud {
   private readonly objPill: HTMLDivElement;
   private readonly objIcon: HTMLSpanElement;
   private readonly objText: HTMLSpanElement;
+  private readonly objStep: HTMLSpanElement;
   private readonly hint: HTMLDivElement;
   private readonly toasts: HTMLDivElement;
   readonly edge: HTMLDivElement;
@@ -70,6 +71,7 @@ export class Hud {
     this.objPill = el('div', 'objective hidden', this.root);
     this.objIcon = el('span', 'obj-icon', this.objPill);
     this.objText = el('span', 'obj-text', this.objPill);
+    this.objStep = el('span', 'obj-step hidden', this.objPill);
 
     this.hint = el('div', 'hint hidden', this.root);
     this.toasts = el('div', 'toasts', this.root);
@@ -181,6 +183,8 @@ export class Hud {
     if (typeof params.name === 'string' && hasKey(params.name)) params.name = t(params.name);
     this.objIcon.innerHTML = iconUrl ? `<img alt="" src="${iconUrl}">` : icon(o.icon === 'sign' ? 'sign' : o.icon);
     this.objText.textContent = t(o.key, params);
+    this.objStep.classList.toggle('hidden', !o.step);
+    if (o.step) this.objStep.textContent = t('tut.step', { n: o.step.n, total: o.step.total });
     this.objPill.classList.remove('hidden');
     this.objPill.classList.remove('pop');
     void this.objPill.offsetWidth;
