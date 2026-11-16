@@ -308,3 +308,25 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Pacing (route harness, Sunday Park):** the line ends at 1:46–1:58 for a perfect player and 3:06–3:49 for a distracted one (35–50 % efficiency). Real players were about 3.5× slower than the perfect bot through the old first minute, so we expect about 5–6 minutes. The economy bot follows the always-on objective, not the guide, so its checks are unchanged.
 - **Portrait pill fix:** the centred pill could only wrap in half the screen width ("Unlock Waiting…"). It is now `width: max-content`, capped at 88vw.
 - **What to watch on Playgama:** `tut_cones → tut_match` (was 52 %), `minute_3 / minute_1` users (was 73 %), median session (was 4.6 min).
+
+## 87. Performance telemetry, early analytics and a late Playgama Bridge
+
+- **Why:** Playgama had no frame-rate data for us (`performance_sample` was never sent). Also, 9 % of sessions (1,080 → 982) were lost between Bridge init and `sdk_ready`, and we couldn't see why:
+  - our `boot` event was sent before analytics was connected, so it never arrived;
+  - a Bridge slower than 2.5 s left the whole session on the mock: no analytics, ads or cloud save.
+- **`performance_sample`** (`core/perf.ts`, following the Playgama telemetry guide):
+  - one aggregate about every 30 s of visible gameplay, built from a preallocated ring buffer (no per-frame allocation);
+  - fields: `target_fps` (60, or 30 once the watchdog caps), `quality_tier`, `build_version`, FPS avg/p10, frame time p50/p95/p99/max, and frames over 50/100/250/500/1000 ms;
+  - optional fields where supported: long tasks, JS heap, error and rejection counts, WebGL context losses;
+  - left out: open panels, ads, portal pause and hidden tabs. The sampler resets when the loop restarts, and a gap over 5 s is never counted as a frame;
+  - a partial window (at least 5 s of play) is sent on hide/pagehide, so short sessions report too.
+- **Early analytics:** events tracked before the platform exists are queued (up to 20) and sent once the sink is set. `boot` now arrives with `ms` (JS running since page start), and `sdk_ready` also carries `ms`.
+- **Late Bridge:** the game still starts on the mock after 2.5 s (gameplay budget), but keeps waiting for the Bridge. When it arrives and the saves have been read (within 10 s), `Platform.upgrade` switches to it mid-session:
+  - replays `game_ready` / `gameplay_started`, completion, context and the pause / mute / auth listeners;
+  - re-enables ads and sends the analytics held meanwhile (up to 60);
+  - hands the save over by `lastSeen`: ours is pushed if newer; if the Bridge's is newer, the game reloads it through the auth-change path (toast);
+  - sends `sdk_late` {kind, ms, save_replaced};
+  - if the Bridge never comes, the held events are dropped.
+  
+  CrazyGames is unchanged.
+- **What to read on Playgama:** `boot` sessions vs `sdk_ready` vs `first_frame` (where loading drops off), `sdk_late` volume, and `performance_sample` by quality tier once there are 30+ sessions.

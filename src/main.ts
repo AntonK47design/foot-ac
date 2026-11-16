@@ -3,6 +3,7 @@ import { AREA1 } from './data/areas/area1';
 import { BALANCE } from './data/balance';
 import { BUILD, SAVE_VERSION } from './data/constants';
 import { analytics } from './core/analytics';
+import { PerfSampler } from './core/perf';
 import { RealClock } from './core/clock';
 import { formatCash, resolveLocale, setLocale, t } from './core/i18n';
 import { FixedLoop } from './core/loop';
@@ -45,10 +46,14 @@ function newSeed(): number {
 }
 
 async function boot(): Promise<void> {
-  analytics.track('boot');
+  // boot: our JS is downloaded and running (ms since the page started); held until the platform can send it
+  const sinceStart = (): number => Math.round(performance.now() - (window.__wkBootT0 ?? 0));
+  analytics.track('boot', { ms: sinceStart() });
   const platform: Platform = await createPlatform();
-  if (platform.hasAnalytics) analytics.setSink((e, p) => platform.track(e, p));
-  analytics.track('sdk_ready', { kind: platform.kind });
+  // always through the platform: it holds events while a late SDK may still arrive, and drops them on the mock
+  analytics.setSink((e, p) => platform.track(e, p));
+  analytics.track('sdk_ready', { kind: platform.kind, ms: sinceStart() });
+  platform.onUpgrade((u) => analytics.track('sdk_late', { kind: u.kind, ms: Math.round(u.ms), save_replaced: u.saveReplaced }));
   platform.loadingStart();
 
   const clock = new RealClock();
@@ -613,6 +618,12 @@ async function boot(): Promise<void> {
   const mouse = { x: 0, z: 0 };
   const minuteMarks = [1, 3, 5, 10, 15];
   let playSec = 0;
+  // performance_sample: frame-time aggregates of visible gameplay, ~every 30 s (Playgama telemetry guide)
+  const perf = new PerfSampler(
+    (e, p) => analytics.track(e, p),
+    () => ({ target_fps: loop.fpsCap || 60, quality_tier: core.tier, build_version: BUILD }),
+  );
+  perf.observe(window);
   const watchdog = new FpsWatchdog(() => {
     if (settings.graphics !== 'auto') return false;
     const next: Tier | null = core.tier === 'high' ? 'mid' : core.tier === 'mid' ? 'low' : null;
@@ -670,6 +681,7 @@ async function boot(): Promise<void> {
         updateHint();
         void import('./view/music').then((m) => m.startMusic(audio)).catch(() => undefined);
       }
+      perf.frame(performance.now(), blockers.size === 0 && !document.hidden);
       if (watchdog.sample(frameDt) && loop.fpsCap === 0) {
         loop.fpsCap = 30;
         platform.record('fps cap 30');
@@ -711,24 +723,30 @@ async function boot(): Promise<void> {
     if (document.hidden) {
       hiddenAt = clock.now();
       loop.stop();
+      perf.flush(performance.now());
       audio.setHidden(true);
       persist('hidden');
     } else {
       audio.setHidden(false);
       watchdog.reset();
+      perf.reset();
       if (!blockers.has('ctx')) loop.start();
       const away = hiddenAt ? (clock.now() - hiddenAt) / 1000 : 0;
       hiddenAt = 0;
       if (away >= BALANCE.meta.offline.minSec && blockers.size === 0) welcomeBack(away);
     }
   });
-  window.addEventListener('pagehide', () => persist('pagehide'));
+  window.addEventListener('pagehide', () => {
+    persist('pagehide');
+    perf.flush(performance.now());
+  });
 
   // ── WebGL context loss
   let ctxOverlay: HTMLDivElement | null = null;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     loop.stop();
+    perf.contextLost();
     blockers.add('ctx');
     persist('ctxlost');
   });
@@ -741,6 +759,7 @@ async function boot(): Promise<void> {
       ctxOverlay = null;
       blockers.delete('ctx');
       resize();
+      perf.reset();
       loop.start();
     });
     gameEl.appendChild(ctxOverlay);
