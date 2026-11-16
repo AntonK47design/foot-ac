@@ -554,8 +554,8 @@ async function boot(): Promise<void> {
     if (metaHudT > 0) return;
     metaHudT = 0.25;
     const st = sim.state;
-    // a new academy sees only the core loop: the meta buttons appear once the Sunday Park route (up to the first upgrade) is done
-    const route = !!st.flags['tut:upgrade'];
+    // a new academy sees only the core loop: the meta buttons appear once the Sunday Park route (its last step, the next big thing) is done
+    const route = !!st.flags['tut:next'];
     hud.setTickets(st.tickets, route && (st.tickets > 0 || Meta.unlocked(st, 'daily')));
     const qn = Meta.questsClaimable(st);
     hud.setButton('quests', route && Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
@@ -589,8 +589,9 @@ async function boot(): Promise<void> {
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
   sim.events.on('tutorialStep', (e) => {
     analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
-    // the route ends with the first upgrade: one short line, once (not for old saves passing the step on load)
-    if (e.id === 'upgrade' && !sim.state.flags.tutDoneSeen && sim.state.records.matches <= 3) {
+    // the route ends with step 10 (Team Bus / Ball Boy / first graduate): one short line, once (not for old saves
+    // passing the step on load)
+    if (e.id === 'next' && !sim.state.flags.tutDoneSeen && sim.state.records.matches <= 3) {
       sim.state.flags.tutDoneSeen = true;
       hud.toast(t('tut.done'), 'gold', 4000);
     }
@@ -681,7 +682,7 @@ async function boot(): Promise<void> {
       const as = sim.areaStars();
       hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
-      const route = !!sim.state.flags['tut:upgrade'];
+      const route = !!sim.state.flags['tut:next'];
       hud.setSideButtons(route && (sim.state.squad.length > 0 || sim.state.records.promoted > 0), route && !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;

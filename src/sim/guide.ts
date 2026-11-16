@@ -42,7 +42,7 @@ export class Guide {
 
   private set(mode: GuideMode, o: Objective | null): void {
     const prev = this.objective;
-    const changed = mode !== this.mode || !prev !== !o || (prev && o && (prev.key !== o.key || prev.targetId !== o.targetId || prev.params?.name !== o.params?.name));
+    const changed = mode !== this.mode || !prev !== !o || (prev && o && (prev.key !== o.key || prev.targetId !== o.targetId || prev.params?.name !== o.params?.name || prev.params?.n !== o.params?.n));
     this.mode = mode;
     this.objective = o;
     if (changed) this.sim.events.emit('guideChanged', { objective: o, mode });

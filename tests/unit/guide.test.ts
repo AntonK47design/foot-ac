@@ -4,6 +4,8 @@ import { BALANCE } from '../../src/data/balance';
 import { Sim, createInitialState } from '../../src/sim/sim';
 
 const STEP = 1 / 60;
+/** The Sunday Park route (steps 1–10). */
+const CORE = ['cash', 'crate', 'goal', 'sign', 'fees', 'cones', 'refill', 'grow', 'grow2', 'next'];
 
 /**
  * What the panels do when the player steps into a prompt: plays the match at the kick-off spot; at the office sells
@@ -63,38 +65,35 @@ describe('guide: fixed tutorial route, then hidden', () => {
       const k = e.objective ? `${e.mode}:${e.objective.key}` : `${e.mode}`;
       if (seen[seen.length - 1] !== k) seen.push(k);
     });
-    for (let t = 0; t < 900 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
+    for (let t = 0; t < 900 && !sim.state.flags['tut:next']; t += 1) play(sim, 1);
     const tut = seen.filter((k) => k.startsWith('tutorial:')).map((k) => k.slice(9));
     const msg = tut.join(' → ');
-    // the basics, strictly in order (in the fees step an empty basket may ask for balls first)
-    const basics = ['obj.collect_cash', 'tut.build_tag', 'obj.unlock', 'obj.meet_first|obj.sign', 'obj.grab_balls', 'obj.bring_balls', 'obj.collect_fees', 'tut.build_more'];
-    const cones = tut.indexOf('tut.build_more');
-    expect(cones, msg).toBeGreaterThan(0);
-    let i = 0;
-    for (const k of tut.slice(0, cones + 1)) {
-      while (i < basics.length && !(basics[i] as string).split('|').includes(k) && !(i >= 6 && ['obj.grab_balls', 'obj.bring_balls'].includes(k)) && k !== 'obj.sign') i++;
-      expect(i, `unexpected step ${k} in ${msg}`).toBeLessThan(basics.length);
-    }
-    // after the cones: no chores and no "save up", only the next lessons, each once: build 2 more things, the Team Bus,
-    // the first match, the free upgrade; the sell intro when a graduate waits
-    // (a lost hint in between may split one task in two entries: count it once)
-    const after = tut
-      .slice(cones + 1)
-      .filter((k) => k !== 'tut.graduate')
-      .filter((k, j, a) => k !== a[j - 1]);
-    expect(after, msg).toEqual(['tut.build_n', 'tut.build_bus', 'tut.match', 'tut.upgrade_free']);
+    // 1–6 strictly in order, exactly once each
+    expect(tut.slice(0, 6), msg).toEqual(['obj.collect_cash', 'tut.build_tag', 'obj.unlock', 'tut.sign_first', 'obj.collect_fees', 'tut.build_more']);
+    // 7: fill up the baskets (grab, then bring), then never again
+    const rest = tut.slice(6);
+    // (bring right away when the coach already picked balls up walking past the crate)
+    expect(['tut.refill_grab', 'tut.refill_bring'], msg).toContain(rest[0]);
+    const lastRefill = Math.max(rest.lastIndexOf('tut.refill_grab'), rest.lastIndexOf('tut.refill_bring'));
+    const grow = ['tut.sign_new', 'tut.sign_next', 'tut.build_station', 'tut.build_station_fees'];
+    const firstGrow = rest.findIndex((k) => grow.includes(k));
+    expect(firstGrow, msg).toBeGreaterThan(lastRefill);
+    // 8–10 and the one-time hints only: no chores (grab / bring / sign / fees as their own tasks) and no "save up"
+    const allowed = [...grow, 'tut.next_big', 'tut.graduate', 'tut.match', 'tut.upgrade_free'];
+    for (const k of rest.slice(lastRefill + 1)) expect(allowed, msg).toContain(k);
     expect(tut, msg).not.toContain('obj.save_for');
-    expect(sim.state.pads.p_cones?.done).toBe(true);
-    for (const f of ['cones', 'pitch', 'match', 'upgrade']) expect(sim.state.flags['tut:' + f], f).toBe(true);
-    // after the route: nothing is forced on the player
-    expect(['hidden', 'lost']).toContain(sim.guide.mode);
+    for (const f of ['sign', 'fees', 'cones', 'refill', 'grow', 'grow2', 'next']) expect(sim.state.flags['tut:' + f], f).toBe(true);
+    expect(sim.state.stats.signed).toBeGreaterThan(BALANCE.objectives.tutFirstSigns);
+    // after the route: nothing is forced on the player (or a one-time hint that can be done right away)
+    expect(['hidden', 'lost', 'tutorial']).toContain(sim.guide.mode);
   });
 
   it('shows a hint when the player stands still, and hides it again on progress', () => {
     const sim = new Sim(createInitialState(AREA1, 7));
-    // play until the Sunday Park route (ending with the first upgrade) is done
-    for (let t = 0; t < 900 && !sim.state.flags['tut:upgrade']; t += 1) play(sim, 1);
-    expect(sim.state.flags['tut:upgrade']).toBe(true);
+    // play until the Sunday Park route is done, with the one-time hints out of the way
+    for (let t = 0; t < 900 && !sim.state.flags['tut:next']; t += 1) play(sim, 1);
+    expect(sim.state.flags['tut:next']).toBe(true);
+    for (const k of ['graduate', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
     // stand still
     for (let t = 0; t < BALANCE.objectives.lostIdleSec + 0.5; t += STEP) {
       sim.input.x = sim.input.z = 0;
@@ -192,7 +191,7 @@ describe('tutorial: the first upgrade is free', () => {
     sim.state.records.matches = 1;
     expect(sim.firstUpgradeFree()).toBe(true);
     expect(sim.cheapestUpgrade()?.cost).toBe(0);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
+    for (const k of [...CORE, 'graduate', 'match']) sim.state.flags['tut:' + k] = true;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.upgrade_free');
     const cash = sim.state.cash;
@@ -210,7 +209,7 @@ describe('tutorial: area gates keep one line', () => {
   it('shows "Open the Training Ground Gate" whether or not the cash is there (no Save up / Unlock flip)', () => {
     const sim = new Sim(createInitialState(AREA1, 8));
     for (const p of AREA1.pads) if (p.area === 1) sim.unlockPad(p);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
+    for (const k of [...CORE, 'graduate', 'match', 'upgrade', 'safe']) sim.state.flags['tut:' + k] = true;
     sim.state.cash = 0;
     sim.tick(STEP);
     expect(sim.guide.objective?.key).toBe('tut.open_gate');
@@ -221,31 +220,67 @@ describe('tutorial: area gates keep one line', () => {
   });
 });
 
-describe('tutorial: build 2 more things after the cones', () => {
-  it('keeps one task with a counter, points at an affordable price tag or the fees, then the Team Bus', () => {
-    const sim = new Sim(createInitialState(AREA1, 9));
+describe('tutorial: steps 4–10', () => {
+  /** Sunday Park built up to the cones, the route at step 7. */
+  function atRefill(seed: number): Sim {
+    const sim = new Sim(createInitialState(AREA1, seed));
     for (const id of ['p_crate', 'p_goal', 'p_cones']) sim.unlockPad(sim.world.pads.get(id)!);
-    for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones']) sim.state.flags['tut:' + k] = true;
+    for (const k of ['cash', 'crate', 'goal', 'sign', 'fees', 'cones']) sim.state.flags['tut:' + k] = true;
     sim.state.flags.firstCash = true;
-    sim.state.cash = 0;
+    sim.state.stats.signed = BALANCE.objectives.tutFirstSigns;
+    return sim;
+  }
+
+  it('the first drill opens with some balls, the next ones empty', () => {
+    const sim = atRefill(3);
+    expect(sim.state.stations.shooting_goal!.balls).toBe(BALANCE.basket.firstFill);
+    expect(sim.state.stations.dribble_cones!.balls).toBe(0);
+  });
+
+  it('step 4 counts the first sign-ups', () => {
+    const sim = new Sim(createInitialState(AREA1, 4));
+    for (const id of ['p_crate', 'p_goal']) sim.unlockPad(sim.world.pads.get(id)!);
+    for (const k of ['cash', 'crate', 'goal']) sim.state.flags['tut:' + k] = true;
+    sim.state.flags.firstCash = true;
     sim.tick(STEP);
-    expect(sim.guide.objective?.key).toBe('tut.build_n');
-    expect(sim.guide.objective?.params).toEqual({ n: 0, total: BALANCE.objectives.busAfterBuilds });
-    expect(sim.guide.objective?.saving).toBe(true); // nothing affordable: the fees
+    expect(sim.guide.objective?.key).toBe('tut.sign_first');
+    expect(sim.guide.objective?.params).toEqual({ n: 0, total: BALANCE.objectives.tutFirstSigns });
+  });
+
+  it('step 7 fills up the baskets once: grab at the crate, bring, done after one delivery', () => {
+    const sim = atRefill(5);
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.refill_grab');
+    sim.state.coach.carry = 3;
+    sim.state.coach.carryKind = 'ball';
+    sim.state.stations.shooting_goal!.balls = 0;
+    sim.tick(STEP);
+    expect(sim.guide.objective?.key).toBe('tut.refill_bring');
+    sim.state.flags.refillTaught = true;
+    sim.tick(STEP);
+    expect(sim.state.flags['tut:refill']).toBe(true);
+    expect(['tut.sign_new', 'tut.sign_next', 'tut.build_station', 'tut.build_station_fees']).toContain(sim.guide.objective?.key);
+  });
+
+  it('steps 8–9: sign a new player and build a new station, whichever comes first, then step 10', () => {
+    const sim = atRefill(6);
+    sim.state.flags['tut:refill'] = true;
     sim.state.cash = 1000;
     sim.tick(STEP);
-    expect(sim.guide.objective?.key).toBe('tut.build_n');
-    const target = sim.guide.objective?.targetId ?? '';
-    expect(target.startsWith('p_')).toBe(true);
-    expect(target).not.toBe('p_match');
-    sim.unlockPad(sim.world.pads.get(target)!);
+    // nobody at the desk yet: the station first
+    expect(sim.guide.objective?.key).toBe('tut.build_station');
+    const pad = sim.guide.objective!.targetId;
+    sim.unlockPad(sim.world.pads.get(pad)!);
     sim.tick(STEP);
-    expect(sim.guide.objective?.params?.n).toBe(1);
-    sim.unlockPad(sim.world.pads.get(sim.guide.objective!.targetId)!);
+    expect(sim.state.flags['tut:grow']).toBe(true);
+    // the other one: a new player
+    expect(['tut.sign_new', 'tut.sign_next']).toContain(sim.guide.objective?.key);
+    sim.state.stats.signed = BALANCE.objectives.tutFirstSigns + 1;
     sim.tick(STEP);
-    expect(sim.guide.objective?.key).toBe('tut.build_bus');
+    expect(sim.state.flags['tut:grow2']).toBe(true);
+    expect(sim.guide.objective?.key).toBe('tut.next_big');
     sim.state.cash = 0;
     sim.tick(STEP);
-    expect(sim.guide.objective?.key).toBe('tut.build_bus'); // one line, with or without the cash
+    expect(sim.guide.objective?.key).toBe('tut.next_big'); // one line, with or without the cash
   });
 });

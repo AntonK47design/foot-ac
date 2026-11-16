@@ -28,7 +28,12 @@ export const BALANCE = {
     signFee: 6,
   },
   crate: { zoneRadius: 1.4 },
-  basket: { zoneRadius: 1.35 },
+  basket: {
+    zoneRadius: 1.35,
+    /** Balls in the first drill's basket when it opens: enough for the first fees (the cones) before anyone has to
+     * bring balls (tutorial step 7 teaches that at the next drill, which opens empty). */
+    firstFill: 4,
+  },
   /**
    * Opening boost for brand-new players: during the first `sec` seconds of play everything that makes the first
    * minute wait (bus, walking, signing, changing, reps) runs faster and reps pay more, then eases back to normal
@@ -282,8 +287,8 @@ export const BALANCE = {
     lostNoProgressSec: 20,
     /** While shown that way, the suggestion is re-picked at most this often (no flip-flopping). */
     lostRefreshSec: 8,
-    /** Tutorial: the Team Bus step waits until the player has built this many more things after the Dribble Cones… */
-    busAfterBuilds: 2,
+    /** Tutorial step 4: sign this many first players at the desk. */
+    tutFirstSigns: 2,
   },
   camera: {
     /** Visible world width (m) at the focus point at the base view: portrait → landscape. */

@@ -79,8 +79,8 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = (window.__wk as unknown as W).sim;
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
-      // past the first-session route (the side buttons show once it ends with the first upgrade)
-      (sim.state.flags as Record<string, boolean>)['tut:upgrade'] = true;
+      // past the first-session route (the side buttons show once it ends)
+      (sim.state.flags as Record<string, boolean>)['tut:next'] = true;
       const t = sim.spawnTrainee();
       if (t) sim.graduate(t);
     });
@@ -139,7 +139,7 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = window.__wk!.sim as unknown as S & { unlockPad(p: unknown): void; world: { pads: Map<string, unknown> } };
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
-      for (const k of ['cash', 'crate', 'goal', 'sign', 'grab', 'bring', 'fees', 'cones', 'graduate', 'builds', 'pitch', 'match']) sim.state.flags['tut:' + k] = true;
+      for (const k of ['cash', 'crate', 'goal', 'sign', 'fees', 'cones', 'refill', 'grow', 'grow2', 'next', 'graduate', 'match']) sim.state.flags['tut:' + k] = true;
       sim.state.records.matches = 1;
       sim.state.records.sold = 1;
       sim.state.cash = 0;

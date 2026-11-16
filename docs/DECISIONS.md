@@ -311,39 +311,33 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Analytics:** every event carries `build_version` (`BUILD`, now `0.8.0`; bump it on every portal upload).
 - **To measure** on 0.8.0: new players who play a match (about 50 % now), when the first match happens (median 7:54 now), sessions that reach 10 min (29 % now).
 
-## 87. Tutorial rework: one task at a time, never waiting for money, building explained, one closing line
+## 87. The tutorial route as the developer specified it: ten steps, one task at a time
 
-- **Why:** the developer's playtest: "the player always gets stuck because the tasks change and keep the player in a loop; the core mechanic of buying new stations is never explained; the popup is too long." Every attempt that had a step wait for money had to send the player off to earn it. Earning is a loop (sign → balls → fees), so however it was ordered the player saw changing, repeating tasks.
-  - Dropped along the way: a permanent "next goal" pill, a bare "Save up: Team Bus" step, chore guidance while waiting for a graduate or upgrade money, and a 4-line "What's next?" card.
-- **Rules** (`sim/tutorial.ts`):
-  - One task on screen, done with one action, never coming back.
-  - No step waits for money.
-  - Building is named as the mechanic.
-  - At most one short line to read.
-- **Sunday Park**, strictly in order (about 20 s):
-  1. collect cash;
+- **Why:** several attempts in this session left players stuck in changing, looping tasks, never explained building stations, or never taught refilling balls (the fixed grab/bring steps were done by accident walking past the crate and never seen). The developer then specified the route.
+- **The route** (`sim/tutorial.ts`), strictly in order, each task done by doing it once:
+  1. collect the start money;
   2. **"Step on the price tag to build the Ball Crate"**;
   3. Shooting Goal;
-  4. sign Leo;
-  5. grab, then bring balls;
-  6. collect training fees (an empty basket may ask for balls first);
-  7. **"Build more drills to earn more: Dribble Cones"**.
-  - The starting cash pays the crate and the goal; the first fees pay the cones.
-- **Then one steady task: "Build 2 more things (0/2)".** The counter goes up with every build, and the arrow points to the cheapest affordable price tag (never the bus or a gate). While nothing is affordable it points to the biggest fee pile, and the lost hint can help (8 s idle / 20 s without progress). The task doesn't switch to sign / balls / fees.
-  - Added in 0.8.7. The first rework went quiet after the cones; the developer: "why does the tutorial stop after building the cones". In real play that was a 75 s silence.
-  - The 2 is `BALANCE.objectives.busAfterBuilds`.
-- **Later lessons:**
-  - "Office: sell {name} or add to your squad": when the first graduate waits.
-  - **"Build the Team Bus"** right after 2/2. It is one line whether or not the cash is all there: the price tag takes what the player has, so a bus that isn't affordable yet doesn't bring back a silent wait or a "Save up".
-  - "Kick-off spot: play your first match".
-  - **"Office: pick a free upgrade"**: the first upgrade is free once a match has been played (`Sim.firstUpgradeFree`). The office opens on its upgrades with a "Your first upgrade is free: pick one!" banner, so no tab-hunting.
-  - Then one gold toast for 4 s, nothing to close: **"Build drills, train players, sell or play them!"** (`flags.tutDoneSeen`).
-  - The meta side buttons appear from then on.
-- **Area gates keep one line** (`steadyPad`, shared with the bus): "Open the Training Ground Gate" whether or not the cash is there. Standing on the price tag pays in whatever the player has, so "Save up" and "Unlock" used to flip every few seconds. The lost hint still helps while saving (`Objective.saving`).
-- **Tested with real play:** a fresh game at 390×844, steered only with arrow keys, the office handled without tab clicks.
-  - 0.8.7: cones at 0:20, "Build 2 more things" from 0:22 (1/2 at 0:53), "Build the Team Bus" at 1:50, the sell hint at 2:19, the match, then the free upgrade; done at 2:32.
-  - The unit route test checks the basics in order and that after the cones the route shows exactly build 2 → bus → match → free upgrade (plus the sell hint), with no chores and no "Save up". A unit test also checks the counter, the targets and the steady bus line.
+  4. **"Sign your first players at the desk (n/2)"** (`BALANCE.objectives.tutFirstSigns`);
+  5. collect training fees;
+  6. **"Build more drills to earn more: Dribble Cones"**;
+  7. **"Fill up the baskets: grab balls at the crate" → "Bring the balls to the basket"**, once: done after one delivery made once the route reached step 7 (`flags.refillTaught`). Holding balls always shows "bring";
+  8. and 9. **"Sign the new player: {name}"** and **"Build a new station: {name}"**, whichever is possible first, then the other. While no drill or lane is affordable, "Collect fees to build a new station" points at the fees; with nobody at the desk, "Sign the next new player at the desk";
+  10. **"Next: build the Team Bus or hire a Ball Boy"**, one line whether or not the cash is there. If a player has finished training, the office decision comes first ("Office: sell {name} or add to your squad").
+  - Then one gold toast: "Build drills, train players, sell or play them!". The meta side buttons appear from then on (`tut:next`).
+- **For steps 5–6 to work before step 7,** the first drill opens with 4 balls in its basket (`BALANCE.basket.firstFill`). Baskets used to open empty, so without balls nobody trained and no fees came. Later drills open empty, which is where step 7 sends the player.
+- **One-time hints after the route,** each when it can be done straight away:
+  - the first match;
+  - **"Office: pick a free upgrade"**: the first upgrade is free once a match is played (`Sim.firstUpgradeFree`, the developer's choice; the office opens on its upgrades with a banner);
+  - the graduate decision;
+  - the area gates ("Open the Training Ground Gate": one steady line, `steadyPad`).
+  - `currentStep` now marks a step done even while it isn't showing, so a hint done on the player's own (the free upgrade taken from the office) is never asked for again.
+- **Dropped earlier in this session:** a permanent "next goal" pill; "Save up: Team Bus"; chores while waiting for money; a 4-line "What's next?" card; "Build 2 more things"; a long silent stretch after the cones.
+- **Guide:** the pill also refreshes when a step's counter changes (`params.n`), not only when its target changes.
+- **Tested with real play** (fresh game, 390×844, arrow keys only, the office handled without tab clicks): the steps came in exactly the developer's order. Sign 0/2 at 0:07, cones at 0:17, fill up the baskets at 0:23, sign Wren at 0:28, new station at 0:42, Team Bus or Ball Boy at 0:43; the bus and first match by 1:20, then the free upgrade; the sell hint at 2:29.
+- **Unit tests:** steps 1–6 in order and once each; step 7 before anything of steps 8–10 and never after; no chores or "Save up" after it. Also covered: the counter, the either/or of steps 8–9, the steady step-10 line, the first basket's fill and the free upgrade.
 - **Economy bot** (`npm run sim`):
   - The free upgrade makes the early game a little faster. A distracted bot may now open the Training Ground from 6:00 (was 7:00), matching #86's 5:30 for a focused bot.
-  - Bug fix in the "never > 85 s with nothing affordable" check: it ran right after the bot's purchases in the same tick, so a run buying an upgrade every ~30 s counted as a dead stretch. A purchase in that tick now counts as affordable.
-- **Build:** `BUILD` 0.8.7.
+  - A full first basket (8 balls) pushed one run's Youth Stadium to 33:06 (limit 34:00), so the first fill is 4. That passes every check unchanged.
+  - Bug fix in the "never > 85 s with nothing affordable" check: a purchase in the same tick now counts as affordable.
+- **Build:** `BUILD` 0.8.8.

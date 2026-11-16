@@ -713,7 +713,9 @@ export class Sim {
     if (u.type === 'station') {
       s.built[u.id] = true;
       const st = this.station(u.id);
-      s.stations[u.id] = { lanes: 1, balls: 0, occupants: [0], queue: [] };
+      // the first drill opens with some balls in its basket: the first fees come before anyone has to bring balls (that is
+      // tutorial step 7, at the next drill, which opens empty)
+      s.stations[u.id] = { lanes: 1, balls: u.id === 'shooting_goal' ? Math.min(st.cfg.basketCap, BALANCE.basket.firstFill) : 0, occupants: [0], queue: [] };
       if (!this.pile('st:' + u.id)) s.piles.push({ id: 'st:' + u.id, x: st.pile.x, z: st.pile.z, amount: 0 });
       if (u.id === 'shooting_goal' && !s.flags.busEnabled) {
         s.flags.busEnabled = true;
@@ -978,7 +980,11 @@ export class Sim {
           s.stats.ballsDelivered++;
           if (kind === 'water') s.flags.firstWater = true;
           else if (kind === 'bib') s.flags.firstBib = true;
-          else s.flags.firstDelivery = true;
+          else {
+            s.flags.firstDelivery = true;
+            // tutorial step 7 ("fill up the baskets") counts a delivery made once the route reached it
+            if (s.flags['tut:cones']) s.flags.refillTaught = true;
+          }
           this.events.emit('ballDropped', { stationId: id, byStaff: false });
         }
         break;

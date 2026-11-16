@@ -71,6 +71,8 @@ describe('sim basics', () => {
     const sim = new Sim(createInitialState(undefined, 1));
     sim.unlockPad(sim.world.pads.get('p_crate')!);
     sim.unlockPad(sim.world.pads.get('p_goal')!);
+    // (the first drill opens with some balls: empty it so the whole stack fits)
+    sim.state.stations.shooting_goal!.balls = 0;
     walkTo(sim, sim.area.crate.spot.x, sim.area.crate.spot.z);
     wait(sim, 2);
     expect(sim.state.coach.carry).toBe(BALANCE.coach.carryCap);
