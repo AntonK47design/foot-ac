@@ -242,7 +242,7 @@ Keep every colour as a named constant in one palette module (`src/view/palette.t
 - **Icons are rendered from the real 3D models** at load: a short-lived offscreen renderer with an orthographic camera, giving 128 px transparent data URLs. HUD, pads and the objective pill then show the actual objects.
 - **Decals** (posters, logos of fictional brands, signs, floor markings) come from one canvas-drawn atlas.
 
-### 8.8 HUD style
+### 8.8 HUD style (full UI spec in section 8b)
 
 - A bold rounded display font (bundled locally, for example Fredoka 600), with a dark stroke and a drop shadow, 3–4 px dark outlines and saturated fills.
 - **Layout:** settings button and hero portrait with a level ring top-left, a big star overlapping the progress bar top-centre, and a large cash pill top-right. The objective pill sits under the star bar, with the real rendered icon of the target.
@@ -269,6 +269,118 @@ Keep every colour as a named constant in one palette module (`src/view/palette.t
 - Add a dev-only `?showcase=1` scene that shows every prop, station and character in a row for quick visual review. It must not ship in production builds.
 - After every visual change, take Playwright screenshots at 1280×720, 390×844 and 844×390, look at them, and fix them against the principles above (frame filling, value ladder, squint test) before committing.
 - Ask the user to review screenshots at the milestone gates. Their taste is the final word on the look.
+
+## 8b. User interface (HUD, panels, feedback)
+
+The UI is a **DOM/CSS overlay** above the canvas, never drawn in WebGL. It's crisp at any DPR, easy to translate, and accessible. Every string comes from `en.json` via `t()`, and all sizes scale with `clamp()` from a few tokens. The style is **sticker-like**: thick dark outlines, saturated fills, a hard drop shadow under every button, rounded everything, and bouncy motion.
+
+### 8b.1 Design tokens (one `:root` block, used everywhere)
+
+| Token | Kickoff value | Use |
+|---|---|---|
+| `--fs` | `clamp(14px, 2.5vmin, 22px)` | base text size (never below 14 px; body text 16 px) |
+| `--btn` | `clamp(48px, 7.5vmin, 60px)` | round button size (never below 48 px) |
+| `--gap` | `clamp(6px, 1.4vmin, 12px)` | spacing (at least 8 px between tap targets) |
+| `--sat/--sar/--sab/--sal` | `env(safe-area-inset-*)` | added to every edge-anchored element |
+| `--ink` / outline | `#1D2433`, 3–4 px | outlines and text stroke |
+| `--blue` / `--blue-d` | `#2F6BFF` / `#1C47C4` | primary buttons and headings (the dark shade is the button "base") |
+| `--cash` / `--cash-d` | `#3DDC84` / `#1E9E5A` | money, "good" toasts, buy buttons |
+| `--yellow` / `--star` | `#FFD23F` / `#FFC83D` | stars, gold toasts, highlights |
+| danger | `#FF5A4F` | close button, destructive actions |
+| `--shadow` | `0 4px 0 rgba(20,30,60,.25)` | hard, offset drop shadow (no blur) under buttons and pills |
+
+- **Fonts** (bundled as WOFF2, `font-display: swap`): a rounded display face for numbers, titles and buttons (Fredoka 600), and a sturdy rounded body face (Nunito 700/800).
+- HUD numbers use the display font with `-webkit-text-stroke: 4px var(--ink)` and `paint-order: stroke fill`, so they read over any background.
+- **Page hardening:** `user-select: none` (all prefixes), `-webkit-touch-callout: none`, `-webkit-tap-highlight-color: transparent`, `touch-action: none`, `overscroll-behavior: none`, and the body background in the void colour (so there's no white flash).
+
+### 8b.2 HUD layout (always visible, minimal)
+
+```
+┌──────────────────────────────────────────────┐
+│ [⚙] (portrait+Lv ring)  ★━━━━ 12/30   [$ 1,240] │
+│              [icon  Objective text…]          │
+│                 toasts stack here             │
+│                                               │
+│                 (game world)                  │
+│                                               │
+│          [info card when an object is tapped] │
+│              [movement hint, early]           │
+└──────────────────────────────────────────────┘
+```
+
+- **Top-left:** settings gear (a round white button) and the hero portrait, a real render, with a circular level-progress ring and a level number badge.
+- **Top-centre:** a big star icon overlapping a progress bar ("12/30" stars in this area). The star bounces and the bar fills on every unlock.
+- **Top-right:** a large cash pill (about 1.4× normal size) with a cash icon. The number **rolls** up or down, and the pill bumps on change. Format big numbers as 1.2K / 3.4M.
+- **The objective pill** sits under the star bar: the real rendered icon of the target plus a short text, clamped to 2 lines and kept under ~40 characters (write short texts). It pops when it changes.
+- **Edge arrow:** when the target is off-screen, or hidden under the HUD band, a pointer sits at the screen edge pointing at it. Otherwise a world arrow floats over the target.
+- **Badges** (red dot plus count) on HUD buttons for things waiting: daily reward ready, quest done, scout back.
+- No other permanent UI. Everything else appears in the world (section 8.7) or in a panel.
+
+### 8b.3 Buttons
+
+- **Round buttons** (`--btn`): white fill, a 3–4 px ink outline, a hard shadow, an SVG icon at 58 % size; `transform: scale(.92)` on `:active`.
+- **Wide buttons:** at least 48 px tall, 14 px radius, the display font at 16 px, and a coloured base shadow (`0 3px 0` of the darker shade).
+  - Primary: blue. Buy: green. Neutral: `#E9EEF8` with a `#C8D0E0` base.
+  - Show the price inside the button with the cash icon. If you can't afford it, grey it out and show what's missing ("Need $120 more").
+- **Rewarded-ad buttons** are a distinct style (a gold or purple gradient with a ▶ icon and the reward: "▶ ×2 cash"). Only render them when an ad can actually play. Under adblock, show a small note instead of a broken button.
+- **Destructive actions** use two-step arming, never `confirm()`: the first tap turns the button solid red ("Tap again to erase everything"); a second tap within a few seconds does it.
+- **Segmented controls** (On/Off, Auto/Low/High): the selected option is blue with white text.
+- Every button gives feedback on press: a scale change, a click sound and a 10–25 ms haptic on mobile (toggleable).
+
+### 8b.4 Panels (modal)
+
+- An overlay (`rgba(10,20,45,.45)`, 150 ms fade) with a centred white card: `width: min(92vw, 460px)`, 22 px radius, a hard shadow, scrolling content, and `max-height` that respects the safe areas.
+  - It springs in with `cubic-bezier(.2,1.4,.4,1)` over about 0.22 s.
+  - The header has a title in the display font (blue-dark) and a round red ✕ close button (48 px). Tapping outside also closes it.
+- **A blocking panel pauses the game:** `gameplayStop()`, sim paused, input blocked. Closing resumes it (`gameplayStart()`). Never stack two blocking panels; queue them.
+- **Panels in Kickoff:**
+  - **Office:** tabs (Coach / Staff / Stations / Academy) with upgrade rows (icon, name, "effect now → next", a price button).
+  - **Payoff card:** a big rarity-coloured card with name, position, stats bars and value, plus a choice of "Sell for $X" or "Add to squad". It's the emotional moment, so give it a reveal animation.
+  - **Results** after the spectacle: score, MVP, cash earned, "▶ ×2".
+  - **Squad / league table.**
+  - **Meta:** daily calendar (7 tiles, today highlighted, tomorrow's prize visible), quests (progress bars plus claim), a scout timer, the album.
+  - **Welcome back:** offline earnings with a big number, "Collect" and "▶ ×2". If the offline time was capped, say so.
+  - **Settings:** sound, music and vibration toggles; graphics Auto/Low/High; language; reset progress (two-step). If the portal mutes audio, show "Muted in portal settings" and disable the toggle.
+- Panels contain only the decision. Keep explanations to one line, use icons over words, and **never more than ~3 choices** at once.
+
+### 8b.5 Feedback layer (non-blocking)
+
+- **Toasts:** pill-shaped, display font, under the objective pill, stacked and at most 3. They pop in, hold about 2.5 s, then fade and slide up. Variants:
+  - neutral: dark translucent `rgba(20,40,80,.8)`;
+  - good (green): hires, sales;
+  - gold (gradient): level-ups, rare drops, area opened.
+  
+  Use them for events, never for instructions (instructions belong in the objective pill).
+- **Floaters:** "+$12" and "+1 SHO" rising from the world point, coloured by type (cash green, stat blue, star gold).
+- **Coin fly:** coins arc from the cash pile to the HUD cash pill, and the pill bumps when they land.
+- **Info card** (tap to explain, section 5.8): bottom-centre above the hint, with icon, title and one line. `pointer-events: none` so it never blocks play; it auto-hides after ~5 s.
+- **Movement hint:** bottom-centre for the first seconds. Show animated WASD keys plus a mouse, or a finger with a ring on touch. Say "Click the game first" while the iframe lacks focus. Hide it after the first real movement.
+- **World labels** (DOM, projected each frame from a pooled label layer): pad price tags (green border when affordable), supply chips ("3/8", red when low), request bubbles over NPCs, area lock signs. Dim labels that pass under the HUD band.
+- **Spectacle overlay:** a live score bar, big "GOAL!" / "SAVED!" banners, a one-input timing meter (tap / click / Space, never Escape) and a Skip button.
+- **Special states:** a "WebGL context lost, restoring…" overlay, and a full-screen travel card for scene changes (fade in, hold, fade out).
+
+### 8b.6 Motion rules
+
+- Everything that changes **bounces** (a quick scale bump of ~1.15 → 1). Numbers roll and never jump.
+- Panels and toasts use spring easing (`cubic-bezier(.2,1.4–1.6,.4,1)`); exits are quick fades of 0.15–0.3 s.
+- Keep motion short: under 350 ms for UI, so it never delays input. Honour `prefers-reduced-motion` by dropping bounces and keeping fades.
+- No per-frame DOM layout thrash: update text only when values change, use `transform`/`opacity` for animation, and pool labels and floaters.
+
+### 8b.7 Mobile and layout rules
+
+- Anchor every edge element with `calc(var(--sat) + var(--gap))` and the other insets. Test with notches in portrait and landscape.
+- **Portrait:** the HUD stays one row; the objective pill can wrap to 2 lines; panels take 92 vw.
+- **Landscape phones (844×390):** panels must scroll inside themselves, never off-screen. Keep the HUD compact so the world stays visible.
+- Joystick visuals: a translucent base ring plus a knob, drawn where the finger landed, fading out on release. They never sit under HUD buttons.
+- No hover-only information: everything shown on hover must also show on tap.
+- **Automated checks:** an e2e test asserts no HUD or panel element overlaps another, and all stay inside the safe area, at 360×640, 390×844, 844×390 and 1024×768, and after a live rotation.
+
+### 8b.8 UI implementation notes
+
+- A small `Panel` base class (open/close, overlay, blocker registration, focus trap, close on ✕ or outside tap) that every panel extends. Panels render from plain data passed in, never by reading sim internals directly.
+- An inline SVG icon set (`icons.ts`, one `icon(name)` helper) for UI glyphs, plus icons rendered from the 3D models for objects.
+- Use `textContent` for anything that includes names or user data; template HTML only for trusted static markup.
+- Use `pointer-events: none` on the HUD container, with `auto` only on real buttons, so the world stays clickable everywhere else.
 
 ## 9. Platforms, SDKs and ads
 
@@ -356,7 +468,7 @@ Run check, test, sim, size and e2e **before every commit**.
 
 ## 15. How you work
 
-- First save this brief as `docs/GDD.md`, with the filled Game card. Write `docs/ART_BIBLE.md` from section 8, and a concise `CLAUDE.md` holding sections 3, 8.9 (budgets), 9, 10, 11 and 13.
+- First save this brief as `docs/GDD.md`, with the filled Game card. Write `docs/ART_BIBLE.md` from sections 8 and 8b, and a concise `CLAUDE.md` holding sections 3, 8.9 (budgets), 9, 10, 11 and 13.
 - Plan each milestone briefly, then build it. Keep going milestone by milestone, unless you're blocked or at the M1 playtest gate.
 - Make reasonable decisions yourself and log each in `docs/DECISIONS.md`, numbered, with why and the measured result. Ask only about expensive-to-reverse design forks.
 - If a feature conflicts with a budget, the budget wins; propose an alternative.
