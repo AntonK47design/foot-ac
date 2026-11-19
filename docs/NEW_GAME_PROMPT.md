@@ -140,27 +140,135 @@ What raised or would raise conversion in Kickoff Academy:
 - **Goals:** quests (3 a day), real-time timers (a scout or production timer), a daily event (cup), an album/collection, academy levels that unlock features.
 - **Auth:** a change of login reloads the save and shows a toast.
 
-## 8. Art (read before modelling anything)
+## 8. Graphics (read before building anything visual)
 
-Write `docs/ART_BIBLE.md` first. It overrides any "procedural art" idea.
+The look is a **bright toy diorama floating in a dark void**: chunky, bevelled, saturated, readable at a glance. It is lit like a sunny afternoon and seen from a fixed high three-quarter camera. Before any world code, write `docs/ART_BIBLE.md` with palette, layouts, prop lists, camera and budgets, using the values below adapted to the theme. The art bible overrides any "procedural placeholder" idea.
 
-- **Fill the frame:** at least 65 % of every frame is walls, furniture, NPCs and world UI.
-- **Value ladder:** dark desaturated void → floors → walls → interactables and characters → UI.
-- **Enclosure:** every activity has its own floor and edge (rooms with cutaway walls, fenced zones, a raised plot with a curb).
-- **Scale:** characters are big (9–12 % of viewport height), with readable faces.
-- **Squint test:** the hero, pads and stations pop first.
-- **Assets:**
-  - use CC0 packs only (record licences in `assets-src/`);
-  - process them with `tools/assets.ts` (prune, dedupe, weld, meshopt, WebP ≤ 512 px) into `public/assets/*.glb` plus a manifest;
-  - load them with GLTFLoader + MeshoptDecoder.
-- **Never ship primitive placeholders.** If an asset is missing, stop and ask.
-- **Performance lessons:**
-  - batch static geometry **per plot**, never across the whole map (one street mesh made a batch span everything);
-  - distance-cull skinned characters (they default to `frustumCulled=false`) and animate off-screen ones at 8 Hz;
-  - cull whole plots by camera rect;
-  - use 12-tri boxes for repeated tiny things like seats and bibs, not rounded boxes;
-  - no shadows on far areas.
-- **Budgets:** ≤ 150 draw calls, ≤ 400 k triangles, Low tier ≥ 30 FPS with 30 characters, heap < 250 MB, textures ≤ 1024 px. DPR cap: High 2, Mid 1.5, Low 1.
+### 8.1 Principles
+
+1. **Fill the frame.** At least 65 % of every gameplay frame is walls, furniture, characters and world UI; empty floor is at most 35 %. Each frame shows at least 15 distinct props.
+2. **Value ladder,** darkest to brightest: void → floors → walls → interactables and characters → UI. Interactables are the most saturated things in the world, and UI is brighter still.
+3. **Enclosure.** Every activity lives in its own space with its own floor and a visible edge: cutaway rooms, fenced zones, a raised plot with a light curb. Nothing floats on open grass.
+4. **Scale and closeness.** Characters fill 9–12 % of the viewport height, and faces are readable.
+5. **The world UI tells you what to do.** Pads show price, icon and a ghost of the object; stations show supply counters; NPCs show request bubbles.
+6. **Squint test.** Blur a greyscale screenshot: the hero, pads and stations must pop first.
+7. **No mid-value same-on-same** (for example green on green). Every surface is framed by a curb, a fence or a line.
+
+### 8.2 Palette (example values: keep the structure, retheme the hues)
+
+| Layer | Example |
+|---|---|
+| Void around the plot | `#241E33`, vignette to `#17121F`; fog in the same colour from 60 to 140 m |
+| Plot curb (island edge) | top `#E9DFC8`, side `#B7A88A`, shadow side `#5A4C66` |
+| Outdoor ground | warm paving `#E8D7B0` / `#DCC89C`, 1 m checker |
+| Activity surfaces | one distinct material each (striped turf `#4FBF4A`/`#45B041`, tartan `#D9503A`, wood deck `#C98B4F`, astro with dots `#2E9E5B`) |
+| Room floors | one colour per room (teal tiles, blue rubber with dots…) |
+| Walls | interior `#F3EEE6`, a brand-colour top trim, a darker skirting |
+| Brand colours | one strong primary (`#2F6BFF`) + yellow `#FFD23F` + white, used on kits, banners, flags and trims |
+| Interactables | most saturated: cash `#3DDC84`, stars `#FFC83D`, orange accents `#FF7A2E` |
+| Locked areas (blueprint) | `#5AB4FF` at 35 % opacity, edges `#BFE3FF` |
+| Rarity tiers | grey `#A7B0BE`, blue `#3D8BFF`, purple `#A35CFF`, animated gold `#FFC83D` |
+| UI | white or saturated fills, 3–4 px outline `#1D2433`, white text with a dark stroke |
+
+Keep every colour as a named constant in one palette module (`src/view/palette.ts`). No hex values scattered in builders.
+
+### 8.3 Where the geometry comes from
+
+- **Props and characters come from CC0 packs**, never from raw primitives. Kickoff used:
+  - **Kenney Mini Characters** for all people;
+  - **KayKit** Furniture, Prototype, City Builder and Restaurant Bits for props.
+  
+  Choose packs that share one chunky, low-poly, palette-texture style. Keep the original zips and licence files in `assets-src/` and generate a credits file.
+- **Architecture is procedural, but never "primitive-looking."** Floors, walls, curbs, fences, stands and pitches are built in code from bevelled rounded boxes, with a skirting at the bottom, a trim on top, and 2–3 tone accents and detail parts (caps, bases, weights, net mesh).
+  - Raw cylinders, boxes or capsules standing in for props are forbidden.
+  - If no pack has a needed prop, stop and ask the user, rather than ship a placeholder.
+- **Asset pipeline** (`tools/assets.ts` + `tools/assets.config.ts`):
+  - group models (an area-1 group loads before gameplayStart; the others are lazy);
+  - prune, dedupe, weld, meshopt-compress; textures to WebP ≤ 512 px;
+  - output one GLB per group with one named root node per model, plus a manifest;
+  - load with GLTFLoader + MeshoptDecoder.
+- **Character tinting:** at build time, remap the shirt, shorts and socks UVs of the character pack into dedicated white palette cells (`tools/kit-remap.ts`). At runtime, one material per role can then tint kit, bib, tracksuit or casual clothes. Skin, hair and shoes keep the pack colours.
+  - Vary skin, hair and hair colour per NPC from a seeded RNG.
+  - Clone with `SkeletonUtils.clone` and share AnimationClips (idle, walk, run, carry with arms forward, sit, cheer, a role action).
+- **Roles must read instantly:**
+  - the hero has a unique outfit plus a hat;
+  - customers wear the brand kit;
+  - each staff type has a distinct colour (bib or apron) and a prop.
+  - Show rarity as a coloured ring under the feet plus a badge above the head.
+
+### 8.4 Materials, lighting and rendering
+
+- **Materials:** use `MeshLambertMaterial` everywhere (a flat toon look), with the pack's palette texture or vertex colours. No PBR, no normal maps, no post-processing.
+- **Floor textures:** small tiling 64–128 px patterns drawn on a `<canvas>` at load (tiles, stripes, rubber dots, planks, paving, tartan, astro, blueprint grid), with subtle noise. No image files for these.
+- **Static batching:** bake each static mesh into position, normal and vertex colour, then merge everything per plot or area into a few meshes. Keep batches local, never one batch spanning the whole map.
+- **Baked vertex AO:** darken wall bases, under furniture and the plot curb (a ground-AO pass on the merged geometry). It's cheap and gives most of the depth.
+- **Renderer:**
+  - `ACESFilmicToneMapping`, exposure about 1.05, sRGB output;
+  - one warm sun (`#FFF0D6`, intensity ~2.4) with short soft PCF shadows on Mid and High;
+  - a hemisphere fill (sky `#EEF4FF`, ground tinted towards the void colour, ~1.45) to make everything cohesive;
+  - background and fog in the void colour.
+- **Quality tiers:**
+
+  | Tier | DPR cap | Shadows | Antialias | Shadow map | Particles / props |
+  |---|---|---|---|---|---|
+  | High | 2 | yes | yes | 2048 | 100 % |
+  | Mid (mobile default) | 1.5 | yes | yes | 1024 | 75 % particles |
+  | Low | 1 | blob shadows only | no | n/a | 40 % particles, 60 % props |
+
+  An FPS watchdog steps down a tier when the average FPS stays below 45 for 3 s. At Low, it locks to 30 FPS rather than jitter.
+- **Character rim light:** a subtle fresnel added in the character material so people separate from the floor.
+
+### 8.5 Camera
+
+- A perspective camera: FOV 48° vertical, pitch 52°, following the hero smoothly with slight look-ahead.
+- Size the view by **visible world width**: about 21 m in landscape and 11 m in portrait (tunables in `balance.ts`). Characters then stay big on phones too.
+- Zoom out only when the playable area grows. Never let walls hide the hero: rooms are cutaways (back walls 2.4 m, front walls as 0.3 m stubs).
+
+### 8.6 World layout
+
+- Draw each area as an ASCII map in the art bible first, with zones, rooms, gates and the arrival point. Give every zone a prop list.
+- The world is a **raised plot (+0.25 m) with a light curb**, the dark void around it, distant silhouettes, and the next locked area visible as a **translucent blueprint ghost** behind a construction fence, with a padlock and price sign.
+- Put the gate to each new area next to the hub (the office) so the walk is short.
+- Every station has its own surface, a basket with a supply counter, a cash pile spot, queue spots and lanes. Keep it all as data in `src/data/areas/*`.
+
+### 8.7 World UI and juice
+
+- **Unlock pad:**
+  - a rounded-square tile with a white dashed border, a big price (cash icon + bold white number with a dark outline), the item icon, and a translucent blue hologram of the object hovering above;
+  - the fill animates while paying;
+  - on completion the ghost turns solid with squash-and-stretch, a dust ring and confetti.
+- **Station and NPC UI:** stations show supply chips ("3/8 ⚽"); NPCs show request bubbles (icon + mood); cash rises as "+$" floaters and flies to the HUD.
+- **Text in the world:** DOM labels projected from 3D (crisp at any DPR, and translated via `t()`), not text textures.
+- **Icons are rendered from the real 3D models** at load: a short-lived offscreen renderer with an orthographic camera, giving 128 px transparent data URLs. HUD, pads and the objective pill then show the actual objects.
+- **Decals** (posters, logos of fictional brands, signs, floor markings) come from one canvas-drawn atlas.
+
+### 8.8 HUD style
+
+- A bold rounded display font (bundled locally, for example Fredoka 600), with a dark stroke and a drop shadow, 3–4 px dark outlines and saturated fills.
+- **Layout:** settings button and hero portrait with a level ring top-left, a big star overlapping the progress bar top-centre, and a large cash pill top-right. The objective pill sits under the star bar, with the real rendered icon of the target.
+- Everything bounces on change, and the cash counter rolls.
+- Sizes scale with `clamp()` and respect the safe areas. Nothing overlaps at 360×640, 390×844, 844×390 or 1024×768.
+
+### 8.9 Performance rules for graphics
+
+- **Budgets:** ≤ 150 draw calls, ≤ 400 k triangles, Low ≥ 30 FPS with 30 characters, heap < 250 MB, textures ≤ 1024 px.
+- **Culling:**
+  - cull whole plots by a camera rectangle (Kickoff used 30 m north, 20 m south and 30 m to the sides);
+  - skinned characters default to `frustumCulled=false`, so distance-cull them yourself (about 26 m sideways);
+  - animate off-screen characters at 8 Hz.
+- **Cheap geometry for repeats:**
+  - use 12-tri boxes for repeated tiny things (stadium seats, bibs), not 300-tri rounded boxes;
+  - use instanced meshes for crowds of identical props;
+  - no shadow casting on far areas.
+- **No per-frame allocations** in the view: reuse vectors and pool floaters and particles.
+- Check the debug overlay (draw calls, triangles, FPS) in every area after each milestone.
+
+### 8.10 How to review the art
+
+- Keep reference frames from successful games in the genre in `docs/art/reference/`. Use them for principles only; never copy assets, layout or UI.
+- Add a dev-only `?showcase=1` scene that shows every prop, station and character in a row for quick visual review. It must not ship in production builds.
+- After every visual change, take Playwright screenshots at 1280×720, 390×844 and 844×390, look at them, and fix them against the principles above (frame filling, value ladder, squint test) before committing.
+- Ask the user to review screenshots at the milestone gates. Their taste is the final word on the look.
 
 ## 9. Platforms, SDKs and ads
 
@@ -233,7 +341,8 @@ Run check, test, sim, size and e2e **before every commit**.
 - **M0 Foundation:**
   - scaffold, platform wrapper plus mock, fixed-step loop, quality tiers;
   - input (keys, hold-mouse, touch joystick), follow camera;
-  - size and zip scripts, mobile CSS hardening.
+  - size and zip scripts, mobile CSS hardening;
+  - **art foundation:** `ART_BIBLE.md`, CC0 packs downloaded and run through the asset pipeline, renderer and lighting setup, palette module, canvas floor patterns, the raised plot with curb and void, one rigged character walking, and the `?showcase` scene.
 - **M1 Vertical slice (first ~5 min of area 1):**
   - pads, carry stack, the first 2–3 stations, the customer lifecycle, check-in point;
   - tutorial route, HUD, juice, economy bot v1;
@@ -247,7 +356,7 @@ Run check, test, sim, size and e2e **before every commit**.
 
 ## 15. How you work
 
-- First save this brief as `docs/GDD.md`, with the filled Game card. Write a concise `CLAUDE.md` holding sections 3, 8 (budgets), 9, 10, 11 and 13.
+- First save this brief as `docs/GDD.md`, with the filled Game card. Write `docs/ART_BIBLE.md` from section 8, and a concise `CLAUDE.md` holding sections 3, 8.9 (budgets), 9, 10, 11 and 13.
 - Plan each milestone briefly, then build it. Keep going milestone by milestone, unless you're blocked or at the M1 playtest gate.
 - Make reasonable decisions yourself and log each in `docs/DECISIONS.md`, numbered, with why and the measured result. Ask only about expensive-to-reverse design forks.
 - If a feature conflicts with a budget, the budget wins; propose an alternative.
