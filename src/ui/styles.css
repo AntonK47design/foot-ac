@@ -2216,6 +2216,34 @@ body {
   width: 100%;
   margin-bottom: 10px;
 }
+/* results: ×2 match cash is the main action (big, gently pulsing; Continue sits below as the quiet option) */
+.results-panel .btn-big.ad.main {
+  min-height: 76px;
+  margin: 10px 0 12px;
+  font-size: 26px;
+  animation: ad-pulse 1.6s ease-in-out infinite;
+}
+.results-panel .btn-big.ad.main svg {
+  width: 30px;
+  height: 30px;
+}
+.results-panel .btn-big.ad.main small {
+  color: #fff;
+}
+@keyframes ad-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-panel .btn-big.ad.main {
+    animation: none;
+  }
+}
 .scout-active .btn-big.ad {
   align-self: flex-start;
 }

@@ -355,3 +355,9 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 
   Against the old code it fails: textures +53 against a limit of 24.
 - **Pre-existing e2e failures (not from this change):** on the pre-installed Chromium (1243, SwiftShader), every test that asserts a clean console fails. The cause is a driver performance warning, `GPU stall due to ReadPixels`, from the boot-time icon atlas. Separately, `meta.spec.ts` › rewarded ads throws `Cannot set properties of undefined (setting 'adsDisabled')`. Both also fail on `e6a95fd`. On 0.7.0, `smoke.spec.ts` › "WASD reaches the first cash and first pad" also fails, with 0 stars where it expects 1; the cause is not yet investigated. It fails the same way on `00fac7d`.
+
+## 89. ×2 match cash is the main button on the results screen
+
+- **Why:** in the week after 0.7.0, players watched 0.17 rewarded ads per session; Playgama's benchmark is 3–5, with 30–40 % of players tapping. Rewarded ads are opt-in, so they raise revenue without the playtime risk of more interstitials. The ×2 match-cash offer sat between the MVP card and two equally loud buttons.
+- **Change:** when the offer is available, the ×2 button sits right under the prize. It's bigger (76 px), pulses gently (no animation under `prefers-reduced-motion`), and says "Watch a short ad" under the reward (Playgama rule 2.2.1). League table and Continue become neutral; Continue turns blue again once the ad is done, or when there's no offer (adblock note, no cash, ads off). Continue carries a stable `results-continue` class for the e2e tests.
+- **What to watch:** `advertisement_rewarded_opened` per session (was 0.17) and still-playing-at-10-minutes (should stay at least 41 %).

@@ -205,7 +205,7 @@ export async function installBot(page: Page): Promise<void> {
         office.querySelector<HTMLElement>('.close')?.click();
         return;
       }
-      const res = shown('.results-panel .btn-big.promote');
+      const res = shown('.results-panel .results-continue');
       if (res) return res.click();
       shown('.m-skip')?.click();
       document.querySelector<HTMLElement>('.overlay:not(.hidden) .close')?.click();

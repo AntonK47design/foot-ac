@@ -117,7 +117,7 @@ test.describe('desktop', () => {
     await page.keyboard.press('Space');
     await expect(page.locator('.results-panel')).toBeVisible({ timeout: 90_000 });
     const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
-    await page.locator('.results-panel .btn-big.promote').click();
+    await page.locator('.results-panel .results-continue').click();
     await expect(page.locator('.results-panel')).toBeHidden();
     await expect(page.locator('.match-ui')).toBeHidden();
     const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
