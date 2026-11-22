@@ -23,7 +23,7 @@ async function sample(page: Page, cdp: CDPSession): Promise<Sample> {
 }
 
 /**
- * Long-session leak guard (DECISIONS §86): a late-game academy keeps churning characters (trainees come and go,
+ * Long-session leak guard (DECISIONS §88): a late-game academy keeps churning characters (trainees come and go,
  * every match spawns two line-ups). After warm-up the GPU resource counts and the JS heap must stay flat.
  * Without the fixes textures grew by ~20 per simulated minute here.
  */

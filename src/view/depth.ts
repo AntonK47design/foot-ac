@@ -1,7 +1,7 @@
 import { MeshDepthMaterial } from 'three';
 
 /**
- * Shadow-pass depth materials, one per program variant (DECISIONS §86).
+ * Shadow-pass depth materials, one per program variant (DECISIONS §88).
  *
  * three.js draws every shadow caster with ONE shared MeshDepthMaterial unless the object has a
  * `customDepthMaterial`. Our casters mix skinned characters, InstancedMeshes (balls, bottles, bibs, cash) and plain

@@ -324,7 +324,7 @@ export class GameView {
   private coachIdle = 0;
   private readonly actors = new Map<string, Actor>();
   private readonly pops: Pop[] = [];
-  /** forceSinglePass: no per-frame back/front pass with `needsUpdate` (DECISIONS §86). */
+  /** forceSinglePass: no per-frame back/front pass with `needsUpdate` (DECISIONS §88). */
   private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide, forceSinglePass: true });
   private readonly icons: IconRenderer;
   private readonly iconUrls = new Map<string, string>();

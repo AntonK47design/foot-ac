@@ -1320,7 +1320,7 @@ function netMaterial(): MeshLambertMaterial {
   t.repeat.set(10, 5);
   t.needsUpdate = true;
   // forceSinglePass: three.js draws transparent DoubleSide materials as a back + front pass and flags
-  // `needsUpdate` for each, so every net re-ran program selection twice a frame (~50 KB garbage/frame; DECISIONS §86)
+  // `needsUpdate` for each, so every net re-ran program selection twice a frame (~50 KB garbage/frame; DECISIONS §88)
   netMat = new MeshLambertMaterial({ map: t, transparent: true, alphaTest: 0.35, side: DoubleSide, forceSinglePass: true });
   return netMat;
 }
