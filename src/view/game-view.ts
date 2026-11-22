@@ -612,7 +612,7 @@ export class GameView {
   resetVisuals(): void {
     for (const u of this.unlocks.values()) this.core.scene.remove(u.root);
     for (const p of this.pads.values()) this.core.scene.remove(p.pad, p.ghost);
-    for (const a of this.actors.values()) this.core.scene.remove(a.c.root);
+    for (const a of this.actors.values()) a.c.dispose();
     this.unlocks.clear();
     this.pads.clear();
     this.actors.clear();
@@ -1029,7 +1029,7 @@ export class GameView {
     // remove actors of trainees that left
     for (const [k, a] of this.actors) {
       if (a.seen === frameId) continue;
-      this.core.scene.remove(a.c.root);
+      a.c.dispose();
       this.actors.delete(k);
     }
 
@@ -1417,7 +1417,7 @@ export class GameView {
     // the squad's training figures make way for the match line-ups
     for (const [k, a] of this.actors) {
       if (!k.startsWith('sq:')) continue;
-      this.core.scene.remove(a.c.root);
+      a.c.dispose();
       this.actors.delete(k);
     }
     this.director.start(script, ourName, skippable, hooks);
