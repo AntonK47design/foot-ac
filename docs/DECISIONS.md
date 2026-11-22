@@ -292,3 +292,24 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
   - The landscape cover shows the whole image, with the logo in the sky on the right.
   - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
+
+## 86. Long-session memory and frame-time fixes (build 0.7.0 telemetry)
+
+- **Why:** Playgama `performance_sample` data for 0.7.0 (155 sessions) showed `memory_used_mb` p99 964 MB / max 1,126 MB, growing with session length. It also showed near-frozen 30 s windows (`long_task_total_ms` p99 28.6 s), and 65 % of sessions were stepped down to the Low tier.
+- **How it was measured:** `npm run build:e2e`, then a bot-driven Playwright session through Area 3 (the `installBot` / `driveBot` helpers in `tests/e2e/helpers.ts`). The bot follows `sim.objective`, decides office prompts, continues results and skips matches. Every simulated minute it logged `usedJSHeapSize` after a forced GC, `renderer.info.memory` and `renderer.info.programs`. Heap snapshots at minutes 15 and 65 were diffed, and allocations were sampled with the CDP sampling heap profiler, including objects already collected by GC.
+- **Found 1: bone textures never freed.** Every `Character` is a `skeletonClone` with its own `Skeleton`, and three.js gives each skeleton a bone `DataTexture` on its first draw. Trainees who left, squad figures and both match line-ups were only removed from the scene, so `renderer.info.memory.textures` grew with every character ever spawned. It reached 1,128 after 70 simulated minutes, with about 50 characters alive. **Fix:** `Character.dispose()` stops the mixer, uncaches its root and disposes the skeletons. All four removal sites call it. Geometries and kit materials stay shared.
+- **Found 2: the program cache key was rebuilt for every net, every frame.** three.js draws a transparent `DoubleSide` material as a back pass plus a front pass, and sets `needsUpdate` for each pass. The goal nets (and pad / area blueprint ghosts) did this every frame. So every draw re-ran `WebGLPrograms.getParameters` plus the ~100-entry cache-key `join`, about 50 KB of garbage per frame in a full academy. **Fix:** `forceSinglePass: true` on those three materials. Nets are alpha-tested and ghosts are faint, so the two-pass ordering bought nothing visible, and their draw calls halve.
+- **Also:** skinned characters and shadow-casting InstancedMeshes get their own shadow depth materials (`src/view/depth.ts`) instead of sharing three's single `MeshDepthMaterial`. `LabelLayer` now writes display, opacity and transform only when they change.
+- **Result (70 simulated minutes, same seed):**
+
+  | | before | after |
+  |---|---|---|
+  | `renderer.info.memory.textures` | 33 → 1,128 (linear) | 33 → 65–80 (tracks live characters) |
+  | shader programs | 33 | 30 |
+  | garbage per frame, late game | 153 KB (9 MB/s at 60 FPS) | 95 KB |
+
+  JS heap after GC was 30 → 73 MB in both runs. It grows only while content is being built and is flat once Area 3 is complete. Geometries likewise follow content: one merged mesh per built object.
+- **Not reproduced:** a JS heap of hundreds of MB. With a forced GC the sim state and the view stay bounded. The JS cost of the bone-texture leak is small; its cost is GPU memory. In the field, the leaked GPU memory and the garbage rate explain the long tasks and tier drops better than a large retained heap. The garbage rate also inflates `usedJSHeapSize`, which is sampled without a GC. Check the next build's `memory_used_mb` against session length before assuming the heap tail is gone. `performance.memory` covers the whole renderer process, which can include the portal page's own heap.
+- **Regression guard:** `tests/e2e/long-session.spec.ts`. With everything built, it runs the bot for 2 simulated minutes of warm-up plus 4 more. It then asserts:
+  - textures, geometries and programs stay flat (textures may follow live characters);
+  - heap growth stays under 6 MB.
