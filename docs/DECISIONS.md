@@ -310,6 +310,10 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 
   JS heap after GC was 30 → 73 MB in both runs. It grows only while content is being built and is flat once Area 3 is complete. Geometries likewise follow content: one merged mesh per built object.
 - **Not reproduced:** a JS heap of hundreds of MB. With a forced GC the sim state and the view stay bounded. The JS cost of the bone-texture leak is small; its cost is GPU memory. In the field, the leaked GPU memory and the garbage rate explain the long tasks and tier drops better than a large retained heap. The garbage rate also inflates `usedJSHeapSize`, which is sampled without a GC. Check the next build's `memory_used_mb` against session length before assuming the heap tail is gone. `performance.memory` covers the whole renderer process, which can include the portal page's own heap.
-- **Regression guard:** `tests/e2e/long-session.spec.ts`. With everything built, it runs the bot for 2 simulated minutes of warm-up plus 4 more. It then asserts:
-  - textures, geometries and programs stay flat (textures may follow live characters);
-  - heap growth stays under 6 MB.
+- **Regression guard:** `tests/e2e/long-session.spec.ts`. With everything built, it runs the bot for 1 simulated minute of warm-up plus 2.5 more (about 2 min of wall time). It then asserts:
+  - textures may grow only with live characters;
+  - geometries and programs stay flat;
+  - heap growth after GC stays under 6 MB.
+
+  Against the old code it fails: textures +53 against a limit of 24.
+- **Pre-existing e2e failures (not from this change):** on the pre-installed Chromium (1243, SwiftShader), every test that asserts a clean console fails. The cause is a driver performance warning, `GPU stall due to ReadPixels`, from the boot-time icon atlas. Separately, `meta.spec.ts` › rewarded ads throws `Cannot set properties of undefined (setting 'adsDisabled')`. Both also fail on `e6a95fd`.
