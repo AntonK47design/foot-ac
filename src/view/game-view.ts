@@ -40,6 +40,7 @@ import { PropKit } from './builders/football';
 import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
 import { Character, KITS, casualKit, type CharAnim, type Kit } from './characters';
+import { DEPTH_INSTANCED } from './depth';
 import { Fx } from './fx';
 import { G } from './geo';
 import { IconRenderer } from './icon-render';
@@ -323,7 +324,8 @@ export class GameView {
   private coachIdle = 0;
   private readonly actors = new Map<string, Actor>();
   private readonly pops: Pop[] = [];
-  private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide });
+  /** forceSinglePass: no per-frame back/front pass with `needsUpdate` (DECISIONS §86). */
+  private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide, forceSinglePass: true });
   private readonly icons: IconRenderer;
   private readonly iconUrls = new Map<string, string>();
   private time = 0;
@@ -382,6 +384,7 @@ export class GameView {
     this.balls.count = 0;
     this.balls.frustumCulled = false;
     this.balls.castShadow = true;
+    this.balls.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.balls);
 
     const bottleKit = new Batch();
@@ -391,6 +394,7 @@ export class GameView {
     this.bottles.count = 0;
     this.bottles.frustumCulled = false;
     this.bottles.castShadow = true;
+    this.bottles.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bottles);
 
     const bibKit = new Batch();
@@ -400,6 +404,7 @@ export class GameView {
     this.bibs.count = 0;
     this.bibs.frustumCulled = false;
     this.bibs.castShadow = true;
+    this.bibs.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bibs);
 
     const bill = new Batch();
@@ -411,6 +416,7 @@ export class GameView {
     this.bills.count = 0;
     this.bills.frustumCulled = false;
     this.bills.castShadow = true;
+    this.bills.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bills);
 
     const ringGeo = new RingGeometry(0.34, 0.45, 32);

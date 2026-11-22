@@ -12,6 +12,7 @@ import {
 } from 'three';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import type { Assets, CharacterKey } from './assets';
+import { DEPTH_SKINNED } from './depth';
 
 /** Animation states mapped onto the shared Kenney clips. */
 export type CharAnim = 'idle' | 'walk' | 'run' | 'sit' | 'carry' | 'carryIdle' | 'cheer' | 'kick' | 'pickup' | 'interact';
@@ -116,6 +117,7 @@ export class Character {
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.frustumCulled = false;
+      if ((mesh as SkinnedMesh).isSkinnedMesh) mesh.customDepthMaterial = DEPTH_SKINNED;
       const src = mesh.material as MeshLambertMaterial;
       if (src.map) mesh.material = kitMaterial(src.map, kit ?? { shirt: 0xffffff, shorts: 0xffffff, socks: 0xffffff, trim: 0xffffff });
     });
