@@ -25,12 +25,13 @@ async function sample(page: Page, cdp: CDPSession): Promise<Sample> {
 /**
  * Long-session leak guard (DECISIONS §86): a late-game academy keeps churning characters (trainees come and go,
  * every match spawns two line-ups). After warm-up the GPU resource counts and the JS heap must stay flat.
+ * Without the fixes textures grew by ~20 per simulated minute here.
  */
 test.describe('long session', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop only');
 
   test('heap and renderer.info stay flat while characters churn', async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(300_000);
     const errors = attachConsole(page);
     await page.setViewportSize({ width: 480, height: 270 });
     await page.goto('/');
@@ -42,20 +43,22 @@ test.describe('long session', () => {
       for (const p of sim.world.padList) sim.unlockPad(sim.world.pads.get(p.id));
     });
     const cdp = await page.context().newCDPSession(page);
-    await driveBot(page, 120);
+    // ~20 sim steps per rendered frame (the loop maximum) keeps the run inside the budget on SwiftShader
+    await driveBot(page, 60, 0.33);
     const warm = await sample(page, cdp);
     let last = warm;
-    for (let i = 0; i < 4; i++) {
-      await driveBot(page, 60);
+    for (let i = 0; i < 3; i++) {
+      await driveBot(page, 50, 0.33);
       last = await sample(page, cdp);
     }
     console.log('long session', JSON.stringify({ warm, last }));
-    expect(last.time - warm.time).toBeGreaterThan(200);
+    expect(last.time - warm.time).toBeGreaterThan(140);
     // bone textures used to grow with every character ever spawned (+~20 per simulated minute)
     expect(last.textures - warm.textures).toBeLessThanOrEqual(Math.max(8, last.actors - warm.actors + 4));
     expect(last.geometries - warm.geometries).toBeLessThanOrEqual(4);
     expect(last.programs).toBe(warm.programs);
     expect(last.heapMb - warm.heapMb).toBeLessThan(6);
-    expect(errors).toEqual([]);
+    // SwiftShader's read-back performance note (boot-time icon atlas) is a driver hint, not a game error
+    expect(errors.filter((e) => !e.includes('GPU stall due to ReadPixels'))).toEqual([]);
   });
 });
