@@ -204,6 +204,7 @@ export class Hud {
     } else {
       this.hint.innerHTML = `<div class="hint-keys"><div class="keys"><span class="k k-w">W</span><span class="k k-a">A</span><span class="k k-s">S</span><span class="k k-d">D</span></div><span class="mouse"><span class="mouse-btn"></span></span></div><span class="hint-text">${t(focused ? 'hint.desktop' : 'hint.desktop_click')}</span>`;
     }
+    this.hint.classList.toggle('nofocus', method !== 'touch' && !focused);
     this.hint.classList.remove('hidden');
   }
 

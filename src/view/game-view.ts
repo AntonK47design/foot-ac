@@ -772,6 +772,17 @@ export class GameView {
   // ───────────────────────────── input helpers ─────────────────────────────
 
   /** World-space direction from the coach towards the cursor's ground point (hold-mouse). */
+  /** Where a screen point (client px) hits the ground; false when it misses (sky). */
+  groundPoint(mx: number, my: number, out: { x: number; z: number }): boolean {
+    const r = this.core.canvas.getBoundingClientRect();
+    this.ndc.set(((mx - r.left) / r.width) * 2 - 1, -((my - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.ndc, this.rig.camera);
+    if (!this.raycaster.ray.intersectPlane(this.groundPlane, this.hit)) return false;
+    out.x = this.hit.x;
+    out.z = this.hit.z;
+    return true;
+  }
+
   mouseDirection(mx: number, my: number, out: { x: number; z: number }): void {
     const r = this.core.canvas.getBoundingClientRect();
     this.ndc.set(((mx - r.left) / r.width) * 2 - 1, -((my - r.top) / r.height) * 2 + 1);

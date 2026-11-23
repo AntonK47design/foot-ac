@@ -292,3 +292,10 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
   - The landscape cover shows the whole image, with the logo in the sky on the right.
   - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
+
+## 86. Click or tap to walk
+
+- **Why:** Playgama telemetry (Nov 17–23) shows about 20% of new players reach the first frame but never move the coach. On desktop the portal page keeps the keyboard until the player clicks, so WASD does nothing. A single click did nothing either: walking needed the button held.
+- **Change:** a quick click or tap on the ground now walks the coach to that point. It stops on arrival, when blocked for 0.6 s, or as soon as keys, a held mouse button or the joystick take over. The tunables are in `BALANCE.coach.tapWalk`.
+- **Hint:** desktop now reads "Click to walk · WASD or hold mouse". Before the game has keyboard focus it shows a large pulsing orange "Click anywhere to walk there". Touch reads "Drag or tap to move".
+- **Measure:** compare `first_move` against `first_frame` for new players on the next build.

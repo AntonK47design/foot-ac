@@ -9,6 +9,17 @@ export const BALANCE = {
     carryCap: 5,
     pickupInterval: 0.1,
     dropInterval: 0.07,
+    /** Click / tap the ground to walk there (works before the iframe has keyboard focus). */
+    tapWalk: {
+      /** Stop this close (m) to the clicked point. */
+      arriveRadius: 0.4,
+      /** Give up when the distance hasn't shrunk for this long (s): blocked by a wall or prop. */
+      stuckSec: 0.6,
+      /** Progress (m) that counts as getting closer. */
+      progressEps: 0.05,
+      /** Full speed until this close (m), then ease in. */
+      slowRadius: 1,
+    },
   },
   cash: {
     collectRadius: 1.3,

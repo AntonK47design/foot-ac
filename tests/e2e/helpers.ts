@@ -116,6 +116,8 @@ export function attachConsole(page: Page): string[] {
     // the CrazyGames SDK script cannot be reached from the sandboxed CI network; the game must cope
     if (m.location().url.includes('crazygames')) return;
     if (m.text().includes('Failed to load resource')) return;
+    // software-GL performance notes from the headless browser, not from the game
+    if (m.text().includes('GL Driver Message')) return;
     errors.push(`[${m.type()}] ${m.text()}`);
   });
   page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));

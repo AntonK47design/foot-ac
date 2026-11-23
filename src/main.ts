@@ -403,6 +403,10 @@ async function boot(): Promise<void> {
     });
   });
 
+  // ── click / tap to walk (target in world space; cancelled by any other movement input)
+  const walkTo = { x: 0, z: 0, on: false, best: Infinity, stall: 0 };
+  const TW = BALANCE.coach.tapWalk;
+
   // ── hints: shown for the method the player actually uses until they've moved
   let hintDone = sim.state.coach.moved > 2;
   // touch input works without keyboard focus; on desktop, ask for a click while the page around us has the keyboard
@@ -413,6 +417,12 @@ async function boot(): Promise<void> {
   // tap / click on a station, desk, room… → a short "what is this?" card (gameplay keeps running)
   input.onTap = (x, y) => {
     if (blockers.size > 0) return;
+    // a single click / tap walks the coach there: movement never depends on keyboard focus or holding the button
+    if (input.enabled && view.groundPoint(x, y, walkTo)) {
+      walkTo.on = true;
+      walkTo.best = Infinity;
+      walkTo.stall = 0;
+    }
     const info = view.explainAt(x, y);
     if (info) {
       hud.showInfo(info.title, info.text, info.icon);
@@ -621,13 +631,34 @@ async function boot(): Promise<void> {
     update: (dt) => {
       input.screenMove(screen);
       if (screen.x !== 0 || screen.y !== 0) {
+        walkTo.on = false;
         sim.input.x = screen.x;
         sim.input.z = screen.y;
       } else if (input.mouseHeld && input.enabled) {
+        walkTo.on = false;
         view.mouseDirection(input.mouseX, input.mouseY, mouse);
         sim.input.x = mouse.x;
         sim.input.z = mouse.z;
+      } else if (walkTo.on && input.enabled && blockers.size === 0) {
+        const c = sim.state.coach;
+        const dx = walkTo.x - c.x;
+        const dz = walkTo.z - c.z;
+        const d = Math.hypot(dx, dz);
+        if (d < walkTo.best - TW.progressEps) {
+          walkTo.best = d;
+          walkTo.stall = 0;
+        } else walkTo.stall += dt;
+        if (d < TW.arriveRadius || walkTo.stall > TW.stuckSec) {
+          walkTo.on = false;
+          sim.input.x = 0;
+          sim.input.z = 0;
+        } else {
+          const m = Math.min(1, d / TW.slowRadius) / d;
+          sim.input.x = dx * m;
+          sim.input.z = dz * m;
+        }
       } else {
+        walkTo.on = false;
         sim.input.x = 0;
         sim.input.z = 0;
       }

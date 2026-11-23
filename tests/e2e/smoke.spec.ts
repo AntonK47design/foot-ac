@@ -16,7 +16,7 @@ test.describe('desktop', () => {
     await page.waitForTimeout(1000);
     expect(errors).toEqual([]);
     // no menu, controllable: hint shows WASD
-    await expect(page.locator('.hint-text')).toHaveText('WASD or hold mouse');
+    await expect(page.locator('.hint-text')).toHaveText('Click to walk · WASD or hold mouse');
   });
 
   test('WASD reaches the first cash and first pad, the pad unlocks, and save → reload restores', async ({ page }) => {
@@ -150,7 +150,7 @@ test.describe('mobile', () => {
     const errors = attachConsole(page);
     await page.goto('/');
     await waitForGameplay(page);
-    await expect(page.locator('.hint-text')).toHaveText('Drag to move');
+    await expect(page.locator('.hint-text')).toHaveText('Drag or tap to move');
     const cdp = await context.newCDPSession(page);
     const o = await objective(page);
     await steerTouch(page, cdp, o!.x, o!.z);
