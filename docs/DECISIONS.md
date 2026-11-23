@@ -299,3 +299,9 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Change:** a quick click or tap on the ground now walks the coach to that point. It stops on arrival, when blocked for 0.6 s, or as soon as keys, a held mouse button or the joystick take over. The tunables are in `BALANCE.coach.tapWalk`.
 - **Hint:** desktop now reads "Click to walk · WASD or hold mouse". Before the game has keyboard focus it shows a large pulsing orange "Click anywhere to walk there". Touch reads "Drag or tap to move".
 - **Measure:** compare `first_move` against `first_frame` for new players on the next build.
+
+## 87. Free characters when they leave
+
+- **Leak:** removing a trainee, squad or match character only took it out of the scene. Its cloned skeleton kept a bone texture (one GPU texture per character), and its animation mixer kept cached bindings. In a late-game save, fast-forwarded in Chrome, GPU textures grew from 68 to 261 in 4 minutes while the scene stayed the same size.
+- **Fix:** `Character.dispose()` stops the mixer, uncaches the root and disposes skeletons. Geometry and kit materials are shared and stay. Every removal site calls it: trainees leaving, squad making way for a match, match cleanup and save reload. After the fix the texture count stays at about 70.
+- **Telemetry caveat:** Playgama reports `memory_used_mb` (JS heap) at p50 54 MB and p99 ~930 MB. The game's own heap measures 10–18 MB even late-game. The reported number probably includes the portal page and ad scripts in the same process, so it may not fall much after this fix.

@@ -7,6 +7,8 @@ import {
   MeshLambertMaterial,
   type Mesh,
   type Object3D,
+  type Skeleton,
+  type SkinnedMesh,
   type Texture,
 } from 'three';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
@@ -120,6 +122,22 @@ export class Character {
     });
     this.mixer = new AnimationMixer(this.root);
     for (const [name, clip] of assets.clips) this.actions.set(name, this.mixer.clipAction(clip));
+  }
+
+  /**
+   * Frees what this instance owns when it leaves for good: its skeleton's bone texture (one GPU texture per
+   * cloned skeleton) and the mixer's cached bindings. Geometry and kit materials are shared, so they stay.
+   */
+  dispose(): void {
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.root);
+    this.root.removeFromParent();
+    this.root.traverse((o) => {
+      const sk = (o as SkinnedMesh).skeleton as Skeleton | undefined;
+      if (sk) sk.dispose();
+    });
+    this.actions.clear();
+    this.current = this.hold = null;
   }
 
   setKit(assets: Assets, kit: Kit): void {
