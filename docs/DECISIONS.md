@@ -305,3 +305,14 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Leak:** removing a trainee, squad or match character only took it out of the scene. Its cloned skeleton kept a bone texture (one GPU texture per character), and its animation mixer kept cached bindings. In a late-game save, fast-forwarded in Chrome, GPU textures grew from 68 to 261 in 4 minutes while the scene stayed the same size.
 - **Fix:** `Character.dispose()` stops the mixer, uncaches the root and disposes skeletons. Geometry and kit materials are shared and stay. Every removal site calls it: trainees leaving, squad making way for a match, match cleanup and save reload. After the fix the texture count stays at about 70.
 - **Telemetry caveat:** Playgama reports `memory_used_mb` (JS heap) at p50 54 MB and p99 ~930 MB. The game's own heap measures 10–18 MB even late-game. The reported number probably includes the portal page and ad scripts in the same process, so it may not fall much after this fix.
+
+## 88. Faster first frame
+
+- **Why:** telemetry put first frame at p50 4.4 s and p90 9.9 s, against the ≤ 4 s desktop / ≤ 8 s mobile budget. Measured locally on mobile (Fast 4G, 4× CPU) it was 6.7 s, and 8.3 s when the Bridge init takes 1.5 s. About 4 s of that was CPU work after every file had downloaded.
+- **Geometry:** `Batch.bake` copied each shared unit shape with `clone()`, and three's shape geometries rebuild themselves from their parameters on clone. That came to 620 rounded boxes rebuilt while building Area 1. It now makes a non-indexed position/normal(/colour) template once per source geometry and copies only those arrays. Quantized or interleaved attributes become plain floats. Rendering is unchanged (screenshot diff equals run-to-run noise).
+- **Icon atlas:** only the coach portrait renders before the first frame. The other ~48 icons render one per idle slice starting 1.5 s later (`BALANCE.boot`). Any icon needed earlier is still rendered on demand by `iconUrl`.
+- **Network:** Area 1 models are `<link rel="preload">`ed from `index.html`, using the shared list in `src/data/area1-files.ts`. Their download also starts before the platform SDK init is awaited, instead of after it.
+- **Result (median of 3):**
+  - mobile 6.7 → 4.9 s; with a 1.5 s Bridge init 8.3 → 5.9 s;
+  - desktop 2.8 → 2.2 s; with a 1.5 s Bridge init 3.9 → 3.2 s;
+  - `GameView` construction (4× CPU) 3.0 → 1.0 s.

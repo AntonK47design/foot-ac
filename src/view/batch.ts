@@ -19,11 +19,49 @@ const tmpP = new Vector3();
 const tmpS = new Vector3();
 const tmpC = new Color();
 
+/**
+ * Non-indexed position/normal (and colour, if present) of a source geometry, made once per source. `clone()` on
+ * three's shape geometries rebuilds the shape from its parameters, and the same few shared unit shapes are
+ * placed hundreds of times while the world is built, so copying these arrays is far cheaper than cloning.
+ */
+const templates = new WeakMap<BufferGeometry, BufferGeometry>();
+
+function template(geo: BufferGeometry): BufferGeometry {
+  let t = templates.get(geo);
+  if (t) return t;
+  const src = geo.index ? geo.toNonIndexed() : geo;
+  t = new BufferGeometry();
+  for (const name of ['position', 'normal', 'color']) {
+    const a = src.getAttribute(name);
+    if (!a) continue;
+    if (a instanceof BufferAttribute && a.array instanceof Float32Array && !a.normalized) {
+      t.setAttribute(name, a);
+      continue;
+    }
+    // interleaved / quantized (meshopt) / normalized: plain floats, so transforms and merging behave
+    const out = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = a.getComponent(i, c);
+    t.setAttribute(name, new BufferAttribute(out, a.itemSize));
+  }
+  if (!t.attributes.normal) t.computeVertexNormals();
+  templates.set(geo, t);
+  return t;
+}
+
+/** A fresh copy of the template's attributes (only those named), ready to transform. */
+function copyOf(geo: BufferGeometry, withColor: boolean): BufferGeometry {
+  const t = template(geo);
+  const g = new BufferGeometry();
+  for (const name of withColor ? ['position', 'normal', 'color'] : ['position', 'normal']) {
+    const a = t.getAttribute(name) as BufferAttribute | undefined;
+    if (a) g.setAttribute(name, new BufferAttribute((a.array as Float32Array).slice(), a.itemSize, a.normalized));
+  }
+  return g;
+}
+
 /** Bakes a geometry into position/normal/color only (non-indexed) so many can be merged. */
 export function bake(geo: BufferGeometry, color: ColorRepresentation, m?: Matrix4): BufferGeometry {
-  let g = geo.index ? geo.toNonIndexed() : geo.clone();
-  for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal') g.deleteAttribute(name);
-  if (!g.attributes.normal) g.computeVertexNormals();
+  const g = copyOf(geo, false);
   if (m) g.applyMatrix4(m);
   const n = g.attributes.position?.count ?? 0;
   const col = new Float32Array(n * 3);
@@ -34,7 +72,6 @@ export function bake(geo: BufferGeometry, color: ColorRepresentation, m?: Matrix
     col[i * 3 + 2] = tmpC.b;
   }
   g.setAttribute('color', new BufferAttribute(col, 3));
-  g = g.index ? g.toNonIndexed() : g;
   return g;
 }
 
@@ -61,9 +98,8 @@ export class Batch {
 
   /** Adds a geometry that already has a colour attribute. */
   addRaw(geo: BufferGeometry, m?: Matrix4): this {
-    let g = geo.index ? geo.toNonIndexed() : geo.clone();
-    for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal' && name !== 'color') g.deleteAttribute(name);
-    if (m) g = g.applyMatrix4(m);
+    const g = copyOf(geo, true);
+    if (m) g.applyMatrix4(m);
     this.parts.push(g);
     return this;
   }

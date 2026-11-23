@@ -12,15 +12,17 @@ export interface Assets {
   clips: Map<string, AnimationClip>;
 }
 
+import { AREA1_FILES, CHARACTER_KEYS, type CharacterKey } from '../data/area1-files';
+
+export { CHARACTER_KEYS, type CharacterKey };
+
 const BASE = './assets/';
-export const CHARACTER_KEYS = ['male-a', 'male-b', 'male-c', 'male-d', 'male-e', 'male-f', 'female-a', 'female-b', 'female-c', 'female-d', 'female-e', 'female-f'] as const;
-export type CharacterKey = (typeof CHARACTER_KEYS)[number];
 
 /** Loads Area 1 assets (before gameplayStart). Props come as one GLB with a named root per model. */
 export async function loadArea1Assets(onProgress?: (k: number) => void): Promise<Assets> {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
-  const files = ['props-area1.glb', ...CHARACTER_KEYS.map((k) => `characters/${k}.glb`)];
+  const files = AREA1_FILES;
   let done = 0;
   const results = await Promise.all(
     files.map(async (f) => {

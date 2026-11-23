@@ -45,6 +45,9 @@ function newSeed(): number {
 
 async function boot(): Promise<void> {
   analytics.track('boot');
+  // Area 1 assets download while the platform SDK starts up (the HTML already preloads the files)
+  const assetsP = loadArea1Assets();
+  assetsP.catch(() => undefined); // awaited below; this only keeps an early failure from being reported as unhandled
   const platform: Platform = await createPlatform();
   if (platform.hasAnalytics) analytics.setSink((e, p) => platform.track(e, p));
   analytics.track('sdk_ready', { kind: platform.kind });
@@ -95,8 +98,8 @@ async function boot(): Promise<void> {
     }
   };
 
-  // Area 1 assets (characters + props) load before gameplayStart; the boot bar shows only if this takes > 1 s
-  const assets = await loadArea1Assets();
+  // Area 1 assets (characters + props) are ready before gameplayStart; the boot bar shows only if this takes > 1 s
+  const assets = await assetsP;
   const vignette = document.createElement('div');
   vignette.className = 'vignette';
   gameEl.insertBefore(vignette, inputLayer);

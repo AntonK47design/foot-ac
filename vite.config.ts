@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { AREA1_FILES } from './src/data/area1-files';
 import { GAME_TITLE } from './src/data/constants';
 
 /** The one runtime script allowed per portal (CLAUDE.md): chosen by VITE_PLATFORM, default CrazyGames. */
@@ -19,7 +20,12 @@ function html(platform: string): Plugin {
   if (!sdk) throw new Error(`unknown VITE_PLATFORM: ${platform}`);
   return {
     name: 'game-html',
-    transformIndexHtml: (src) => src.replace(/%GAME_TITLE%/g, GAME_TITLE).replace('%PLATFORM_SDK%', `<script src="${sdk}"></script>`),
+    transformIndexHtml: (src) =>
+      src
+        .replace(/%GAME_TITLE%/g, GAME_TITLE)
+        // Area 1 models start downloading with the page, not after the JS and the platform SDK have started up
+        .replace('%AREA1_PRELOAD%', AREA1_FILES.map((f) => `<link rel="preload" href="./assets/${f}" as="fetch" type="model/gltf-binary" crossorigin="anonymous" />`).join('\n    '))
+        .replace('%PLATFORM_SDK%', `<script src="${sdk}"></script>`),
     generateBundle() {
       if (platform === 'playgama') {
         this.emitFile({ type: 'asset', fileName: 'playgama-bridge-config.json', source: JSON.stringify(PLAYGAMA_CONFIG, null, 2) + '\n' });

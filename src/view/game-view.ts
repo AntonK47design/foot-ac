@@ -290,6 +290,12 @@ function buildIconModel(id: IconId | 'cash' | 'sign' | 'move', station?: string)
 }
 
 /** Everything visual: subscribes to sim events for juice and draws interpolated sim state. */
+/** Runs `fn` when the main thread is idle (or soon, where requestIdleCallback is missing). */
+function later(fn: () => void): void {
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(fn, { timeout: BALANCE.boot.idleTimeoutMs });
+  else window.setTimeout(fn, BALANCE.boot.idleTimeoutMs / 10);
+}
+
 export class GameView {
   readonly rig = new CameraRig();
   readonly projector: Projector;
@@ -479,49 +485,63 @@ export class GameView {
     coachIcon.play('idle', 0);
     coachIcon.seek(0);
     this.hud.setPortrait(this.icons.render('portrait', coachIcon.root, { yaw: 0.35, pitch: 0.15, zoom: 2.2, focusY: 0.78 }));
-    // pre-render the whole icon atlas, then free the offscreen context
-    for (const id of [
-      'ball',
-      'cash',
-      'sign',
-      'goal',
-      'cones',
-      'wall',
-      'track',
-      'chair',
-      'staff',
-      'bench',
-      'flag',
-      'shelter',
-      'cooler',
-      'pitch',
-      'podium',
-      'whistle',
-      'gate',
-      'water',
-      'gym',
-      'rondo',
-      'freekick',
-      'agility',
-      'skills',
-      'physio',
-      'bib',
-      'crossing',
-      'heading',
-      'juggling',
-      'reaction',
-      'tactics',
-      'analysis',
-      'shop',
-      'stadium',
-      'stand',
-      'lights',
-    ])
-      this.iconUrl(id);
-    for (const st of ['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track', 'gym', 'rondo', 'freekick', 'agility', 'skills', 'crossing', 'heading', 'juggling', 'reaction'])
-      this.iconUrl('lane', st);
-    this.icons.dispose();
-    this.iconsDone = true;
+    // the rest of the icon atlas renders after the first frame, one icon per idle slice (iconUrl also renders
+    // any icon that's asked for sooner); the offscreen context is freed once the atlas is complete
+    this.scheduleIconAtlas();
+  }
+
+  private scheduleIconAtlas(): void {
+    const todo: Array<[string, string | undefined]> = [
+      ...[
+        'ball',
+        'cash',
+        'sign',
+        'goal',
+        'cones',
+        'wall',
+        'track',
+        'chair',
+        'staff',
+        'bench',
+        'flag',
+        'shelter',
+        'cooler',
+        'pitch',
+        'podium',
+        'whistle',
+        'gate',
+        'water',
+        'gym',
+        'rondo',
+        'freekick',
+        'agility',
+        'skills',
+        'physio',
+        'bib',
+        'crossing',
+        'heading',
+        'juggling',
+        'reaction',
+        'tactics',
+        'analysis',
+        'shop',
+        'stadium',
+        'stand',
+        'lights',
+      ].map((id): [string, undefined] => [id, undefined]),
+      ...['shooting_goal', 'dribble_cones', 'passing_wall', 'sprint_track', 'gym', 'rondo', 'freekick', 'agility', 'skills', 'crossing', 'heading', 'juggling', 'reaction'].map((st): [string, string] => ['lane', st]),
+    ];
+    const next = (): void => {
+      const job = todo.shift();
+      if (!job) {
+        this.icons.dispose();
+        this.iconsDone = true;
+        return;
+      }
+      this.iconUrl(job[0], job[1]);
+      later(next);
+    };
+    window.setTimeout(() => later(next), BALANCE.boot.iconAtlasDelayMs);
   }
 
   /** Icon atlas: objective/pad icons rendered from the real 3D models. */

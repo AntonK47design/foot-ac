@@ -291,6 +291,13 @@ export const BALANCE = {
     /** While shown that way, the suggestion is re-picked at most this often (no flip-flopping). */
     lostRefreshSec: 8,
   },
+  /** Work deferred until after the first frame (time to first frame, GDD §2). */
+  boot: {
+    /** Wait this long (ms) after the world is built before rendering the rest of the icon atlas. */
+    iconAtlasDelayMs: 1500,
+    /** Longest wait (ms) for an idle slice before the next deferred job runs anyway. */
+    idleTimeoutMs: 400,
+  },
   camera: {
     /** Visible world width (m) at the focus point at the base view: portrait → landscape. */
     widthPortrait: 11,
