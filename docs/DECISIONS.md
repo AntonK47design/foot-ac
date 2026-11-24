@@ -383,3 +383,9 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   - The 0.8.x tutorial routes.
 - **Tests:** the e2e tests that open meta panels set `tut:ballboy`. A real-input playthrough at 390×844 (arrow keys only) went through 0.7.2's whole line with the cleaned-up HUD.
 - **Build:** `BUILD` 0.7.3.
+
+## 91. 0.7.4 = 0.7.3 with a new version number, for YouTube review
+
+- 0.7.3 went live in the Playgama catalog through the direct update. That route skips moderation, so it never reaches YouTube, and afterwards the console refuses a review submit of the same build ("Nothing has changed since the last submitted version").
+- 0.7.4 is the same game with `BUILD` raised, so it counts as a change and can be submitted for review (YouTube included) from the console.
+- For builds that should reach YouTube: submit them for review instead of using the Playgama-only direct update.
