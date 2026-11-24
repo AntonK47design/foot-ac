@@ -213,3 +213,55 @@ test.describe('layout', () => {
     });
   }
 });
+
+/** Playgama review (0.7.4): HUD overlapping after resizing the window, and a scrollbar in the settings panel. */
+test.describe('layout after resizing / settings without scrollbars', () => {
+  test.skip(({ isMobile }) => isMobile, 'desktop browser windows');
+  test('a window shrunk to 257x443 mid-game: HUD widgets apart, the level tag clear of the star', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    await waitForGameplay(page);
+    await page.setViewportSize({ width: 257, height: 443 });
+    await page.waitForTimeout(800);
+    const sels = ['.gear', '.badge', '.badge-lv', '.starbar-icon svg', '.starbar-track', '.cash', '.cash-icon svg', '.objective'];
+    const boxes = [];
+    for (const sel of sels) {
+      const b = await page.locator(sel).first().boundingBox();
+      if (b) boxes.push({ sel, b });
+    }
+    // (a widget's own parts may touch: the tag sits on the badge, the icons on their bars)
+    const own = (a: string, c: string): boolean => [a, c].includes('.badge') && [a, c].includes('.badge-lv') || [a, c].includes('.cash') && [a, c].includes('.cash-icon svg') || [a, c].includes('.starbar-track') && [a, c].includes('.starbar-icon svg');
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!;
+        const c = boxes[j]!;
+        if (own(a.sel, c.sel)) continue;
+        const ox = Math.min(a.b.x + a.b.width, c.b.x + c.b.width) - Math.max(a.b.x, c.b.x);
+        const oy = Math.min(a.b.y + a.b.height, c.b.y + c.b.height) - Math.max(a.b.y, c.b.y);
+        expect(ox > 1 && oy > 1, `${a.sel} overlaps ${c.sel}`).toBe(false);
+      }
+  });
+
+  for (const [w, h] of [
+    [257, 443],
+    [568, 320],
+    [668, 382],
+    [844, 390],
+  ]) {
+    test(`settings fit without a scrollbar at ${w}x${h}`, async ({ page }) => {
+      await page.setViewportSize({ width: w as number, height: h as number });
+      await page.goto('/');
+      await waitForGameplay(page);
+      await page.locator('.hud-tl .gear').click();
+      const panel = page.locator('.overlay:not(.hidden) .panel');
+      await expect(panel).toBeVisible();
+      await page.waitForTimeout(300);
+      const fit = await panel.evaluate((el) => ({ h: el.scrollHeight <= el.clientHeight + 1, w: el.scrollWidth <= el.clientWidth + 1 }));
+      expect(fit).toEqual({ h: true, w: true });
+      for (const b of await panel.locator('button').all()) {
+        const r = (await b.boundingBox())!;
+        expect(r.x >= -1 && r.x + r.width <= (w as number) + 1, `button "${await b.textContent()}" inside the window`).toBe(true);
+      }
+    });
+  }
+});

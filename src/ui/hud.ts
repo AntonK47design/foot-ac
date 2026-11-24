@@ -104,6 +104,27 @@ export class Hud {
     this.leagueBtn.setAttribute('aria-label', t('hud.league'));
   }
 
+  /**
+   * Bottom (px) of the top HUD band as laid out now: corner widgets, star bar and objective pill. World labels and the
+   * guide's edge pointer stay below it. Measures layout: call on resize / a few times a second, not per label.
+   */
+  bandBottom(): number {
+    let y = 0;
+    for (const el of this.root.querySelectorAll<HTMLElement>('.hud-tl, .hud-tc, .hud-tr, .objective')) {
+      if (el.classList.contains('hidden') || el.offsetHeight === 0) continue;
+      // layout box, not getBoundingClientRect: the pill's pop-in scale animation would make it read too short
+      const top = (el.offsetParent?.getBoundingClientRect().top ?? 0) + el.offsetTop;
+      if (top + el.offsetHeight > y) y = top + el.offsetHeight;
+    }
+    return y;
+  }
+
+  /** Toasts sit just below the measured HUD band (a two-line objective pill used to overlap them). */
+  placeBelowBand(y: number): void {
+    const top = Math.round(y + 6) + 'px';
+    if (this.toasts.style.top !== top) this.toasts.style.top = top;
+  }
+
   setCash(v: number, instant = false): void {
     this.targetCash = Math.floor(v);
     if (instant) {

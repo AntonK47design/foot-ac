@@ -389,3 +389,24 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - 0.7.3 went live in the Playgama catalog through the direct update. That route skips moderation, so it never reaches YouTube, and afterwards the console refuses a review submit of the same build ("Nothing has changed since the last submitted version").
 - 0.7.4 is the same game with `BUILD` raised, so it counts as a change and can be submitted for review (YouTube included) from the console.
 - For builds that should reach YouTube: submit them for review instead of using the Playgama-only direct update.
+
+## 92. 0.7.5: Playgama review notes on 0.7.4 (HUD overlap after resizing, scrollbars)
+
+- **The notes:** "menu elements start overlapping when the screen is resized" (a desktop window narrowed to about 257×443) and "avoid vertical scrollbars inside the game" (the settings panel in a short landscape window, about 668×382).
+- **Reproduced** with a layout audit at 15 window sizes (257×443 to 1280×720; HUD boxes, world labels and panel overflow) and a window shrunk mid-game:
+  - The settings panel needed 454 px but got 296–426 px in every short window and at very narrow portrait sizes, so it scrolled. At 257 px wide the Graphics row also ran off the right edge.
+  - In narrow portrait windows the cash icon touched the level ring, and on common phone sizes (360–414 wide) the "LVL" tag overlapped the star icon by 5–6 px.
+  - The guide's edge pointer sat on the star bar and the objective pill.
+  - World labels slid under the pill: they were hidden by their anchor point against a fixed 175 / 80 px band, but they grow upwards from that point.
+- **Fixes:**
+  - **Settings:**
+    - Two columns in a short landscape window.
+    - The portrait bottom sheet may use the height it needs.
+    - Rows are tighter and may wrap (label above its buttons) below 340 px.
+    - "Vibration" only shows on touch devices (desktop Chrome has `navigator.vibrate` too).
+  - **Panels never show a scrollbar** (`scrollbar-width: none`). Content still scrolls by wheel or touch if it ever doesn't fit.
+  - **Top HUD band measured, not guessed:** `Hud.bandBottom()` (the corner widgets, star bar and pill, using layout boxes so the pill's pop-in animation can't shorten it) is re-measured every 0.5 s and on resize. World labels reaching into it by their top are hidden on phones (dimmed on desktop, as before). The edge pointer stays below it, and toasts sit just under it.
+  - **Below 340 px wide** (a desktop window made thin; no phone is that narrow): a smaller avatar badge, cash text and star, and the ticket counter goes under the cash. All buttons stay at least 48 px.
+  - **Portrait phones:** a slightly smaller star and the star bar 4 px lower. **Everywhere:** the objective pill sits a little lower, clearing the cash icon.
+- **Tests:** e2e `layout after resizing / settings without scrollbars`: a 1280×720 window shrunk to 257×443 mid-game, and the settings panel at 257×443, 568×320, 668×382 and 844×390 (no vertical or horizontal overflow, every button inside the window). All five fail on 0.7.4 and pass on 0.7.5. The audit at all 15 sizes now reports no overlaps and no scrolling.
+- **Build:** `BUILD` 0.7.5. Submit it for review in the console (YouTube included), not through the Playgama-only direct update (§91).

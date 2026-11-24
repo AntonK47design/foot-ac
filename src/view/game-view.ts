@@ -59,6 +59,9 @@ const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
 /** Phones: world-unit radii around the coach for the pad perk line, "+1 PAC" pops and trainee rating badges. */
 const NEAR_PERK = 3.5;
+/** Top HUD band: re-measured this often (s), plus this margin (px) below it for labels and the edge pointer. */
+const RESERVE_EVERY = 0.5;
+const RESERVE_PAD = 6;
 const NEAR_STAT = 6;
 const NEAR_OVR = 7;
 /** Plot culling margins (m) around the camera focus: north = towards the screen top. */
@@ -334,6 +337,8 @@ export class GameView {
   private readonly icons: IconRenderer;
   private readonly iconUrls = new Map<string, string>();
   private time = 0;
+  /** When to re-measure the top HUD band next (view time, s). */
+  private reserveAt = 0;
   private stepT = 0;
   private coachYaw = 0;
   private readonly raycaster = new Raycaster();
@@ -804,7 +809,7 @@ export class GameView {
     this.core.resize(w, h);
     this.rig.resize(w, h);
     this.projector.resize(w, h);
-    this.labels.topReserve = h > w ? 175 : 80;
+    this.labels.topReserve = this.hud.bandBottom() + RESERVE_PAD;
   }
 
   // ───────────────────────────── characters ─────────────────────────────
@@ -1146,6 +1151,13 @@ export class GameView {
     if (this.bus.visible && s.bus.phase === 'stopped') this.bus.position.y = -0.3 + Math.abs(Math.sin(this.time * 10)) * 0.02;
 
     this.coachIdle = Math.hypot(c.vx, c.vz) < 0.2 ? this.coachIdle + dt : 0;
+    // the HUD band changes height with the objective pill (one or two lines) and on resize: re-measure now and then
+    if (this.time >= this.reserveAt) {
+      this.reserveAt = this.time + RESERVE_EVERY;
+      const band = this.hud.bandBottom();
+      this.labels.topReserve = band + RESERVE_PAD;
+      this.hud.placeBelowBand(band);
+    }
     this.updateArrow(cx, cz);
     this.fx.update(dt, this.time);
     this.labels.end();
@@ -1664,7 +1676,7 @@ export class GameView {
     const w = this.projector.w;
     const h = this.projector.h;
     const m = 44;
-    const off = !p.visible || p.x < m || p.y < m * 1.6 || p.x > w - m || p.y > h - m;
+    const off = !p.visible || p.x < m || p.y < Math.max(m * 1.6, this.labels.topReserve) || p.x > w - m || p.y > h - m;
     if (!off || near) {
       edge.classList.add('hidden');
       return;
@@ -1678,7 +1690,9 @@ export class GameView {
     }
     const ang = Math.atan2(dy, dx);
     const kx = Math.cos(ang) !== 0 ? (Math.cos(ang) > 0 ? w - m - w / 2 : m - w / 2) / Math.cos(ang) : Infinity;
-    const ky = Math.sin(ang) !== 0 ? (Math.sin(ang) > 0 ? h - m - h / 2 : m * 2.2 - h / 2) / Math.sin(ang) : Infinity;
+    // (the pointer never goes up into the top HUD band: it stops just below the objective pill)
+    const top = Math.max(m * 2.2, this.labels.topReserve + m);
+    const ky = Math.sin(ang) !== 0 ? (Math.sin(ang) > 0 ? h - m - h / 2 : top - h / 2) / Math.sin(ang) : Infinity;
     const k = Math.min(Math.abs(kx), Math.abs(ky));
     const px = w / 2 + Math.cos(ang) * k;
     const py = h / 2 + Math.sin(ang) * k;

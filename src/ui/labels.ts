@@ -42,8 +42,9 @@ interface LabelEntry {
   /** Position in tenths of a pixel (the precision written to the transform). */
   tx: number;
   ty: number;
-  /** Rendered width (px) for the phone edge check; -1 = measure again (content length changed). */
+  /** Rendered size (px) for the phone edge / top-band checks; w -1 = measure again (content length changed). */
   w: number;
+  h: number;
 }
 
 /**
@@ -54,7 +55,7 @@ export class LabelLayer {
   readonly root: HTMLDivElement;
   private readonly pool = new Map<string, LabelEntry>();
   private readonly sp: ScreenPoint = { x: 0, y: 0, visible: false };
-  /** Screen y (px) above which labels are dimmed (HUD band). */
+  /** Screen y (px) of the top HUD band's bottom (measured from the HUD): labels reaching above it are dimmed / hidden. */
   topReserve = 0;
 
   constructor(parent: HTMLElement, private readonly projector: Projector) {
@@ -74,7 +75,7 @@ export class LabelLayer {
       const div = document.createElement('div');
       this.root.appendChild(div);
       div.className = 'lbl';
-      e = { el: div, used: false, html: '', cls: '', shown: true, dim: false, tx: NaN, ty: NaN, w: -1 };
+      e = { el: div, used: false, html: '', cls: '', shown: true, dim: false, tx: NaN, ty: NaN, w: -1, h: 0 };
       this.pool.set(key, e);
     }
     e.used = true;
@@ -93,8 +94,9 @@ export class LabelLayer {
       return null;
     }
     const compact = isCompact();
-    // phones: no half-cut labels at the side edges and none under the top HUD band (desktop dims those instead)
-    if (compact && (p.y < this.topReserve || this.cutOff(e, p.x))) {
+    // phones: no half-cut labels at the side edges and none reaching into the top HUD band, judged by the label's
+    // top (labels grow upwards from their anchor); desktop dims those instead
+    if (compact && (this.cutOff(e, p.x) || p.y - e.h < this.topReserve)) {
       this.hide(e);
       return null;
     }
@@ -132,6 +134,7 @@ export class LabelLayer {
         e.shown = true;
       }
       e.w = e.el.offsetWidth;
+      e.h = e.el.offsetHeight;
     }
     const half = e.w / 2;
     return x - half < EDGE_PX || x + half > this.projector.w - EDGE_PX;
