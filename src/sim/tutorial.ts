@@ -106,7 +106,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => pileObjective(s, 'safe', 'tut.safe'),
   },
   // ── Training Ground (starts once the gate shows up)
-  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => padObjective(s, 'p2_gate') },
+  { id: 'gate', ready: (s) => isVisible(s, 'p2_gate') || s.area2Open(), done: (s) => s.area2Open(), objective: (s) => gateObjective(s, 'p2_gate') },
   { id: 'water', done: (s) => padDone(s, 'p2_water'), objective: (s) => padObjective(s, 'p2_water') },
   { id: 'gym', done: (s) => padDone(s, 'p2_gym'), objective: (s) => padObjective(s, 'p2_gym') },
   {
@@ -115,7 +115,7 @@ export const TUTORIAL: TutorialStep[] = [
     objective: (s) => ballObjective(s, 'gym'),
   },
   // ── Youth Stadium (starts once its gate shows up)
-  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => padObjective(s, 'p3_gate') },
+  { id: 'gate3', ready: (s) => isVisible(s, 'p3_gate') || s.area3Open(), done: (s) => s.area3Open(), objective: (s) => gateObjective(s, 'p3_gate') },
   { id: 'kit', done: (s) => padDone(s, 'p3_kit'), objective: (s) => padObjective(s, 'p3_kit') },
   { id: 'crossing', done: (s) => padDone(s, 'p3_crossing'), objective: (s) => padObjective(s, 'p3_crossing') },
   {
@@ -129,6 +129,15 @@ export const TUTORIAL: TutorialStep[] = [
 function officeObjective(sim: Sim, key: string, grad?: ReturnType<Sim['podiumGraduate']>): Objective {
   const P = sim.area.office.computer;
   return { key, params: grad ? { name: firstName(grad) } : undefined, icon: 'podium', x: P.x, z: P.z, targetId: grad ? 'podium' : 'office', radius: BALANCE.transfer.zoneRadius };
+}
+
+/**
+ * An area gate: one steady line ("Open the Training Ground Gate") whether or not the cash is there yet. Standing on
+ * its price tag pays in whatever the player has, so "Unlock" / "Save up" used to flip every few seconds.
+ */
+function gateObjective(sim: Sim, padId: string): Objective | null {
+  const o = padObjective(sim, padId);
+  return o ? { ...o, key: 'tut.open_gate' } : null;
 }
 
 function isVisible(sim: Sim, padId: string): boolean {

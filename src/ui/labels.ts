@@ -1,5 +1,9 @@
 import type { Camera } from 'three';
 import { Vector3 } from 'three';
+import { isCompact } from './compact';
+
+/** Phones: labels must fit this far inside the left/right screen edge. */
+const EDGE_PX = 6;
 
 const v = new Vector3();
 
@@ -38,6 +42,8 @@ interface LabelEntry {
   /** Position in tenths of a pixel (the precision written to the transform). */
   tx: number;
   ty: number;
+  /** Rendered width (px) for the phone edge check; -1 = measure again (content length changed). */
+  w: number;
 }
 
 /**
@@ -68,7 +74,7 @@ export class LabelLayer {
       const div = document.createElement('div');
       this.root.appendChild(div);
       div.className = 'lbl';
-      e = { el: div, used: false, html: '', cls: '', shown: true, dim: false, tx: NaN, ty: NaN };
+      e = { el: div, used: false, html: '', cls: '', shown: true, dim: false, tx: NaN, ty: NaN, w: -1 };
       this.pool.set(key, e);
     }
     e.used = true;
@@ -77,10 +83,18 @@ export class LabelLayer {
       e.cls = cls;
     }
     if (e.html !== html) {
+      // re-measure only when the content's length changes (a ticking price keeps its width; no layout per frame)
+      if (html.length !== e.html.length) e.w = -1;
       e.el.innerHTML = '<div class="c">' + html + '</div>';
       e.html = html;
     }
     if (!p.visible || p.x < -200 || p.y < -200 || p.x > this.projector.w + 200 || p.y > this.projector.h + 200) {
+      this.hide(e);
+      return null;
+    }
+    const compact = isCompact();
+    // phones: no half-cut labels at the side edges and none under the top HUD band (desktop dims those instead)
+    if (compact && (p.y < this.topReserve || this.cutOff(e, p.x))) {
       this.hide(e);
       return null;
     }
@@ -89,7 +103,7 @@ export class LabelLayer {
       e.shown = true;
     }
     // labels sliding under the top HUD band are dimmed so the HUD stays readable
-    const dim = p.y < this.topReserve;
+    const dim = !compact && p.y < this.topReserve;
     if (dim !== e.dim) {
       e.el.style.opacity = dim ? '0.25' : '';
       e.dim = dim;
@@ -108,6 +122,19 @@ export class LabelLayer {
     if (!e.shown) return;
     e.el.style.display = 'none';
     e.shown = false;
+  }
+
+  /** The centred label would stick out of the left/right screen edge (width measured once per content change). */
+  private cutOff(e: LabelEntry, x: number): boolean {
+    if (e.w < 0) {
+      if (!e.shown) {
+        e.el.style.display = '';
+        e.shown = true;
+      }
+      e.w = e.el.offsetWidth;
+    }
+    const half = e.w / 2;
+    return x - half < EDGE_PX || x + half > this.projector.w - EDGE_PX;
   }
 
   end(): void {

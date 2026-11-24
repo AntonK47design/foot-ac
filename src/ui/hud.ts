@@ -2,6 +2,23 @@ import { formatCash, formatNumber, t, hasKey } from '../core/i18n';
 import type { Objective } from '../sim/objectives';
 import { icon } from './icons';
 import type { InputMethod } from './input';
+import { isCompact } from './compact';
+
+type ToastKind = 'info' | 'good' | 'gold';
+interface ToastEntry {
+  el: HTMLDivElement;
+  kind: ToastKind;
+  born: number;
+  ms: number;
+  lines: number;
+  timer: number;
+  out: boolean;
+}
+/** Messages this close together share one card. */
+const TOAST_MERGE_MS = 1200;
+const TOAST_MAX_LINES = 3;
+const TOAST_STALE_MS = 5000;
+const KIND_RANK: Record<ToastKind, number> = { info: 0, good: 1, gold: 2 };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: HTMLElement, html?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -40,6 +57,8 @@ export class Hud {
   private shownCash = 0;
   private targetCash = 0;
   private hintMethod: string | null = null;
+  private readonly toastList: ToastEntry[] = [];
+  private readonly toastQueue: Array<{ text: string; kind: ToastKind; ms: number; at: number }> = [];
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'hud', parent);
@@ -105,6 +124,10 @@ export class Hud {
   }
 
   setStars(stars: number, total: number): void {
+    // a full bar says nothing new (the objective pill points at the next gate): hide it
+    const full = stars >= total;
+    const bar = this.starFill.parentElement?.parentElement;
+    if (bar && bar.classList.contains('hidden') !== full) bar.classList.toggle('hidden', full);
     this.starFill.style.width = `${Math.min(100, (stars / Math.max(1, total)) * 100)}%`;
     const txt = t('hud.stars', { stars, total });
     if (this.starText.textContent !== txt) this.starText.textContent = txt;
@@ -233,14 +256,62 @@ export class Hud {
     this.infoEl?.classList.add('hidden');
   }
 
-  toast(text: string, kind: 'info' | 'good' | 'gold' = 'info', ms = 2400): void {
+  /**
+   * Short message under the top HUD. Messages that arrive together (a level-up, its chest and a feature unlock) share
+   * one card, one line each. Phones show one card at a time and queue the rest; larger screens stack up to three.
+   */
+  toast(text: string, kind: ToastKind = 'info', ms = 2400): void {
+    const now = performance.now();
+    const last = this.toastList[this.toastList.length - 1];
+    if (last && !last.out && now - last.born < TOAST_MERGE_MS && last.lines < TOAST_MAX_LINES) {
+      el('span', 'toast-line', last.el).textContent = text;
+      last.lines++;
+      if (KIND_RANK[kind] > KIND_RANK[last.kind]) {
+        last.el.classList.replace(last.kind, kind);
+        last.kind = kind;
+      }
+      this.armToast(last, Math.max(ms, last.ms) + 600);
+      return;
+    }
+    const max = isCompact() ? 1 : 3;
+    if (this.toastList.filter((x) => !x.out).length >= max) {
+      if (isCompact()) {
+        // wait for the current card; keep only the newest few
+        this.toastQueue.push({ text, kind, ms, at: now });
+        if (this.toastQueue.length > 3) this.toastQueue.shift();
+        return;
+      }
+      const first = this.toastList.find((x) => !x.out);
+      if (first) this.dropToast(first);
+    }
     const e = el('div', `toast ${kind}`, this.toasts);
-    e.textContent = text;
-    while (this.toasts.children.length > 3) this.toasts.firstElementChild?.remove();
+    el('span', 'toast-line', e).textContent = text;
+    const tt: ToastEntry = { el: e, kind, born: now, ms, lines: 1, timer: 0, out: false };
+    this.toastList.push(tt);
+    this.armToast(tt, ms);
+  }
+
+  private armToast(tt: ToastEntry, ms: number): void {
+    tt.ms = ms;
+    window.clearTimeout(tt.timer);
+    tt.timer = window.setTimeout(() => this.dropToast(tt), ms);
+  }
+
+  private dropToast(tt: ToastEntry): void {
+    if (tt.out) return;
+    tt.out = true;
+    window.clearTimeout(tt.timer);
+    tt.el.classList.add('out');
     window.setTimeout(() => {
-      e.classList.add('out');
-      window.setTimeout(() => e.remove(), 350);
-    }, ms);
+      tt.el.remove();
+      const i = this.toastList.indexOf(tt);
+      if (i >= 0) this.toastList.splice(i, 1);
+    }, 350);
+    // everything that waited comes up together (one card, merged lines)
+    // (news older than a few seconds is dropped rather than shown late)
+    const now = performance.now();
+    const waiting = this.toastQueue.splice(0).filter((w) => now - w.at < TOAST_STALE_MS);
+    if (waiting.length) window.setTimeout(() => waiting.forEach((w) => this.toast(w.text, w.kind, w.ms)), 360);
   }
 
   update(dt: number): void {

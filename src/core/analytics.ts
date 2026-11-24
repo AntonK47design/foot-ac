@@ -1,3 +1,5 @@
+import { BUILD } from '../data/constants';
+
 type Props = Record<string, string | number | boolean>;
 
 const seen = new Set<string>();
@@ -10,7 +12,8 @@ let early: Array<[string, Props | undefined]> | null = [];
 
 function send(event: string, props?: Props): void {
   try {
-    sink?.(event, props);
+    // every event carries the build, so before/after comparisons don't depend on dates
+    sink?.(event, { ...props, build_version: BUILD });
   } catch {
     /* analytics never breaks the game */
   }

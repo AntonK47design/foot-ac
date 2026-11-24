@@ -361,3 +361,25 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **Why:** in the week after 0.7.0, players watched 0.17 rewarded ads per session; Playgama's benchmark is 3–5, with 30–40 % of players tapping. Rewarded ads are opt-in, so they raise revenue without the playtime risk of more interstitials. The ×2 match-cash offer sat between the MVP card and two equally loud buttons.
 - **Change:** when the offer is available, the ×2 button sits right under the prize. It's bigger (76 px), pulses gently (no animation under `prefers-reduced-motion`), and says "Watch a short ad" under the reward (Playgama rule 2.2.1). League table and Continue become neutral; Continue turns blue again once the ad is done, or when there's no offer (adblock note, no cash, ads off). Continue carries a stable `results-continue` class for the e2e tests.
 - **What to watch:** `advertisement_rewarded_opened` per session (was 0.17) and still-playing-at-10-minutes (should stay at least 41 %).
+
+## 90. 0.7.3: the phone HUD cleanup, build_version on every event, steady gate line (ported from the 0.8.x line)
+
+- **Context:** a parallel line of work (0.8.0–0.8.8, branch `claude/tender-ritchie-74zssr`) split off before 0.7.0. It reworked the tutorial several times and was never published. 0.7.2's own opening line went live on Nov 22. Its first two days (48 sessions, 31 new players; too few to be sure) look clearly better than before: 39 % of sessions reach minute 10 (was 29 %), the median session is 11.5 min (was 4.6), and 65 % of new players reach a match (was about 40 %). So 0.7.3 keeps 0.7.2's tutorial and economy untouched and takes only what doesn't change the game's pace, so the tutorial can still be judged.
+  - The 0.8.x commits are kept in this branch's history through a merge that keeps 0.7.2's files (`git merge -s ours`).
+- **Ported:**
+  1. **Phone HUD** (`ui/compact.ts`: portrait ≤ 760 px wide or landscape ≤ 460 px tall):
+     - Toasts that arrive within 1.2 s share one card, one line each, up to 3 lines. Phones show one card at a time, the rest wait, and anything older than 5 s is dropped.
+     - Side buttons are icon only (52 px). The Hall of Fame uses the star icon, not a second trophy.
+     - The full star bar hides.
+     - A pad's perk line shows only within 3.5 m of the coach, "+1 PAC" pops within 6 m, idle rating badges within 7 m.
+     - No half-cut labels at the side edges and none under the top HUD band (desktop dims those, as before). This is merged into 0.7.2's per-label style cache: widths are measured only when a label's content length changes.
+     - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the tutorial line is done (`tut:ballboy`). The Scout badge shows only when a mission can start.
+  2. **`build_version` on every analytics event** (0.7.2 had it only on `performance_sample`), so releases can be compared by build, not by date.
+  3. **Area gates keep one line:** "Open the Training Ground Gate" instead of flipping between "Save up" and "Unlock" while paying in.
+  4. **Economy bot:** a purchase in the same tick counts as affordable (the check ran after the purchase and reported dead stretches that weren't there).
+- **Not ported (for now):**
+  - Faster early matches (100 s for the first 5, then 150 s): a pace change. A candidate for 0.7.4, once 0.7.2's tutorial has a week of data.
+  - The free first upgrade: 0.7.2's line already teaches the upgrade, and 16 of the 20 players who finished it bought one.
+  - The 0.8.x tutorial routes.
+- **Tests:** the e2e tests that open meta panels set `tut:ballboy`. A real-input playthrough at 390×844 (arrow keys only) went through 0.7.2's whole line with the cleaned-up HUD.
+- **Build:** `BUILD` 0.7.3.

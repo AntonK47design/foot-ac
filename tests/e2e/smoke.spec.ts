@@ -79,6 +79,8 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = (window.__wk as unknown as W).sim;
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
+      // past the tutorial line (the side buttons show once it ends with the Ball Boy)
+      (sim.state.flags as Record<string, boolean>)['tut:ballboy'] = true;
       const t = sim.spawnTrainee();
       if (t) sim.graduate(t);
     });

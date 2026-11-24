@@ -176,7 +176,10 @@ export function runBot(opts: BotOptions): BotReport {
       for (const p of sim.state.piles) piles += Math.floor(p.amount);
       // an Office upgrade counts as an affordable purchase too (GDD §4.9 never-dead-air)
       const cheapest = Math.min(...pads.map((p) => sim.padRemaining(p)), sim.cheapestUpgrade()?.cost ?? Infinity);
-      const affordable = sim.state.cash + piles >= cheapest;
+      // something bought this tick counts too: the check runs after the purchase, when the cash is already spent
+      const now = sim.state.time;
+      const bought = unlockTimes[unlockTimes.length - 1] === now || upgradeTimes[upgradeTimes.length - 1] === now;
+      const affordable = bought || sim.state.cash + piles >= cheapest;
       if (!affordable) {
         if (unaffordableSince === null) unaffordableSince = sim.state.time;
         const gap = sim.state.time - unaffordableSince;

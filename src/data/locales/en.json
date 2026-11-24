@@ -364,6 +364,7 @@
   "toast.area3": "Youth Stadium open!",
   "tut.graduate": "Office: sell {name} or add to your squad",
   "tut.upgrade": "Office: buy upgrades to earn more",
+  "tut.open_gate": "Open the {name}",
   "tut.match": "Kick-off spot: play your first match",
   "tut.safe": "Collect the safe: your accountant's cash",
   "tut.step": "{n}/{total}",
