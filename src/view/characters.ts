@@ -6,11 +6,13 @@ import {
   LoopRepeat,
   MeshLambertMaterial,
   type Mesh,
+  type SkinnedMesh,
   type Object3D,
   type Texture,
 } from 'three';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 import type { Assets, CharacterKey } from './assets';
+import { DEPTH_SKINNED } from './depth';
 
 /** Animation states mapped onto the shared Kenney clips. */
 export type CharAnim = 'idle' | 'walk' | 'run' | 'sit' | 'carry' | 'carryIdle' | 'cheer' | 'kick' | 'pickup' | 'interact';
@@ -115,6 +117,7 @@ export class Character {
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.frustumCulled = false;
+      if ((mesh as SkinnedMesh).isSkinnedMesh) mesh.customDepthMaterial = DEPTH_SKINNED;
       const src = mesh.material as MeshLambertMaterial;
       if (src.map) mesh.material = kitMaterial(src.map, kit ?? { shirt: 0xffffff, shorts: 0xffffff, socks: 0xffffff, trim: 0xffffff });
     });
@@ -188,6 +191,24 @@ export class Character {
 
   get busy(): boolean {
     return this.time < this.oneShotUntil;
+  }
+
+  /**
+   * Frees what this instance owns: every SkinnedMesh got its own Skeleton from skeletonClone, and the renderer
+   * gives each one a bone DataTexture on first draw (renderer.info.memory.textures). Geometry and kit materials
+   * are shared, so they stay. Call after removing `root` from the scene; the instance is unusable afterwards.
+   */
+  dispose(): void {
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.root);
+    this.actions.clear();
+    this.current = null;
+    this.hold = null;
+    this.root.removeFromParent();
+    this.root.traverse((o) => {
+      const sm = o as SkinnedMesh;
+      if (sm.isSkinnedMesh) sm.skeleton.dispose();
+    });
   }
 }
 

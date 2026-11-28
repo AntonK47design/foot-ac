@@ -30,6 +30,7 @@ import type { MatchUi } from '../ui/match-ui';
 import type { Hud } from '../ui/hud';
 import { icon } from '../ui/icons';
 import { LabelLayer, Popups, Projector, type ScreenPoint } from '../ui/labels';
+import { isCompact } from '../ui/compact';
 import type { Assets, CharacterKey } from './assets';
 import type { AudioSystem } from './audio';
 import { Batch } from './batch';
@@ -40,6 +41,7 @@ import { PropKit } from './builders/football';
 import { buildBus } from './builders/bus';
 import { CameraRig } from './camera';
 import { Character, KITS, casualKit, type CharAnim, type Kit } from './characters';
+import { DEPTH_INSTANCED } from './depth';
 import { Fx } from './fx';
 import { G } from './geo';
 import { IconRenderer } from './icon-render';
@@ -55,6 +57,13 @@ const MAX_BIBS = 160;
 const MAX_BILLS = 420;
 const MAX_RINGS = 64;
 const KID_SCALE = 1.6;
+/** Phones: world-unit radii around the coach for the pad perk line, "+1 PAC" pops and trainee rating badges. */
+const NEAR_PERK = 3.5;
+/** Top HUD band: re-measured this often (s), plus this margin (px) below it for labels and the edge pointer. */
+const RESERVE_EVERY = 0.5;
+const RESERVE_PAD = 6;
+const NEAR_STAT = 6;
+const NEAR_OVR = 7;
 /** Plot culling margins (m) around the camera focus: north = towards the screen top. */
 const PLOT_SEE_NORTH = 30;
 const PLOT_SEE_SOUTH = 20;
@@ -323,10 +332,13 @@ export class GameView {
   private coachIdle = 0;
   private readonly actors = new Map<string, Actor>();
   private readonly pops: Pop[] = [];
-  private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide });
+  /** forceSinglePass: no per-frame back/front pass with `needsUpdate` (DECISIONS §88). */
+  private readonly ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide, forceSinglePass: true });
   private readonly icons: IconRenderer;
   private readonly iconUrls = new Map<string, string>();
   private time = 0;
+  /** When to re-measure the top HUD band next (view time, s). */
+  private reserveAt = 0;
   private stepT = 0;
   private coachYaw = 0;
   private readonly raycaster = new Raycaster();
@@ -382,6 +394,7 @@ export class GameView {
     this.balls.count = 0;
     this.balls.frustumCulled = false;
     this.balls.castShadow = true;
+    this.balls.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.balls);
 
     const bottleKit = new Batch();
@@ -391,6 +404,7 @@ export class GameView {
     this.bottles.count = 0;
     this.bottles.frustumCulled = false;
     this.bottles.castShadow = true;
+    this.bottles.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bottles);
 
     const bibKit = new Batch();
@@ -400,6 +414,7 @@ export class GameView {
     this.bibs.count = 0;
     this.bibs.frustumCulled = false;
     this.bibs.castShadow = true;
+    this.bibs.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bibs);
 
     const bill = new Batch();
@@ -411,6 +426,7 @@ export class GameView {
     this.bills.count = 0;
     this.bills.frustumCulled = false;
     this.bills.castShadow = true;
+    this.bills.customDepthMaterial = DEPTH_INSTANCED;
     scene.add(this.bills);
 
     const ringGeo = new RingGeometry(0.34, 0.45, 32);
@@ -612,7 +628,7 @@ export class GameView {
   resetVisuals(): void {
     for (const u of this.unlocks.values()) this.core.scene.remove(u.root);
     for (const p of this.pads.values()) this.core.scene.remove(p.pad, p.ghost);
-    for (const a of this.actors.values()) this.core.scene.remove(a.c.root);
+    for (const a of this.actors.values()) a.c.dispose();
     this.unlocks.clear();
     this.pads.clear();
     this.actors.clear();
@@ -702,7 +718,7 @@ export class GameView {
     ev.on('rep', (e) => {
       const tr = this.sim.trainee(e.traineeId);
       if (!tr) return;
-      if (e.gain > 0) this.popups.text(tr.x, 1.9, tr.z, t('popup.stat', { n: e.gain, stat: t('stat.' + e.stat) }), 'stat');
+      if (e.gain > 0 && this.nearCoach(tr.x, tr.z, NEAR_STAT)) this.popups.text(tr.x, 1.9, tr.z, t('popup.stat', { n: e.gain, stat: t('stat.' + e.stat) }), 'stat');
     });
     ev.on('graduated', (e) => {
       const tr = this.sim.trainee(e.id);
@@ -793,7 +809,7 @@ export class GameView {
     this.core.resize(w, h);
     this.rig.resize(w, h);
     this.projector.resize(w, h);
-    this.labels.topReserve = h > w ? 175 : 80;
+    this.labels.topReserve = this.hud.bandBottom() + RESERVE_PAD;
   }
 
   // ───────────────────────────── characters ─────────────────────────────
@@ -1029,7 +1045,7 @@ export class GameView {
     // remove actors of trainees that left
     for (const [k, a] of this.actors) {
       if (a.seen === frameId) continue;
-      this.core.scene.remove(a.c.root);
+      a.c.dispose();
       this.actors.delete(k);
     }
 
@@ -1135,6 +1151,13 @@ export class GameView {
     if (this.bus.visible && s.bus.phase === 'stopped') this.bus.position.y = -0.3 + Math.abs(Math.sin(this.time * 10)) * 0.02;
 
     this.coachIdle = Math.hypot(c.vx, c.vz) < 0.2 ? this.coachIdle + dt : 0;
+    // the HUD band changes height with the objective pill (one or two lines) and on resize: re-measure now and then
+    if (this.time >= this.reserveAt) {
+      this.reserveAt = this.time + RESERVE_EVERY;
+      const band = this.hud.bandBottom();
+      this.labels.topReserve = band + RESERVE_PAD;
+      this.hud.placeBelowBand(band);
+    }
     this.updateArrow(cx, cz);
     this.fx.update(dt, this.time);
     this.labels.end();
@@ -1373,7 +1396,7 @@ export class GameView {
       this.labels.place(key, x, HEAD_Y + 0.3, z, '', `<div class="bubble">👕</div>`);
     } else if (tr.state === 'seated' && tr.waitT > BALANCE.trainee.moodWaitSec) {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<div class="bubble">⏳<span class="emo">😴</span></div>`);
-    } else {
+    } else if (this.nearCoach(x, z, NEAR_OVR)) {
       this.labels.place(key, x, HEAD_Y + 0.1, z, '', `<span class="ovr ${rc}">${ovr}</span>`);
     }
     return a;
@@ -1417,7 +1440,7 @@ export class GameView {
     // the squad's training figures make way for the match line-ups
     for (const [k, a] of this.actors) {
       if (!k.startsWith('sq:')) continue;
-      this.core.scene.remove(a.c.root);
+      a.c.dispose();
       this.actors.delete(k);
     }
     this.director.start(script, ourName, skippable, hooks);
@@ -1528,7 +1551,11 @@ export class GameView {
         this.fx.coins.spawn(s.coach.x, 1.4, s.coach.z, p.pos.x, 0.1, p.pos.z, 0.35);
         this.audio.play('coin', 0.8 + (paid / p.cost) * 0.6);
       }
-      if (!this.matchActive) this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford));
+      if (!this.matchActive) {
+        // phones: the perk line ("+25% transfer fees") only when the coach walks up to the pad
+        const perk = !isCompact() || Math.hypot(s.coach.x - p.pos.x, s.coach.z - p.pos.z) < NEAR_PERK;
+        this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford, perk));
+      }
     }
     for (const [id, pv] of this.pads) {
       if (seen.has(id)) continue;
@@ -1597,10 +1624,17 @@ export class GameView {
     return best ? { title: best.title, text: best.text, icon: this.iconUrl(best.icon) } : null;
   }
 
-  private padTag(p: PadDef, afford: boolean): string {
+  /** Phones show some world labels only around the coach (desktop: everywhere). */
+  private nearCoach(x: number, z: number, r: number): boolean {
+    if (!isCompact()) return true;
+    const c = this.sim.state.coach;
+    return (c.x - x) * (c.x - x) + (c.z - z) * (c.z - z) < r * r;
+  }
+
+  private padTag(p: PadDef, afford: boolean, showPerk = true): string {
     const rem = Math.ceil(this.sim.padRemaining(p));
     const name = p.unlock.type === 'staff' ? t('pad.hire', { name: t(p.nameKey) }) : t(p.nameKey);
-    const perk = p.unlock.type === 'object' ? perkText(p.unlock.id) : '';
+    const perk = showPerk && p.unlock.type === 'object' ? perkText(p.unlock.id) : '';
     return `<div class="pad2${afford ? ' ok' : ''}"><div class="pad2-price">${icon('cash')}<b>${formatCash(rem)}</b></div><div class="pad2-name">${icon(p.icon)}<i>${t('pad.unlock')}</i>${name}</div>${perk ? `<div class="pad2-perk">${perk}</div>` : ''}</div>`;
   }
 
@@ -1642,7 +1676,7 @@ export class GameView {
     const w = this.projector.w;
     const h = this.projector.h;
     const m = 44;
-    const off = !p.visible || p.x < m || p.y < m * 1.6 || p.x > w - m || p.y > h - m;
+    const off = !p.visible || p.x < m || p.y < Math.max(m * 1.6, this.labels.topReserve) || p.x > w - m || p.y > h - m;
     if (!off || near) {
       edge.classList.add('hidden');
       return;
@@ -1656,7 +1690,9 @@ export class GameView {
     }
     const ang = Math.atan2(dy, dx);
     const kx = Math.cos(ang) !== 0 ? (Math.cos(ang) > 0 ? w - m - w / 2 : m - w / 2) / Math.cos(ang) : Infinity;
-    const ky = Math.sin(ang) !== 0 ? (Math.sin(ang) > 0 ? h - m - h / 2 : m * 2.2 - h / 2) / Math.sin(ang) : Infinity;
+    // (the pointer never goes up into the top HUD band: it stops just below the objective pill)
+    const top = Math.max(m * 2.2, this.labels.topReserve + m);
+    const ky = Math.sin(ang) !== 0 ? (Math.sin(ang) > 0 ? h - m - h / 2 : top - h / 2) / Math.sin(ang) : Infinity;
     const k = Math.min(Math.abs(kx), Math.abs(ky));
     const px = w / 2 + Math.cos(ang) * k;
     const py = h / 2 + Math.sin(ang) * k;

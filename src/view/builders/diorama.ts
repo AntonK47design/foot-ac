@@ -424,7 +424,8 @@ export function buildDiorama(assets: Assets, L: Layout, mat: Material): Diorama 
   aoBlobs.push({ x: -16.0, z: -2.0, r: 0.35 });
 
   // ── locked expansions: blueprint ghosts behind construction fences
-  const ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.32, depthWrite: false, side: DoubleSide });
+  // forceSinglePass: see netMat
+  const ghostMat = new MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.32, depthWrite: false, side: DoubleSide, forceSinglePass: true });
   const ghostEdge = new MeshBasicMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.75, depthWrite: false });
   for (const gh of L.ghosts) {
     const r = gh.rect;
@@ -1318,6 +1319,8 @@ function netMaterial(): MeshLambertMaterial {
   t.image = c;
   t.repeat.set(10, 5);
   t.needsUpdate = true;
-  netMat = new MeshLambertMaterial({ map: t, transparent: true, alphaTest: 0.35, side: DoubleSide });
+  // forceSinglePass: three.js draws transparent DoubleSide materials as a back + front pass and flags
+  // `needsUpdate` for each, so every net re-ran program selection twice a frame (~50 KB garbage/frame; DECISIONS §88)
+  netMat = new MeshLambertMaterial({ map: t, transparent: true, alphaTest: 0.35, side: DoubleSide, forceSinglePass: true });
   return netMat;
 }

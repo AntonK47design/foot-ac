@@ -292,3 +292,121 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
 - **New mode:** `compose-cover.ts --wide` writes the covers to `store/v3/`.
   - The landscape cover shows the whole image, with the logo in the sky on the right.
   - The square and portrait covers are strips through the coach. The art is pushed down and the sky continued above it, so the logo sits at the top without covering the face, the pointing hand or the cash.
+
+## 86. One straight opening line for the first ~5 minutes
+
+- **Why:** Playgama telemetry (30 days, 1,087 sessions; see `docs/TUTORIAL_PLAN.md`). The scripted first minute lost about 4 % of players per step and 83 % finished it. The old route ended after the Dribble Cones and the guide hid. A third of the players who got that far quit within the next 2–3 minutes, mostly before buying anything else. The first match came at a median of 8 minutes and 57 % of players never saw one.
+- **The line** (`sim/tutorial.ts`, the steps marked `core`), numbered in the objective pill ("9/16"):
+  - core loop: cash → Ball Crate → Shooting Goal → sign Leo → balls → fees → Dribble Cones (unchanged);
+  - Waiting Bench → Shooting Lane 2 → Team Bench → Passing Wall → Cone Lane 2 → Team Bus → **first match** → **Ball Boy** (first automation);
+  - after the Ball Boy, a gold toast says "the academy is yours". From then on the guide only appears when the player looks lost, as before.
+- **The first graduate cuts in** wherever they happen in the line (optional step): the office is explained at the moment of the first big payout.
+- **Never "wait":** while a build is unaffordable, the step shows the quickest way to earn the rest (`earnObjective`): cash on the ground that covers it → a graduate to sell → a drill out of balls → a player to sign → a basket to top up → a decent pile. It falls back to "Save up" only when there's nothing to do.
+- **No flicker:** an earn hint stays at least `objectives.earnHoldSec` (1.5 s) before a better one replaces it. It is never held back over the build itself, the next step, or "bring" once the coach has the supplies.
+- **Upgrades are left out on purpose.** The office upgrade intro comes after the line, unchanged.
+- **Analytics:** `tutorialStep` now carries `live`. Old saves catching up on steps added later don't send `tut_*` events or show the toast, so the funnel only counts new players.
+- **Pacing (route harness, Sunday Park):** the line ends at 1:46–1:58 for a perfect player and 3:06–3:49 for a distracted one (35–50 % efficiency). Real players were about 3.5× slower than the perfect bot through the old first minute, so we expect about 5–6 minutes. The economy bot follows the always-on objective, not the guide, so its checks are unchanged.
+- **Portrait pill fix:** the centred pill could only wrap in half the screen width ("Unlock Waiting…"). It is now `width: max-content`, capped at 88vw.
+- **What to watch on Playgama:** `tut_cones → tut_match` (was 52 %), `minute_3 / minute_1` users (was 73 %), median session (was 4.6 min).
+
+## 87. Performance telemetry, early analytics and a late Playgama Bridge
+
+- **Why:** Playgama had no frame-rate data for us (`performance_sample` was never sent). Also, 9 % of sessions (1,080 → 982) were lost between Bridge init and `sdk_ready`, and we couldn't see why:
+  - our `boot` event was sent before analytics was connected, so it never arrived;
+  - a Bridge slower than 2.5 s left the whole session on the mock: no analytics, ads or cloud save.
+- **`performance_sample`** (`core/perf.ts`, following the Playgama telemetry guide):
+  - one aggregate about every 30 s of visible gameplay, built from a preallocated ring buffer (no per-frame allocation);
+  - fields: `target_fps` (60, or 30 once the watchdog caps), `quality_tier`, `build_version`, FPS avg/p10, frame time p50/p95/p99/max, and frames over 50/100/250/500/1000 ms;
+  - optional fields where supported: long tasks, JS heap, error and rejection counts, WebGL context losses;
+  - left out: open panels, ads, portal pause and hidden tabs. The sampler resets when the loop restarts, and a gap over 5 s is never counted as a frame;
+  - a partial window (at least 5 s of play) is sent on hide/pagehide, so short sessions report too.
+- **Early analytics:** events tracked before the platform exists are queued (up to 20) and sent once the sink is set. `boot` now arrives with `ms` (JS running since page start), and `sdk_ready` also carries `ms`.
+- **Late Bridge:** the game still starts on the mock after 2.5 s (gameplay budget), but keeps waiting for the Bridge. When it arrives and the saves have been read (within 10 s), `Platform.upgrade` switches to it mid-session:
+  - replays `game_ready` / `gameplay_started`, completion, context and the pause / mute / auth listeners;
+  - re-enables ads and sends the analytics held meanwhile (up to 60);
+  - hands the save over by `lastSeen`: ours is pushed if newer; if the Bridge's is newer, the game reloads it through the auth-change path (toast);
+  - sends `sdk_late` {kind, ms, save_replaced};
+  - if the Bridge never comes, the held events are dropped.
+  
+  CrazyGames is unchanged.
+- **What to read on Playgama:** `boot` sessions vs `sdk_ready` vs `first_frame` (where loading drops off), `sdk_late` volume, and `performance_sample` by quality tier once there are 30+ sessions.
+
+## 88. Long-session memory and frame-time fixes (build 0.7.0 telemetry)
+
+- **Why:** Playgama `performance_sample` data for 0.7.0 (155 sessions) showed `memory_used_mb` p99 964 MB / max 1,126 MB, growing with session length. It also showed near-frozen 30 s windows (`long_task_total_ms` p99 28.6 s), and 65 % of sessions were stepped down to the Low tier.
+- **How it was measured:** `npm run build:e2e`, then a bot-driven Playwright session through Area 3 (the `installBot` / `driveBot` helpers in `tests/e2e/helpers.ts`). The bot follows `sim.objective`, decides office prompts, continues results and skips matches. Every simulated minute it logged `usedJSHeapSize` after a forced GC, `renderer.info.memory` and `renderer.info.programs`. Heap snapshots at minutes 15 and 65 were diffed, and allocations were sampled with the CDP sampling heap profiler, including objects already collected by GC.
+- **Found 1: bone textures never freed.** Every `Character` is a `skeletonClone` with its own `Skeleton`, and three.js gives each skeleton a bone `DataTexture` on its first draw. Trainees who left, squad figures and both match line-ups were only removed from the scene, so `renderer.info.memory.textures` grew with every character ever spawned. It reached 1,128 after 70 simulated minutes, with about 50 characters alive. **Fix:** `Character.dispose()` stops the mixer, uncaches its root and disposes the skeletons. All four removal sites call it. Geometries and kit materials stay shared.
+- **Found 2: the program cache key was rebuilt for every net, every frame.** three.js draws a transparent `DoubleSide` material as a back pass plus a front pass, and sets `needsUpdate` for each pass. The goal nets (and pad / area blueprint ghosts) did this every frame. So every draw re-ran `WebGLPrograms.getParameters` plus the ~100-entry cache-key `join`, about 50 KB of garbage per frame in a full academy. **Fix:** `forceSinglePass: true` on those three materials. Nets are alpha-tested and ghosts are faint, so the two-pass ordering bought nothing visible, and their draw calls halve.
+- **Also:** skinned characters and shadow-casting InstancedMeshes get their own shadow depth materials (`src/view/depth.ts`) instead of sharing three's single `MeshDepthMaterial`. `LabelLayer` now writes display, opacity and transform only when they change.
+- **Result (70 simulated minutes, same seed):**
+
+  | | before | after |
+  |---|---|---|
+  | `renderer.info.memory.textures` | 33 → 1,128 (linear) | 33 → 65–80 (tracks live characters) |
+  | shader programs | 33 | 30 |
+  | garbage per frame, late game | 153 KB (9 MB/s at 60 FPS) | 95 KB |
+
+  JS heap after GC was 30 → 73 MB in both runs. It grows only while content is being built and is flat once Area 3 is complete. Geometries likewise follow content: one merged mesh per built object.
+- **Not reproduced:** a JS heap of hundreds of MB. With a forced GC the sim state and the view stay bounded. The JS cost of the bone-texture leak is small; its cost is GPU memory. In the field, the leaked GPU memory and the garbage rate explain the long tasks and tier drops better than a large retained heap. The garbage rate also inflates `usedJSHeapSize`, which is sampled without a GC. Check the next build's `memory_used_mb` against session length before assuming the heap tail is gone. `performance.memory` covers the whole renderer process, which can include the portal page's own heap.
+- **Regression guard:** `tests/e2e/long-session.spec.ts`. With everything built, it runs the bot for 1 simulated minute of warm-up plus 2.5 more (about 2 min of wall time). It then asserts:
+  - textures may grow only with live characters;
+  - geometries and programs stay flat;
+  - heap growth after GC stays under 6 MB.
+
+  Against the old code it fails: textures +53 against a limit of 24.
+- **Pre-existing e2e failures (not from this change):** on the pre-installed Chromium (1243, SwiftShader), every test that asserts a clean console fails. The cause is a driver performance warning, `GPU stall due to ReadPixels`, from the boot-time icon atlas. Separately, `meta.spec.ts` › rewarded ads throws `Cannot set properties of undefined (setting 'adsDisabled')`. Both also fail on `e6a95fd`. On 0.7.0, `smoke.spec.ts` › "WASD reaches the first cash and first pad" also fails, with 0 stars where it expects 1; the cause is not yet investigated. It fails the same way on `00fac7d`.
+
+## 89. ×2 match cash is the main button on the results screen
+
+- **Why:** in the week after 0.7.0, players watched 0.17 rewarded ads per session; Playgama's benchmark is 3–5, with 30–40 % of players tapping. Rewarded ads are opt-in, so they raise revenue without the playtime risk of more interstitials. The ×2 match-cash offer sat between the MVP card and two equally loud buttons.
+- **Change:** when the offer is available, the ×2 button sits right under the prize. It's bigger (76 px), pulses gently (no animation under `prefers-reduced-motion`), and says "Watch a short ad" under the reward (Playgama rule 2.2.1). League table and Continue become neutral; Continue turns blue again once the ad is done, or when there's no offer (adblock note, no cash, ads off). Continue carries a stable `results-continue` class for the e2e tests.
+- **What to watch:** `advertisement_rewarded_opened` per session (was 0.17) and still-playing-at-10-minutes (should stay at least 41 %).
+
+## 90. 0.7.3: the phone HUD cleanup, build_version on every event, steady gate line (ported from the 0.8.x line)
+
+- **Context:** a parallel line of work (0.8.0–0.8.8, branch `claude/tender-ritchie-74zssr`) split off before 0.7.0. It reworked the tutorial several times and was never published. 0.7.2's own opening line went live on Nov 22. Its first two days (48 sessions, 31 new players; too few to be sure) look clearly better than before: 39 % of sessions reach minute 10 (was 29 %), the median session is 11.5 min (was 4.6), and 65 % of new players reach a match (was about 40 %). So 0.7.3 keeps 0.7.2's tutorial and economy untouched and takes only what doesn't change the game's pace, so the tutorial can still be judged.
+  - The 0.8.x commits are kept in this branch's history through a merge that keeps 0.7.2's files (`git merge -s ours`).
+- **Ported:**
+  1. **Phone HUD** (`ui/compact.ts`: portrait ≤ 760 px wide or landscape ≤ 460 px tall):
+     - Toasts that arrive within 1.2 s share one card, one line each, up to 3 lines. Phones show one card at a time, the rest wait, and anything older than 5 s is dropped.
+     - Side buttons are icon only (52 px). The Hall of Fame uses the star icon, not a second trophy.
+     - The full star bar hides.
+     - A pad's perk line shows only within 3.5 m of the coach, "+1 PAC" pops within 6 m, idle rating badges within 7 m.
+     - No half-cut labels at the side edges and none under the top HUD band (desktop dims those, as before). This is merged into 0.7.2's per-label style cache: widths are measured only when a label's content length changes.
+     - The meta side buttons (Daily, Quests, Scout, Cup, Hall of Fame, League, Squad, tickets) appear once the tutorial line is done (`tut:ballboy`). The Scout badge shows only when a mission can start.
+  2. **`build_version` on every analytics event** (0.7.2 had it only on `performance_sample`), so releases can be compared by build, not by date.
+  3. **Area gates keep one line:** "Open the Training Ground Gate" instead of flipping between "Save up" and "Unlock" while paying in.
+  4. **Economy bot:** a purchase in the same tick counts as affordable (the check ran after the purchase and reported dead stretches that weren't there).
+- **Not ported (for now):**
+  - Faster early matches (100 s for the first 5, then 150 s): a pace change. A candidate for 0.7.4, once 0.7.2's tutorial has a week of data.
+  - The free first upgrade: 0.7.2's line already teaches the upgrade, and 16 of the 20 players who finished it bought one.
+  - The 0.8.x tutorial routes.
+- **Tests:** the e2e tests that open meta panels set `tut:ballboy`. A real-input playthrough at 390×844 (arrow keys only) went through 0.7.2's whole line with the cleaned-up HUD.
+- **Build:** `BUILD` 0.7.3.
+
+## 91. 0.7.4 = 0.7.3 with a new version number, for YouTube review
+
+- 0.7.3 went live in the Playgama catalog through the direct update. That route skips moderation, so it never reaches YouTube, and afterwards the console refuses a review submit of the same build ("Nothing has changed since the last submitted version").
+- 0.7.4 is the same game with `BUILD` raised, so it counts as a change and can be submitted for review (YouTube included) from the console.
+- For builds that should reach YouTube: submit them for review instead of using the Playgama-only direct update.
+
+## 92. 0.7.5: Playgama review notes on 0.7.4 (HUD overlap after resizing, scrollbars)
+
+- **The notes:** "menu elements start overlapping when the screen is resized" (a desktop window narrowed to about 257×443) and "avoid vertical scrollbars inside the game" (the settings panel in a short landscape window, about 668×382).
+- **Reproduced** with a layout audit at 15 window sizes (257×443 to 1280×720; HUD boxes, world labels and panel overflow) and a window shrunk mid-game:
+  - The settings panel needed 454 px but got 296–426 px in every short window and at very narrow portrait sizes, so it scrolled. At 257 px wide the Graphics row also ran off the right edge.
+  - In narrow portrait windows the cash icon touched the level ring, and on common phone sizes (360–414 wide) the "LVL" tag overlapped the star icon by 5–6 px.
+  - The guide's edge pointer sat on the star bar and the objective pill.
+  - World labels slid under the pill: they were hidden by their anchor point against a fixed 175 / 80 px band, but they grow upwards from that point.
+- **Fixes:**
+  - **Settings:**
+    - Two columns in a short landscape window.
+    - The portrait bottom sheet may use the height it needs.
+    - Rows are tighter and may wrap (label above its buttons) below 340 px.
+    - "Vibration" only shows on touch devices (desktop Chrome has `navigator.vibrate` too).
+  - **Panels never show a scrollbar** (`scrollbar-width: none`). Content still scrolls by wheel or touch if it ever doesn't fit.
+  - **Top HUD band measured, not guessed:** `Hud.bandBottom()` (the corner widgets, star bar and pill, using layout boxes so the pill's pop-in animation can't shorten it) is re-measured every 0.5 s and on resize. World labels reaching into it by their top are hidden on phones (dimmed on desktop, as before). The edge pointer stays below it, and toasts sit just under it.
+  - **Below 340 px wide** (a desktop window made thin; no phone is that narrow): a smaller avatar badge, cash text and star, and the ticket counter goes under the cash. All buttons stay at least 48 px.
+  - **Portrait phones:** a slightly smaller star and the star bar 4 px lower. **Everywhere:** the objective pill sits a little lower, clearing the cash icon.
+- **Tests:** e2e `layout after resizing / settings without scrollbars`: a 1280×720 window shrunk to 257×443 mid-game, and the settings panel at 257×443, 568×320, 668×382 and 844×390 (no vertical or horizontal overflow, every button inside the window). All five fail on 0.7.4 and pass on 0.7.5. The audit at all 15 sizes now reports no overlaps and no scrolling.
+- **Build:** `BUILD` 0.7.5. Submit it for review in the console (YouTube included), not through the Playgama-only direct update (§91).

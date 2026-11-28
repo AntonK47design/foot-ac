@@ -3,6 +3,7 @@ import { AREA1 } from './data/areas/area1';
 import { BALANCE } from './data/balance';
 import { BUILD, SAVE_VERSION } from './data/constants';
 import { analytics } from './core/analytics';
+import { PerfSampler } from './core/perf';
 import { RealClock } from './core/clock';
 import { formatCash, resolveLocale, setLocale, t } from './core/i18n';
 import { FixedLoop } from './core/loop';
@@ -18,6 +19,7 @@ import { autoTier, FpsWatchdog, type Tier } from './view/quality';
 import { RenderCore } from './view/renderer';
 import { loadArea1Assets } from './view/assets';
 import type { Objective } from './sim/objectives';
+import { HANDOVER_STEP } from './sim/tutorial';
 import { DIVISIONS } from './data/clubs';
 import { computeOvr } from './sim/players';
 import { opponentsOf, pairings, sortedTable } from './sim/match';
@@ -44,10 +46,14 @@ function newSeed(): number {
 }
 
 async function boot(): Promise<void> {
-  analytics.track('boot');
+  // boot: our JS is downloaded and running (ms since the page started); held until the platform can send it
+  const sinceStart = (): number => Math.round(performance.now() - (window.__wkBootT0 ?? 0));
+  analytics.track('boot', { ms: sinceStart() });
   const platform: Platform = await createPlatform();
-  if (platform.hasAnalytics) analytics.setSink((e, p) => platform.track(e, p));
-  analytics.track('sdk_ready', { kind: platform.kind });
+  // always through the platform: it holds events while a late SDK may still arrive, and drops them on the mock
+  analytics.setSink((e, p) => platform.track(e, p));
+  analytics.track('sdk_ready', { kind: platform.kind, ms: sinceStart() });
+  platform.onUpgrade((u) => analytics.track('sdk_late', { kind: u.kind, ms: Math.round(u.ms), save_replaced: u.saveReplaced }));
   platform.loadingStart();
 
   const clock = new RealClock();
@@ -500,7 +506,7 @@ async function boot(): Promise<void> {
       () => rewardToast(sim.claimAlbum()),
     );
   hud.button('quests', 'left', 'scroll', t('hud.quests'), openQuests);
-  hud.button('album', 'left', 'trophy', t('hud.album'), openAlbum);
+  hud.button('album', 'left', 'star', t('hud.album'), openAlbum);
   hud.button('daily', 'right', 'gift', t('hud.daily'), openDaily);
   hud.button('scout', 'right', 'scout', t('hud.scout'), openScout);
   hud.button('cup', 'right', 'whistle', t('hud.cup'), () => hud.toast(t('cup.hint')));
@@ -555,14 +561,18 @@ async function boot(): Promise<void> {
     if (metaHudT > 0) return;
     metaHudT = 0.25;
     const st = sim.state;
-    hud.setTickets(st.tickets, st.tickets > 0 || Meta.unlocked(st, 'daily'));
+    // a new academy sees only the core loop: the meta buttons appear once the tutorial line is done (the Ball Boy)
+    const route = !!st.flags['tut:ballboy'];
+    hud.setTickets(st.tickets, route && (st.tickets > 0 || Meta.unlocked(st, 'daily')));
     const qn = Meta.questsClaimable(st);
-    hud.setButton('quests', Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
-    hud.setButton('album', Meta.albumSlots(st) > 0, Meta.albumClaimable(st) ? '!' : null);
-    hud.setButton('daily', Meta.unlocked(st, 'daily'), Meta.dailyAvailable(st, sim.now, sim.tz) ? '!' : null);
+    hud.setButton('quests', route && Meta.unlocked(st, 'quests'), qn ? String(qn) : null);
+    hud.setButton('album', route && Meta.albumSlots(st) > 0, Meta.albumClaimable(st) ? '!' : null);
+    hud.setButton('daily', route && Meta.unlocked(st, 'daily'), Meta.dailyAvailable(st, sim.now, sim.tz) ? '!' : null);
     const sc = st.meta.scout;
-    hud.setButton('scout', Meta.unlocked(st, 'scout'), !sc.tier && st.tickets > 0 ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
-    const cupOk = Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
+    // badge only when a mission can actually start (tickets alone pile up every level)
+    const canScout = !sc.tier && TIERS.some((tier) => Meta.canScout(st, tier));
+    hud.setButton('scout', route && Meta.unlocked(st, 'scout'), canScout ? '!' : null, sc.tier ? hms(sc.endsAt - sim.now) : null);
+    const cupOk = route && Meta.unlocked(st, 'cup') && !!st.built[sim.area.matchPitch.objectId];
     hud.setButton('cup', cupOk, sim.cupAvailable() ? '!' : null, sim.cupAvailable() ? t('hud.cup_today') : hms(Meta.msToMidnight(sim.now, sim.tz)));
   };
 
@@ -584,7 +594,13 @@ async function boot(): Promise<void> {
   });
   sim.events.on('graduated', () => analytics.once('first_graduation'));
   // first-minute funnel: each tutorial step as it's done (where do new players drop off?)
-  sim.events.on('tutorialStep', (e) => analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) }));
+  sim.events.on('tutorialStep', (e) => {
+    // old saves catch up on steps added later: not part of the new-player funnel
+    if (!e.live) return;
+    analytics.track('tut_' + e.id, { sec: Math.round(sim.state.time) });
+    // the opening line is over: say so, so the hidden guide doesn't read as "the game stopped talking to me"
+    if (e.id === HANDOVER_STEP) hud.toast(t('tut.handover'), 'gold', 4000);
+  });
   setObjective(sim.guide.objective);
   hud.setCash(sim.state.cash, true);
   platform.reportCompletion(sim.completionPct());
@@ -606,6 +622,12 @@ async function boot(): Promise<void> {
   const mouse = { x: 0, z: 0 };
   const minuteMarks = [1, 3, 5, 10, 15];
   let playSec = 0;
+  // performance_sample: frame-time aggregates of visible gameplay, ~every 30 s (Playgama telemetry guide)
+  const perf = new PerfSampler(
+    (e, p) => analytics.track(e, p),
+    () => ({ target_fps: loop.fpsCap || 60, quality_tier: core.tier, build_version: BUILD }),
+  );
+  perf.observe(window);
   const watchdog = new FpsWatchdog(() => {
     if (settings.graphics !== 'auto') return false;
     const next: Tier | null = core.tier === 'high' ? 'mid' : core.tier === 'mid' ? 'low' : null;
@@ -663,6 +685,7 @@ async function boot(): Promise<void> {
         updateHint();
         void import('./view/music').then((m) => m.startMusic(audio)).catch(() => undefined);
       }
+      perf.frame(performance.now(), blockers.size === 0 && !document.hidden);
       if (watchdog.sample(frameDt) && loop.fpsCap === 0) {
         loop.fpsCap = 30;
         platform.record('fps cap 30');
@@ -671,7 +694,8 @@ async function boot(): Promise<void> {
       const as = sim.areaStars();
       hud.setStars(as.have, as.total);
       updateMetaHud(frameDt);
-      hud.setSideButtons(sim.state.squad.length > 0 || sim.state.records.promoted > 0, !!sim.state.built[sim.area.matchPitch.objectId]);
+      const route = !!sim.state.flags['tut:ballboy'];
+      hud.setSideButtons(route && (sim.state.squad.length > 0 || sim.state.records.promoted > 0), route && !!sim.state.built[sim.area.matchPitch.objectId]);
       const lv = sim.state.level;
       const lo = BALANCE.levelXp[lv - 1] ?? 0;
       const hi = BALANCE.levelXp[lv] ?? lo + 1000;
@@ -704,24 +728,30 @@ async function boot(): Promise<void> {
     if (document.hidden) {
       hiddenAt = clock.now();
       loop.stop();
+      perf.flush(performance.now());
       audio.setHidden(true);
       persist('hidden');
     } else {
       audio.setHidden(false);
       watchdog.reset();
+      perf.reset();
       if (!blockers.has('ctx')) loop.start();
       const away = hiddenAt ? (clock.now() - hiddenAt) / 1000 : 0;
       hiddenAt = 0;
       if (away >= BALANCE.meta.offline.minSec && blockers.size === 0) welcomeBack(away);
     }
   });
-  window.addEventListener('pagehide', () => persist('pagehide'));
+  window.addEventListener('pagehide', () => {
+    persist('pagehide');
+    perf.flush(performance.now());
+  });
 
   // ── WebGL context loss
   let ctxOverlay: HTMLDivElement | null = null;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     loop.stop();
+    perf.contextLost();
     blockers.add('ctx');
     persist('ctxlost');
   });
@@ -734,6 +764,7 @@ async function boot(): Promise<void> {
       ctxOverlay = null;
       blockers.delete('ctx');
       resize();
+      perf.reset();
       loop.start();
     });
     gameEl.appendChild(ctxOverlay);

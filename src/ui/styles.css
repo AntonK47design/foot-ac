@@ -343,6 +343,20 @@ body {
   height: 112%;
   object-fit: contain;
 }
+.obj-step {
+  /* opening-line counter ("3/14"): a small badge after the text */
+  flex: none;
+  order: 2;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  border: 2px solid var(--ol);
+  font-size: calc(var(--fs) * 0.8);
+  font-variant-numeric: tabular-nums;
+}
+.obj-step.hidden {
+  display: none;
+}
 .obj-text {
   /* up to two lines (tutorial explanations), then an ellipsis */
   display: -webkit-box;
@@ -1074,6 +1088,8 @@ body {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
+    /* centred with left: 50% the pill would only get half the screen to wrap in */
+    width: max-content;
     max-width: 88vw;
   }
   .objective.pop {
@@ -2200,6 +2216,34 @@ body {
   width: 100%;
   margin-bottom: 10px;
 }
+/* results: ×2 match cash is the main action (big, gently pulsing; Continue sits below as the quiet option) */
+.results-panel .btn-big.ad.main {
+  min-height: 76px;
+  margin: 10px 0 12px;
+  font-size: 26px;
+  animation: ad-pulse 1.6s ease-in-out infinite;
+}
+.results-panel .btn-big.ad.main svg {
+  width: 30px;
+  height: 30px;
+}
+.results-panel .btn-big.ad.main small {
+  color: #fff;
+}
+@keyframes ad-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-panel .btn-big.ad.main {
+    animation: none;
+  }
+}
 .scout-active .btn-big.ad {
   align-self: flex-start;
 }
@@ -2253,4 +2297,152 @@ body {
 }
 .info-card.hidden {
   display: none;
+}
+
+/* ── phone declutter: one toast card with a line per message; icon-only side buttons ── */
+.toast-line {
+  display: block;
+}
+.toast-line + .toast-line {
+  margin-top: 2px;
+  font-size: 0.88em;
+}
+@media (orientation: portrait) and (max-width: 760px), (orientation: landscape) and (max-height: 460px) {
+  .btn-side {
+    width: 52px;
+    min-height: 52px;
+    border-radius: 14px;
+    padding: 2px;
+  }
+  .btn-side svg {
+    width: 28px;
+    height: 28px;
+  }
+  .btn-side .bs-label,
+  .btn-side > span:not(.bs-label) {
+    display: none;
+  }
+  .hud-side {
+    gap: 8px;
+  }
+  .bs-badge {
+    top: -7px;
+    right: -7px;
+    min-width: 20px;
+    height: 20px;
+    line-height: 16px;
+  }
+  .toast {
+    padding: 6px 14px;
+  }
+}
+
+/* ── no scrollbars inside the game (Playgama review): panels are laid out to fit; if one ever doesn't, it still
+   scrolls by wheel / touch, just without a visible bar ── */
+.panel {
+  scrollbar-width: none;
+}
+.panel::-webkit-scrollbar {
+  display: none;
+}
+/* settings in a short landscape window: the rows in two columns (one tall column didn't fit) */
+@media (max-height: 460px) and (orientation: landscape) {
+  .settings-panel {
+    width: min(94vw, 760px);
+  }
+  .settings-panel .panel-head {
+    padding: 8px 10px 2px 18px;
+  }
+  .settings-panel .panel-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 22px;
+    row-gap: 6px;
+  }
+  .settings-panel .row {
+    min-height: 48px;
+  }
+  .settings-panel .btn-wide {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+}
+/* portrait: a bottom sheet may use the height it needs (80 % cut the settings off in small windows) */
+@media (orientation: portrait) and (max-width: 760px) {
+  .settings-panel {
+    max-height: calc(100% - var(--sat) - 12px);
+  }
+}
+@media (max-height: 520px) {
+  .settings-panel .panel-body {
+    gap: 6px;
+  }
+  .settings-panel .row {
+    min-height: 48px;
+  }
+}
+/* very narrow portrait windows (a desktop browser made thin; no phone is this narrow): gear, level badge and cash
+   need to fit side by side */
+@media (orientation: portrait) and (max-width: 340px) {
+  .badge {
+    width: calc(var(--btn) * 1.1);
+    height: calc(var(--btn) * 1.1);
+  }
+  .cash {
+    min-width: calc(var(--fs) * 5.5);
+    padding: 0 calc(var(--fs) * 0.7) 0 calc(var(--fs) * 2.4);
+  }
+  .cash-icon {
+    left: calc(var(--fs) * -0.5);
+  }
+  .cash-icon svg {
+    width: calc(var(--fs) * 2.7);
+    height: calc(var(--fs) * 2.7);
+  }
+  .cash-text {
+    font-size: calc(var(--fs) * 1.3);
+  }
+  /* the ticket counter goes under the cash instead of beside it */
+  .tr-row {
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .starbar-icon svg {
+    width: calc(var(--fs) * 2.6);
+    height: calc(var(--fs) * 2.6);
+  }
+}
+/* the objective pill clears the cash icon (it hangs below the cash box) */
+.objective {
+  margin-top: calc(var(--fs) * 0.35);
+}
+/* portrait phones: a smaller star, a little lower, so the level tag above never touches it */
+@media (orientation: portrait) and (max-width: 760px) {
+  .starbar-icon svg {
+    width: calc(var(--fs) * 2.7);
+    height: calc(var(--fs) * 2.7);
+  }
+  .hud-tc {
+    margin-top: 4px;
+  }
+}
+/* settings in a narrow window: tighter buttons, and a row may wrap (label above its buttons) instead of running
+   off the right edge */
+@media (max-width: 340px) {
+  .settings-panel .panel-body {
+    padding: 4px 14px;
+  }
+  .settings-panel .row {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .settings-panel .seg {
+    gap: 6px;
+    margin-left: auto;
+  }
+  .settings-panel .seg button {
+    min-width: 48px;
+    padding: 0 9px;
+  }
 }

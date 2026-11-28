@@ -121,3 +121,108 @@ export function attachConsole(page: Page): string[] {
   page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));
   return errors;
 }
+
+/**
+ * Takes over the game loop for fast-forwarded long sessions: the coach follows `sim.objective` like the economy
+ * bot, office prompts are decided, results are continued and match cinematics skipped. Afterwards call
+ * `driveBot(page, simSec, frameDt)` to advance; real rAF frames stop.
+ */
+export async function installBot(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type Obj = { targetId: string; x: number; z: number; radius: number };
+    type Grad = { id: number };
+    const wk = window.__wk as unknown as {
+      sim: {
+        objective: Obj | null;
+        state: { time: number; cash: number; coach: { x: number; z: number }; squad: unknown[]; built: Record<string, boolean> };
+        input: { x: number; z: number };
+        nav: { findPath(a: number, b: number, c: number, d: number): number[] };
+        area: { matchPitch: { objectId: string } };
+        tick(dt: number): void;
+        podiumGraduate(): Grad | undefined;
+        weakestSquadPlayer(): Grad | undefined;
+        squadSize(): number;
+        ovr(p: Grad): number;
+        decideGraduate(d: 'sell' | 'promote'): void;
+        cheapestUpgrade(): { id: string; cost: number } | null;
+        upgradeFitsBudget(c: number): boolean;
+        buyUpgrade(id: string): boolean;
+      };
+      loop: { stop(): void; advance(dt: number): void };
+    };
+    const { sim, loop } = wk;
+    loop.stop();
+    const tick = sim.tick.bind(sim);
+    let path: number[] = [];
+    let pathI = 0;
+    let pathKey = '';
+    const d2 = (a: number, b: number, c: number, d: number): number => (a - c) ** 2 + (b - d) ** 2;
+    sim.tick = (dt: number): void => {
+      const o = sim.objective;
+      const c = sim.state.coach;
+      sim.input.x = 0;
+      sim.input.z = 0;
+      if (o) {
+        const key = `${o.targetId}:${o.x.toFixed(2)}:${o.z.toFixed(2)}:${Math.floor(sim.state.time / 2)}`;
+        if (key !== pathKey) {
+          pathKey = key;
+          path = sim.nav.findPath(c.x, c.z, o.x, o.z);
+          pathI = 0;
+        }
+        const stopR = Math.min(0.5, o.radius * 0.4);
+        if (d2(c.x, c.z, o.x, o.z) > stopR * stopR) {
+          while (pathI * 2 < path.length - 2 && d2(c.x, c.z, path[pathI * 2] as number, path[pathI * 2 + 1] as number) < 0.09) pathI++;
+          const dx = (path[pathI * 2] ?? o.x) - c.x;
+          const dz = (path[pathI * 2 + 1] ?? o.z) - c.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 0.01) {
+            const k = Math.min(1, d / 0.6 + 0.35);
+            sim.input.x = (dx / d) * k;
+            sim.input.z = (dz / d) * k;
+          }
+        }
+      }
+      tick(dt);
+    };
+    const shown = (sel: string): HTMLElement | undefined =>
+      [...document.querySelectorAll<HTMLElement>(sel)].find((e) => !e.closest('.hidden') && !e.classList.contains('hidden'));
+    const handleUi = (): void => {
+      const office = shown('.overlay .office-panel');
+      if (office) {
+        for (let g = sim.podiumGraduate(); g; g = sim.podiumGraduate()) {
+          const w = sim.weakestSquadPlayer();
+          const pitch = !!sim.state.built[sim.area.matchPitch.objectId];
+          const promote = pitch && (sim.state.squad.length < sim.squadSize() || (!!w && sim.ovr(g) > sim.ovr(w) + 2));
+          const btn = shown('.office-panel .btn-big.' + (promote ? 'promote' : 'sell'));
+          if (btn) btn.click();
+          else sim.decideGraduate(promote ? 'promote' : 'sell');
+        }
+        for (let n = 0; n < 6; n++) {
+          const up = sim.cheapestUpgrade();
+          if (!up || sim.state.cash < up.cost || !sim.upgradeFitsBudget(up.cost)) break;
+          sim.buyUpgrade(up.id);
+        }
+        office.querySelector<HTMLElement>('.close')?.click();
+        return;
+      }
+      const res = shown('.results-panel .results-continue');
+      if (res) return res.click();
+      shown('.m-skip')?.click();
+      document.querySelector<HTMLElement>('.overlay:not(.hidden) .close')?.click();
+    };
+    (window as unknown as { __wkDrive: (sec: number, fd: number) => number }).__wkDrive = (sec, fd) => {
+      const t0 = sim.state.time;
+      let frames = 0;
+      while (sim.state.time - t0 < sec && frames < 200_000) {
+        loop.advance(fd);
+        if (++frames % 3 === 0) handleUi();
+      }
+      return sim.state.time;
+    };
+  });
+}
+
+/** Advances a bot-driven session (see installBot) by `simSec` simulated seconds, rendering every `frameDt`. */
+export async function driveBot(page: Page, simSec: number, frameDt = 0.25): Promise<number> {
+  return page.evaluate(([s, fd]) => (window as unknown as { __wkDrive: (sec: number, fd: number) => number }).__wkDrive(s as number, fd as number), [simSec, frameDt]);
+}

@@ -79,6 +79,8 @@ test.describe('desktop', () => {
     await page.evaluate(() => {
       const sim = (window.__wk as unknown as W).sim;
       for (const id of ['p_crate', 'p_goal', 'p_cones', 'p_wall', 'p_cones_l2', 'p_match']) sim.unlockPad(sim.world.pads.get(id));
+      // past the tutorial line (the side buttons show once it ends with the Ball Boy)
+      (sim.state.flags as Record<string, boolean>)['tut:ballboy'] = true;
       const t = sim.spawnTrainee();
       if (t) sim.graduate(t);
     });
@@ -117,7 +119,7 @@ test.describe('desktop', () => {
     await page.keyboard.press('Space');
     await expect(page.locator('.results-panel')).toBeVisible({ timeout: 90_000 });
     const cash = await page.evaluate(() => (window.__wk as unknown as W).sim.state.cash);
-    await page.locator('.results-panel .btn-big.promote').click();
+    await page.locator('.results-panel .results-continue').click();
     await expect(page.locator('.results-panel')).toBeHidden();
     await expect(page.locator('.match-ui')).toBeHidden();
     const rows = await page.evaluate(() => ((window.__wk as unknown as W).sim.state.league as { table: Array<{ p: number }> }).table.filter((r) => r.p === 1).length);
@@ -208,6 +210,58 @@ test.describe('layout', () => {
           expect(overlap, `${boxes[i]!.s} overlaps ${boxes[j]!.s}`).toBe(false);
         }
       await page.screenshot({ path: `${SHOT_DIR}/layout-${w}x${h}.png` });
+    });
+  }
+});
+
+/** Playgama review (0.7.4): HUD overlapping after resizing the window, and a scrollbar in the settings panel. */
+test.describe('layout after resizing / settings without scrollbars', () => {
+  test.skip(({ isMobile }) => isMobile, 'desktop browser windows');
+  test('a window shrunk to 257x443 mid-game: HUD widgets apart, the level tag clear of the star', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    await waitForGameplay(page);
+    await page.setViewportSize({ width: 257, height: 443 });
+    await page.waitForTimeout(800);
+    const sels = ['.gear', '.badge', '.badge-lv', '.starbar-icon svg', '.starbar-track', '.cash', '.cash-icon svg', '.objective'];
+    const boxes = [];
+    for (const sel of sels) {
+      const b = await page.locator(sel).first().boundingBox();
+      if (b) boxes.push({ sel, b });
+    }
+    // (a widget's own parts may touch: the tag sits on the badge, the icons on their bars)
+    const own = (a: string, c: string): boolean => [a, c].includes('.badge') && [a, c].includes('.badge-lv') || [a, c].includes('.cash') && [a, c].includes('.cash-icon svg') || [a, c].includes('.starbar-track') && [a, c].includes('.starbar-icon svg');
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!;
+        const c = boxes[j]!;
+        if (own(a.sel, c.sel)) continue;
+        const ox = Math.min(a.b.x + a.b.width, c.b.x + c.b.width) - Math.max(a.b.x, c.b.x);
+        const oy = Math.min(a.b.y + a.b.height, c.b.y + c.b.height) - Math.max(a.b.y, c.b.y);
+        expect(ox > 1 && oy > 1, `${a.sel} overlaps ${c.sel}`).toBe(false);
+      }
+  });
+
+  for (const [w, h] of [
+    [257, 443],
+    [568, 320],
+    [668, 382],
+    [844, 390],
+  ]) {
+    test(`settings fit without a scrollbar at ${w}x${h}`, async ({ page }) => {
+      await page.setViewportSize({ width: w as number, height: h as number });
+      await page.goto('/');
+      await waitForGameplay(page);
+      await page.locator('.hud-tl .gear').click();
+      const panel = page.locator('.overlay:not(.hidden) .panel');
+      await expect(panel).toBeVisible();
+      await page.waitForTimeout(300);
+      const fit = await panel.evaluate((el) => ({ h: el.scrollHeight <= el.clientHeight + 1, w: el.scrollWidth <= el.clientWidth + 1 }));
+      expect(fit).toEqual({ h: true, w: true });
+      for (const b of await panel.locator('button').all()) {
+        const r = (await b.boundingBox())!;
+        expect(r.x >= -1 && r.x + r.width <= (w as number) + 1, `button "${await b.textContent()}" inside the window`).toBe(true);
+      }
     });
   }
 });

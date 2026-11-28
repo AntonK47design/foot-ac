@@ -139,7 +139,7 @@ export class Ads {
 }
 
 /** Rewarded button (video icon + exact reward) or the adblock note; null when there's no offer. */
-export function adElement(offer: AdOffer | null | undefined, onDone: (ok: boolean) => void, cls = ''): HTMLElement | null {
+export function adElement(offer: AdOffer | null | undefined, onDone: (ok: boolean) => void, cls = '', sub?: string): HTMLElement | null {
   if (!offer) return null;
   if (offer.blocked) {
     const n = document.createElement('div');
@@ -149,7 +149,7 @@ export function adElement(offer: AdOffer | null | undefined, onDone: (ok: boolea
   }
   const b = document.createElement('button');
   b.className = 'btn-big ad ' + cls;
-  b.innerHTML = `<span>${icon('video')}${offer.label}</span>`;
+  b.innerHTML = `<span>${icon('video')}${offer.label}</span>${sub ? `<small>${sub}</small>` : ''}`;
   b.addEventListener('click', () => {
     b.disabled = true;
     void offer.run().then((ok) => {

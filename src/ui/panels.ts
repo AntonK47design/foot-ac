@@ -194,14 +194,23 @@ export class ResultsPanel extends Panel {
           : `<span>${icon('star')}<b>${t('results.points', { n: r.points })}</b></span><span>${icon('trophy')}<b>${t('rank.' + Math.min(r.rank, 6))}</b></span>`
       }</div>
       ${r.mvp ? `<div class="mvp"><div class="mvp-tag">${t('results.mvp')}</div>${cardHtml(r.mvp, 'small')}</div>` : ''}`;
-    const adEl = adElement(r.ad, (ok) => {
-      if (!ok || !adEl) return;
-      const done = document.createElement('div');
-      done.className = 'ad-done';
-      done.textContent = t('ads.doubled', { cash: formatCash(r.cash * 2) });
-      adEl.replaceWith(done);
-    });
-    if (adEl) this.body.appendChild(adEl);
+    // ×2 is the main action when it's on offer (right under the prize); Continue steps back until the ad is done
+    let cont: HTMLButtonElement | null = null;
+    const adEl = adElement(
+      r.ad,
+      (ok) => {
+        if (!ok || !adEl) return;
+        const done = document.createElement('div');
+        done.className = 'ad-done';
+        done.textContent = t('ads.doubled', { cash: formatCash(r.cash * 2) });
+        adEl.replaceWith(done);
+        if (cont) cont.className = 'btn-big promote results-continue';
+      },
+      'main',
+      t('ads.watch_short'),
+    );
+    const adIsMain = adEl instanceof HTMLButtonElement;
+    if (adEl) this.body.querySelector('.rewards')?.after(adEl);
     const row = document.createElement('div');
     row.className = 'choice-row';
     row.appendChild(
@@ -210,12 +219,11 @@ export class ResultsPanel extends Panel {
         onTable();
       }),
     );
-    row.appendChild(
-      button(t('results.continue'), 'promote', () => {
-        this.close();
-        onContinue();
-      }),
-    );
+    cont = button(t('results.continue'), (adIsMain ? 'neutral' : 'promote') + ' results-continue', () => {
+      this.close();
+      onContinue();
+    });
+    row.appendChild(cont);
     this.body.appendChild(row);
     this.show();
   }

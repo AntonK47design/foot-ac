@@ -235,7 +235,7 @@ export class MatchDirector {
   }
 
   private cleanup(): void {
-    for (const b of [...this.ours, ...this.theirs]) this.scene.remove(b.c.root);
+    for (const b of [...this.ours, ...this.theirs]) b.c.dispose();
     this.ours = [];
     this.theirs = [];
     this.active = false;

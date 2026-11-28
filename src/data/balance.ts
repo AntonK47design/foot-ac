@@ -279,6 +279,8 @@ export const BALANCE = {
     lostNoProgressSec: 20,
     /** While shown that way, the suggestion is re-picked at most this often (no flip-flopping). */
     lostRefreshSec: 8,
+    /** Opening line: an "earn towards the next build" hint stays at least this long before a better one replaces it (s). */
+    earnHoldSec: 1.5,
   },
   camera: {
     /** Visible world width (m) at the focus point at the base view: portrait → landscape. */

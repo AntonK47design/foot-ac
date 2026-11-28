@@ -12,6 +12,20 @@ export interface PlatformLogEntry {
 }
 
 const ADS_FLAG = (import.meta.env?.VITE_ADS ?? 'off') === 'on';
+/** Analytics held while a late SDK may still arrive (boot funnel + a few perf samples; the rest is dropped). */
+const ANALYTICS_QUEUE_MAX = 60;
+
+/** `lastSeen` of a save blob (0 when missing or unreadable). */
+function lastSeen(raw: string | null): number {
+  if (!raw) return 0;
+  try {
+    const v = (JSON.parse(raw) as { lastSeen?: unknown }).lastSeen;
+    return typeof v === 'number' ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** Which portal this build is for (VITE_PLATFORM): 'crazygames' (default) or 'playgama'. */
 const PLATFORM = (import.meta.env?.VITE_PLATFORM ?? 'crazygames') as 'crazygames' | 'playgama';
 
@@ -28,8 +42,85 @@ export class Platform {
   private adsEnabled = ADS_FLAG;
   private adInFlight = false;
   private readonly t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+  private current: PlatformAdapter;
+  /** Ever told the portal the game finished loading (replayed onto a late SDK). */
+  private loaded = false;
+  private context: GameContext | null = null;
+  private readonly pauseFns: Array<(paused: boolean) => void> = [];
+  private readonly muteFns: Array<(muted: boolean) => void> = [];
+  private readonly authFns: Array<(u: PlatformUser | null) => void> = [];
+  private readonly upgradeFns: Array<(info: { ms: number; kind: PlatformAdapter['kind']; saveReplaced: boolean }) => void> = [];
+  /** Analytics held back while the real SDK may still arrive (null: send or drop straight away). */
+  private analyticsQueue: Array<[string, Record<string, string | number | boolean> | undefined]> | null = null;
 
-  constructor(readonly adapter: PlatformAdapter) {}
+  constructor(adapter: PlatformAdapter) {
+    this.current = adapter;
+  }
+
+  get adapter(): PlatformAdapter {
+    return this.current;
+  }
+
+  /** The real SDK missed the boot deadline but may still arrive: hold analytics until `upgrade` / `cancelUpgrade`. */
+  expectUpgrade(): void {
+    this.analyticsQueue ??= [];
+  }
+
+  /** The real SDK won't come after all: drop the held analytics (the mock has nowhere to send them). */
+  cancelUpgrade(reason: string): void {
+    this.record(`late sdk gave up (${reason})`);
+    this.analyticsQueue = null;
+  }
+
+  /**
+   * The real SDK came up after boot (we started on the mock to keep gameplay within the time budget): switch to it
+   * mid-session. Replays loading / gameplay state, completion, context and listeners onto it, re-enables ads,
+   * sends the held analytics and hands the save over: the newer of the two wins (`lastSeen`). When the SDK's save is
+   * newer, auth-change listeners fire so the game reloads it (the same path as a login).
+   */
+  upgrade(next: PlatformAdapter, ms: number): void {
+    const prev = this.current;
+    if (prev === next) return;
+    let saveReplaced = false;
+    try {
+      const mine = prev.dataGet(SAVE_KEY);
+      const theirs = next.dataGet(SAVE_KEY);
+      if (theirs && theirs !== mine && lastSeen(theirs) > lastSeen(mine)) saveReplaced = true;
+      else if (mine && mine !== theirs) next.dataSet(SAVE_KEY, mine);
+    } catch (e) {
+      this.record(`late sdk save handover failed: ${String(e)}`);
+    }
+    this.current = next;
+    this.adsEnabled = ADS_FLAG;
+    this.record(`late sdk ready (${next.kind}, ${Math.round(ms)} ms)${saveReplaced ? ', its save is newer' : ''}`);
+    const safe = (name: string, fn: () => void): void => {
+      try {
+        fn();
+      } catch (e) {
+        this.record(`late sdk ${name} failed: ${String(e)}`);
+      }
+    };
+    if (this.loading) safe('loadingStart', () => next.loadingStart());
+    else if (this.loaded) safe('loadingStop', () => next.loadingStop());
+    if (this.gameplay) safe('gameplayStart', () => next.gameplayStart());
+    if (this.completion > 0) safe('completion', () => next.reportCompletion(this.completion));
+    if (this.context) safe('context', () => next.setContext(this.context as GameContext));
+    for (const fn of this.pauseFns) safe('onPauseChange', () => next.onPauseChange?.(fn));
+    for (const fn of this.muteFns) safe('onSettingsChange', () => next.onSettingsChange(fn));
+    for (const fn of this.authFns) safe('onAuthChange', () => next.onAuthChange(fn));
+    const muted = next.isMuted();
+    for (const fn of this.muteFns) safe('mute', () => fn(muted));
+    const queue = this.analyticsQueue;
+    this.analyticsQueue = null;
+    if (queue) for (const [e, d] of queue) this.track(e, d);
+    for (const fn of this.upgradeFns) safe('upgrade listener', () => fn({ ms, kind: next.kind, saveReplaced }));
+    if (saveReplaced) for (const fn of this.authFns) safe('auth listener', () => fn(null));
+  }
+
+  /** The real SDK took over mid-session (see `upgrade`). */
+  onUpgrade(fn: (info: { ms: number; kind: PlatformAdapter['kind']; saveReplaced: boolean }) => void): void {
+    this.upgradeFns.push(fn);
+  }
 
   get kind(): PlatformAdapter['kind'] {
     return this.adapter.kind;
@@ -55,6 +146,7 @@ export class Platform {
   loadingStop(): void {
     if (!this.loading) return;
     this.loading = false;
+    this.loaded = true;
     this.record('loadingStop');
     this.adapter.loadingStop();
   }
@@ -88,6 +180,7 @@ export class Platform {
   }
 
   setContext(ctx: GameContext): void {
+    this.context = ctx;
     this.adapter.setContext(ctx);
   }
 
@@ -101,14 +194,20 @@ export class Platform {
   }
 
   track(event: string, data?: Record<string, string | number | boolean>): void {
+    if (this.analyticsQueue && !this.adapter.sendAnalytics) {
+      if (this.analyticsQueue.length < ANALYTICS_QUEUE_MAX) this.analyticsQueue.push([event, data]);
+      return;
+    }
     this.adapter.sendAnalytics?.(event, data);
   }
 
   onPauseChange(fn: (paused: boolean) => void): void {
+    this.pauseFns.push(fn);
     this.adapter.onPauseChange?.(fn);
   }
 
   onMuteChange(fn: (muted: boolean) => void): void {
+    this.muteFns.push(fn);
     this.adapter.onSettingsChange(fn);
   }
 
@@ -160,6 +259,7 @@ export class Platform {
     return this.adapter.showAuthPrompt();
   }
   onAuthChange(fn: (u: PlatformUser | null) => void): void {
+    this.authFns.push(fn);
     this.adapter.onAuthChange(fn);
   }
   deviceType(): DeviceType {
@@ -197,25 +297,34 @@ export async function createPlatform(initTimeoutMs = 2500): Promise<Platform> {
   let adapter: PlatformAdapter;
   if (PLATFORM === 'playgama') {
     const bridge = getBridge();
+    let late: Promise<void> | null = null;
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     if (!bridge) {
       pending.push('bridge script missing → mock');
       adapter = new MockAdapter(logFn);
     } else {
+      // no Playgama splash: the game shows its own world within a few seconds (GDD §2)
+      const init = bridge.initialize({ disableLoadingLogo: true });
       try {
-        // no Playgama splash: the game shows its own world within a few seconds (GDD §2)
-        await timeout(bridge.initialize({ disableLoadingLogo: true }), initTimeoutMs);
+        await timeout(init, initTimeoutMs);
         const pg = new PlaygamaAdapter(bridge, logFn);
         await timeout(pg.preload([SAVE_KEY, SAVE_BACKUP_KEY]), initTimeoutMs);
         pending.push(`bridge ready (${bridge.platform.id})`);
         adapter = pg;
       } catch (e) {
-        pending.push(`bridge init failed (${String(e)}) → mock`);
+        // start on the mock (gameplay within budget) and switch over if the bridge still comes up
+        pending.push(`bridge init slow or failed (${String(e)}) → mock for now`);
         adapter = new MockAdapter(logFn);
+        late = init;
       }
     }
     const platform = new Platform(adapter);
     holder.p = platform;
     for (const m of pending) platform.record(m);
+    if (late && bridge) {
+      platform.expectUpgrade();
+      void lateBridge(platform, bridge, late, t0, logFn);
+    }
     return platform;
   }
   const sdk = getSdk();
@@ -241,4 +350,20 @@ export async function createPlatform(initTimeoutMs = 2500): Promise<Platform> {
   holder.p = platform;
   for (const m of pending) platform.record(m);
   return platform;
+}
+
+/** How long a late bridge may take to read the saves before we give up on it for this session. */
+const LATE_PRELOAD_MS = 10_000;
+
+/** Waits for a bridge that missed the boot deadline and switches the running game over to it. Never throws. */
+async function lateBridge(platform: Platform, bridge: NonNullable<ReturnType<typeof getBridge>>, init: Promise<void>, t0: number, log: (m: string) => void): Promise<void> {
+  try {
+    await init;
+    const pg = new PlaygamaAdapter(bridge, log);
+    // only switch once the saves are read: never push our save over one we couldn't see
+    await timeout(pg.preload([SAVE_KEY, SAVE_BACKUP_KEY]), LATE_PRELOAD_MS);
+    platform.upgrade(pg, (typeof performance !== 'undefined' ? performance.now() : 0) - t0);
+  } catch (e) {
+    platform.cancelUpgrade(String(e));
+  }
 }

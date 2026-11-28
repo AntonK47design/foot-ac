@@ -21,6 +21,14 @@ export interface SettingsCallbacks {
 }
 
 /** Settings panel (bottom sheet in portrait, centred card in landscape). Opening pauses the game. */
+function touchDevice(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export class SettingsPanel {
   private readonly overlay: HTMLDivElement;
   private readonly body: HTMLDivElement;
@@ -38,7 +46,7 @@ export class SettingsPanel {
       if (e.target === this.overlay) this.close();
     });
     const sheet = document.createElement('div');
-    sheet.className = 'panel';
+    sheet.className = 'panel settings-panel';
     sheet.setAttribute('role', 'dialog');
     const head = document.createElement('div');
     head.className = 'panel-head';
@@ -106,7 +114,8 @@ export class SettingsPanel {
     const muted = this.cb.platformMuted();
     b.appendChild(this.toggleRow(t('settings.sound'), 'sound', muted ? t('settings.muted_by_platform') : undefined));
     b.appendChild(this.toggleRow(t('settings.music'), 'music'));
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) b.appendChild(this.toggleRow(t('settings.vibration'), 'vibration'));
+    // vibration only where it can be felt: a touch device (desktop Chrome has navigator.vibrate too)
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator && touchDevice()) b.appendChild(this.toggleRow(t('settings.vibration'), 'vibration'));
     // graphics
     const g = document.createElement('div');
     g.className = 'row';

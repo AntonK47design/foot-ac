@@ -1,5 +1,9 @@
 import type { Camera } from 'three';
 import { Vector3 } from 'three';
+import { isCompact } from './compact';
+
+/** Phones: labels must fit this far inside the left/right screen edge. */
+const EDGE_PX = 6;
 
 const v = new Vector3();
 
@@ -27,15 +31,31 @@ export class Projector {
   }
 }
 
+interface LabelEntry {
+  el: HTMLDivElement;
+  used: boolean;
+  html: string;
+  cls: string;
+  /** Last written style state: style writes (and their strings) only happen on change. */
+  shown: boolean;
+  dim: boolean;
+  /** Position in tenths of a pixel (the precision written to the transform). */
+  tx: number;
+  ty: number;
+  /** Rendered size (px) for the phone edge / top-band checks; w -1 = measure again (content length changed). */
+  w: number;
+  h: number;
+}
+
 /**
  * Keyed pool of absolutely positioned DOM labels anchored to world positions.
  * begin() → place(...) for each visible label → end() hides the rest. No per-frame allocation once warm.
  */
 export class LabelLayer {
   readonly root: HTMLDivElement;
-  private readonly pool = new Map<string, { el: HTMLDivElement; used: boolean; html: string; cls: string }>();
+  private readonly pool = new Map<string, LabelEntry>();
   private readonly sp: ScreenPoint = { x: 0, y: 0, visible: false };
-  /** Screen y (px) above which labels are dimmed (HUD band). */
+  /** Screen y (px) of the top HUD band's bottom (measured from the HUD): labels reaching above it are dimmed / hidden. */
   topReserve = 0;
 
   constructor(parent: HTMLElement, private readonly projector: Projector) {
@@ -55,7 +75,7 @@ export class LabelLayer {
       const div = document.createElement('div');
       this.root.appendChild(div);
       div.className = 'lbl';
-      e = { el: div, used: false, html: '', cls: '' };
+      e = { el: div, used: false, html: '', cls: '', shown: true, dim: false, tx: NaN, ty: NaN, w: -1, h: 0 };
       this.pool.set(key, e);
     }
     e.used = true;
@@ -64,24 +84,66 @@ export class LabelLayer {
       e.cls = cls;
     }
     if (e.html !== html) {
+      // re-measure only when the content's length changes (a ticking price keeps its width; no layout per frame)
+      if (html.length !== e.html.length) e.w = -1;
       e.el.innerHTML = '<div class="c">' + html + '</div>';
       e.html = html;
     }
     if (!p.visible || p.x < -200 || p.y < -200 || p.x > this.projector.w + 200 || p.y > this.projector.h + 200) {
-      e.el.style.display = 'none';
+      this.hide(e);
       return null;
     }
-    e.el.style.display = '';
+    const compact = isCompact();
+    // phones: no half-cut labels at the side edges and none reaching into the top HUD band, judged by the label's
+    // top (labels grow upwards from their anchor); desktop dims those instead
+    if (compact && (this.cutOff(e, p.x) || p.y - e.h < this.topReserve)) {
+      this.hide(e);
+      return null;
+    }
+    if (!e.shown) {
+      e.el.style.display = '';
+      e.shown = true;
+    }
     // labels sliding under the top HUD band are dimmed so the HUD stays readable
-    e.el.style.opacity = p.y < this.topReserve ? '0.25' : '';
-    e.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;
+    const dim = !compact && p.y < this.topReserve;
+    if (dim !== e.dim) {
+      e.el.style.opacity = dim ? '0.25' : '';
+      e.dim = dim;
+    }
+    const tx = Math.round(p.x * 10);
+    const ty = Math.round(p.y * 10);
+    if (tx !== e.tx || ty !== e.ty) {
+      e.tx = tx;
+      e.ty = ty;
+      e.el.style.transform = `translate3d(${tx / 10}px, ${ty / 10}px, 0)`;
+    }
     return e.el;
+  }
+
+  private hide(e: LabelEntry): void {
+    if (!e.shown) return;
+    e.el.style.display = 'none';
+    e.shown = false;
+  }
+
+  /** The centred label would stick out of the left/right screen edge (width measured once per content change). */
+  private cutOff(e: LabelEntry, x: number): boolean {
+    if (e.w < 0) {
+      if (!e.shown) {
+        e.el.style.display = '';
+        e.shown = true;
+      }
+      e.w = e.el.offsetWidth;
+      e.h = e.el.offsetHeight;
+    }
+    const half = e.w / 2;
+    return x - half < EDGE_PX || x + half > this.projector.w - EDGE_PX;
   }
 
   end(): void {
     for (const [k, e] of this.pool) {
       if (e.used) continue;
-      e.el.style.display = 'none';
+      this.hide(e);
       if (this.pool.size > 80) {
         e.el.remove();
         this.pool.delete(k);
