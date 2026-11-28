@@ -999,6 +999,7 @@ export class GameView {
         st.basket.z + 0.3,
         '',
         `<div class="chip-supply${low ? ' low' : ''}${sup !== 'ball' ? ' ' + sup : ''}">${icon(SUPPLY_ICON[sup])}<b>${ss.balls}/${st.cfg.basketCap}</b>${lv > 0 ? `<i class="lv">Lv ${lv + 1}</i>` : ''}</div>`,
+        true,
       );
     }
 
@@ -1116,6 +1117,7 @@ export class GameView {
         G2.plot.z0 - 0.5,
         '',
         `<div class="lock-sign">${icon('lock')}<span>${t('area.2.sign')}</span><b>${have >= total ? t('area.2.open') : t('area.2.req', { have, stars: total })}</b></div>`,
+        true,
       );
     }
 
@@ -1131,6 +1133,7 @@ export class GameView {
         G3.gateGap[0] - 0.6,
         '',
         `<div class="lock-sign">${icon('lock')}<span>${t('area.3.sign')}</span><b>${have >= total ? t('area.2.open') : t('area.3.req', { have, stars: total })}</b></div>`,
+        true,
       );
     }
 
@@ -1554,7 +1557,7 @@ export class GameView {
       if (!this.matchActive) {
         // phones: the perk line ("+25% transfer fees") only when the coach walks up to the pad
         const perk = !isCompact() || Math.hypot(s.coach.x - p.pos.x, s.coach.z - p.pos.z) < NEAR_PERK;
-        this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford, perk));
+        this.labels.place('pad:' + p.id, p.pos.x, 0.05, p.pos.z + 0.75, '', this.padTag(p, afford, perk), true);
       }
     }
     for (const [id, pv] of this.pads) {

@@ -68,7 +68,12 @@ export class LabelLayer {
     for (const e of this.pool.values()) e.used = false;
   }
 
-  place(key: string, x: number, y: number, z: number, cls: string, html: string): HTMLDivElement | null {
+  /**
+   * `keep`: a label the player acts on (a pad's price tag, a basket's supply count, an area gate sign). On phones it is
+   * never hidden for touching a side edge or reaching into the top HUD band: it is dimmed there instead, like on
+   * desktop. Hiding those in 0.7.3–0.7.5 left the screen without visible buys (DECISIONS §93).
+   */
+  place(key: string, x: number, y: number, z: number, cls: string, html: string, keep = false): HTMLDivElement | null {
     const p = this.projector.project(x, y, z, this.sp);
     let e = this.pool.get(key);
     if (!e) {
@@ -95,17 +100,23 @@ export class LabelLayer {
     }
     const compact = isCompact();
     // phones: no half-cut labels at the side edges and none reaching into the top HUD band, judged by the label's
-    // top (labels grow upwards from their anchor); desktop dims those instead
-    if (compact && (this.cutOff(e, p.x) || p.y - e.h < this.topReserve)) {
-      this.hide(e);
-      return null;
+    // top (labels grow upwards from their anchor); desktop dims those instead, and so do phones for `keep` labels
+    let underBand = !compact && p.y < this.topReserve;
+    if (compact) {
+      this.measure(e);
+      const reaches = p.y - e.h < this.topReserve;
+      if (!keep && (this.cutOff(e, p.x) || reaches)) {
+        this.hide(e);
+        return null;
+      }
+      underBand = keep && reaches;
     }
     if (!e.shown) {
       e.el.style.display = '';
       e.shown = true;
     }
     // labels sliding under the top HUD band are dimmed so the HUD stays readable
-    const dim = !compact && p.y < this.topReserve;
+    const dim = underBand;
     if (dim !== e.dim) {
       e.el.style.opacity = dim ? '0.25' : '';
       e.dim = dim;
@@ -128,16 +139,20 @@ export class LabelLayer {
 
   /** The centred label would stick out of the left/right screen edge (width measured once per content change). */
   private cutOff(e: LabelEntry, x: number): boolean {
-    if (e.w < 0) {
-      if (!e.shown) {
-        e.el.style.display = '';
-        e.shown = true;
-      }
-      e.w = e.el.offsetWidth;
-      e.h = e.el.offsetHeight;
-    }
+    this.measure(e);
     const half = e.w / 2;
     return x - half < EDGE_PX || x + half > this.projector.w - EDGE_PX;
+  }
+
+  /** Width and height, measured once per content change. */
+  private measure(e: LabelEntry): void {
+    if (e.w >= 0) return;
+    if (!e.shown) {
+      e.el.style.display = '';
+      e.shown = true;
+    }
+    e.w = e.el.offsetWidth;
+    e.h = e.el.offsetHeight;
   }
 
   end(): void {

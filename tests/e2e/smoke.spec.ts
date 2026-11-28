@@ -265,3 +265,39 @@ test.describe('layout after resizing / settings without scrollbars', () => {
     });
   }
 });
+
+/** Playgama funnel (0.7.5): phones hid pad price tags under the HUD band and at the side edges (DECISIONS §93). */
+test.describe('phones keep the tags of things to buy', () => {
+  test.skip(({ isMobile }) => isMobile, 'set up with a phone-sized desktop window');
+  for (const [w, h] of [
+    [844, 390],
+    [390, 844],
+  ]) {
+    test(`a buy tag under the HUD band or at the edge is dimmed, not hidden, at ${w}x${h}`, async ({ page }) => {
+      await page.setViewportSize({ width: w as number, height: h as number });
+      await page.goto('/');
+      await waitForGameplay(page);
+      const r = await page.evaluate(() => {
+        type Layer = { topReserve: number; place(k: string, x: number, y: number, z: number, c: string, html: string, keep?: boolean): HTMLDivElement | null };
+        const wk = window.__wk as unknown as { view: { labels: Layer }; sim: { state: { coach: { x: number; z: number } } }; loop: { stop(): void } };
+        wk.loop.stop();
+        const L = wk.view.labels;
+        const c = wk.sim.state.coach;
+        const wide = '<div style="width:3000px">x</div>';
+        L.topReserve = 100_000; // every label now reaches into the band
+        const keep = L.place('test:keep', c.x, 0.05, c.z, '', '<div class="pad2">keep</div>', true);
+        const drop = L.place('test:drop', c.x, 0.05, c.z, '', '<div class="pad2">drop</div>');
+        L.topReserve = 0;
+        const edgeKeep = L.place('test:edge-keep', c.x, 0.05, c.z, '', wide, true);
+        const edgeDrop = L.place('test:edge-drop', c.x, 0.05, c.z, '', wide);
+        return {
+          keep: !!keep && keep.style.display !== 'none' && keep.style.opacity === '0.25',
+          drop: drop === null,
+          edgeKeep: !!edgeKeep && edgeKeep.style.display !== 'none' && edgeKeep.style.opacity === '',
+          edgeDrop: edgeDrop === null,
+        };
+      });
+      expect(r).toEqual({ keep: true, drop: true, edgeKeep: true, edgeDrop: true });
+    });
+  }
+});

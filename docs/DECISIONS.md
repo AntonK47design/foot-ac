@@ -410,3 +410,28 @@ Decisions made within the GDD where the spec left room. Newest at the bottom.
   - **Portrait phones:** a slightly smaller star and the star bar 4 px lower. **Everywhere:** the objective pill sits a little lower, clearing the cash icon.
 - **Tests:** e2e `layout after resizing / settings without scrollbars`: a 1280×720 window shrunk to 257×443 mid-game, and the settings panel at 257×443, 568×320, 668×382 and 844×390 (no vertical or horizontal overflow, every button inside the window). All five fail on 0.7.4 and pass on 0.7.5. The audit at all 15 sizes now reports no overlaps and no scrolling.
 - **Build:** `BUILD` 0.7.5. Submit it for review in the console (YouTube included), not through the Playgama-only direct update (§91).
+
+## 93. 0.7.6: phones keep the tags of things to buy
+
+- **Why:** Playgama funnel by `build_version` (Nov 24–28). After the Dribble Cones, the share of new players who also build the Waiting Bench:
+  - 0.7.0: 82 %
+  - 0.7.2: 88 %
+  - 0.7.3: 81 %
+  - **0.7.5: 68 %** (51 of 75)
+
+  New players reaching the first match fell to 39 %, from 54 % on 0.7.0 and 56 % on 0.7.3. Traffic also changed in the same days: more new players and more desktops. So not all of the drop has to come from the build.
+- **Screenshot check** (bot following the guide, fresh academy, 0.7.2 vs 0.7.5, at 390×844, 844×390 and 1280×720, both when the Cones are built and when the guide says "Unlock Waiting Bench"):
+  - **Unchanged:** the guide is identical, the Waiting Bench is off-screen with the same edge arrow, and the economy timing is the same.
+  - **Changed on phones in 0.7.5:** price tags of other buys vanished. On 844×390 the Shooting Lane 2 and Team Bench tags were gone: the top band grew from 80 to 110 px, and since 0.7.3 a label reaching into it is hidden on phones. On 390×844, tags touching a side edge vanished instead of showing half.
+  - **Result:** the step players leave is guided as before, but the screen shows fewer things to buy.
+- **Change:** `LabelLayer.place(..., keep)`. The labels a player acts on keep showing on phones: pad price tags, basket supply counts and area gate signs. Under the HUD band they are dimmed (0.25), as on desktop. At a side edge they show cut off, as in 0.7.2. Everything else (rating badges, bubbles, perk lines) keeps the 0.7.3 phone rules. Desktop is unchanged.
+- **Tests:** e2e `phones keep the tags of things to buy` (844×390 and 390×844): a `keep` label under the band is dimmed, not hidden, and stays shown when wider than the screen; a normal label is still hidden. Both fail on 0.7.5 and pass on 0.7.6.
+- **Pre-existing e2e failures on this machine**, the same on 0.7.5:
+  - area2, area3, info (all three projects);
+  - the `meta` rewarded ad test and the `sdk` event map;
+  - smoke WASD (0 stars, 3 of 3 runs on both builds);
+  - the mobile touch-joystick test.
+
+  The two other `meta` tests failed on the 0.7.5 baseline run and passed on 0.7.6.
+- **What to watch:** Cones → Waiting Bench (aim: back to at least 80 %) and Cones → first match, by `build_version`.
+- **Build:** `BUILD` 0.7.6. Submit it for review in the console (§91).
